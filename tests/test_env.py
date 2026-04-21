@@ -67,6 +67,9 @@ def test_reward_and_group_diagnostics_match_hand_calculation() -> None:
     expected_downside_cost = 0.0
     expected_group_a_violation = ((0.25 - 0.1) / 0.25) ** 2
     expected_group_b_violation = ((0.7 - 0.6) / 0.6) ** 2
+    expected_concentration = float(np.sum(np.square(target_weights)))
+    expected_excess_concentration = (expected_concentration - 1.0 / 3.0) / (1.0 - 1.0 / 3.0)
+    expected_diversification = env.config.diversification_beta * expected_excess_concentration
 
     assert not terminated
     assert np.isclose(info["group_a_weight"], 0.1)
@@ -78,7 +81,10 @@ def test_reward_and_group_diagnostics_match_hand_calculation() -> None:
     assert np.isclose(info["downside_cost"], expected_downside_cost)
     assert np.isclose(info["group_a_min_violation_cost"], expected_group_a_violation)
     assert np.isclose(info["group_b_max_violation_cost"], expected_group_b_violation)
-    assert np.isclose(info["constraint_cost"], 0.0)
+    assert np.isclose(info["concentration"], expected_concentration)
+    assert np.isclose(info["excess_concentration_cost"], expected_excess_concentration)
+    assert np.isclose(info["diversification_cost"], expected_diversification)
+    assert np.isclose(info["constraint_cost"], expected_diversification)
     assert info["constraint_mode"] == "downside"
 
 
@@ -97,7 +103,23 @@ def test_downside_constraint_cost_ignores_group_diagnostics() -> None:
     assert np.isclose(info["net_return"], expected_net)
     assert np.isclose(info["downside_cost"], expected_downside_cost)
     assert np.isclose(info["normalized_downside_cost"], expected_downside_cost / 1e-4)
-    assert np.isclose(info["constraint_cost"], info["normalized_downside_cost"])
+    expected_concentration = float(np.sum(np.square(target_weights)))
+    expected_excess_concentration = (expected_concentration - 1.0 / 3.0) / (1.0 - 1.0 / 3.0)
+    expected_diversification = env.config.diversification_beta * expected_excess_concentration
+    assert np.isclose(info["constraint_cost"], info["normalized_downside_cost"] + expected_diversification)
+
+
+def test_equal_weights_have_zero_excess_concentration_cost() -> None:
+    env = build_env()
+    env.reset(options={"start_index": 2})
+    action = np.zeros(3, dtype=np.float32)
+    _, _, _, _, info = env.step(action)
+
+    assert np.isclose(info["weights"].sum(), 1.0)
+    assert np.allclose(info["weights"], np.full(3, 1.0 / 3.0))
+    assert np.isclose(info["concentration"], 1.0 / 3.0)
+    assert np.isclose(info["excess_concentration_cost"], 0.0)
+    assert np.isclose(info["diversification_cost"], 0.0)
 
 
 def test_sortino_constraint_cost_uses_target_violation_after_warmup() -> None:
@@ -125,6 +147,7 @@ def test_sortino_constraint_cost_uses_target_violation_after_warmup() -> None:
     assert np.isclose(second_info["sortino_ratio"], expected_sortino)
     assert np.isclose(second_info["sortino_violation_cost"], expected_cost)
     assert np.isclose(second_info["constraint_cost"], expected_cost)
+    assert second_info["diversification_cost"] > 0.0
 
 
 def test_constraint_preset_resolution_changes_bounds() -> None:

@@ -19,7 +19,7 @@ from rcpo_portfolio.evaluation import (
     save_evaluation_artifacts,
 )
 from rcpo_portfolio.env import PortfolioEnv
-from rcpo_portfolio.market import generate_continuation_splits
+from rcpo_portfolio.market import generate_continuation_split, generate_continuation_splits
 
 
 def parse_args() -> argparse.Namespace:
@@ -37,6 +37,30 @@ def parse_args() -> argparse.Namespace:
             "Optional evaluation artifact directory. Defaults to evaluation_best for "
             "checkpoint_best.pt, evaluation_last for checkpoint_last.pt, otherwise evaluation."
         ),
+    )
+    parser.add_argument(
+        "--future-market-count",
+        type=int,
+        default=None,
+        help=(
+            "Number of independent continuation markets used for mean cumulative-return "
+            "plots. Defaults to the configured branch count for each split. Each market "
+            "starts from the end of the same train market."
+        ),
+    )
+    parser.add_argument(
+        "--include-train-seed-future",
+        action="store_true",
+        help=(
+            "Also evaluate one continuation market that starts from the end of the "
+            "train market and uses the same numeric seed as the train split."
+        ),
+    )
+    parser.add_argument(
+        "--train-seed-future-steps",
+        type=int,
+        default=252,
+        help="Number of future steps for --include-train-seed-future.",
     )
     return parser.parse_args()
 
@@ -56,7 +80,12 @@ def main() -> None:
                 lambda_history.append(float(payload.get("lambda_value", 0.0)))
 
     def policy_fn(observation):
-        observation_tensor = torch.as_tensor(observation, dtype=torch.float32).unsqueeze(0)
+        device = next(model.parameters()).device
+        observation_tensor = torch.as_tensor(
+            observation,
+            dtype=torch.float32,
+            device=device,
+        ).unsqueeze(0)
         with torch.no_grad():
             action, _, _, _, _ = model.get_action_and_value(
                 observation_tensor, deterministic=config.evaluation.deterministic
@@ -86,12 +115,19 @@ def main() -> None:
             else config.market.test_steps
         )
         seed_offset = 10_000 if split_name == "validation" else 20_000
+        branch_count = args.future_market_count
+        if branch_count is None:
+            branch_count = (
+                config.evaluation.validation_branch_count
+                if split_name == "validation"
+                else config.evaluation.test_branch_count
+            )
         future_markets = generate_continuation_splits(
             config.market,
             environments["train"].market,
             steps,
             metadata["seed"] + seed_offset,
-            count=5,
+            count=branch_count,
         )
         model_returns = []
         equal_weight_returns = []
@@ -141,6 +177,36 @@ def main() -> None:
             lambda_history=lambda_history,
             mean_episode_returns=model_mean_returns,
             equal_weight_mean_episode_returns=equal_weight_mean_returns,
+        )
+        print(json.dumps(result.summary, indent=2))
+
+    if args.include_train_seed_future:
+        train_seed = metadata["seed"] + 11
+        train_seed_future_market = generate_continuation_split(
+            config.market,
+            environments["train"].market,
+            args.train_seed_future_steps,
+            train_seed,
+        )
+        train_seed_future_env = PortfolioEnv(
+            config.environment,
+            train_seed_future_market,
+            config.market,
+            seed=train_seed,
+        )
+        result = evaluate_policy(
+            train_seed_future_env,
+            policy_fn=policy_fn,
+            episodes=1,
+            alpha=metadata["alpha"],
+            split_name="train_seed_future",
+        )
+        save_evaluation_artifacts(
+            result,
+            evaluation_dir,
+            split_name="train_seed_future",
+            rolling_window=config.evaluation.rolling_risk_window,
+            lambda_history=lambda_history,
         )
         print(json.dumps(result.summary, indent=2))
 

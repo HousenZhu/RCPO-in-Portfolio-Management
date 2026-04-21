@@ -1,0 +1,26 @@
+{
+  "algo": "rcpo",
+  "seed": 0,
+  "alpha": 0.22664784360677004,
+  "constraint_preset": "c3",
+  "best_validation": {
+    "annualized_return": 0.08555995225906372,
+    "annualized_volatility": 0.09155350869048101,
+    "downside_deviation": 0.06399034977809412,
+    "sortino": 1.7393085068226164,
+    "max_drawdown": -0.07723006010055541,
+    "average_turnover": 0.006510094646364451,
+    "average_downside_cost": 1.7160995776066555e-05,
+    "episode_average_downside_cost": 1.7160995776066555e-05,
+    "episode_average_constraint_cost": 0.17160995900630951,
+    "average_constraint_cost": 0.17160995900630951,
+    "average_group_a_min_violation_cost": 0.0,
+    "average_group_b_max_violation_cost": 0.0,
+    "average_group_a_weight": 0.31949165652668665,
+    "average_group_b_weight": 0.41107309174443046,
+    "episodes": 5,
+    "constraint_violation_rate": 0.4,
+    "split": "validation"
+  },
+  "lambda_final": 1.307941168172257
+}

@@ -54,3 +54,35 @@ def test_constraint_flags_are_rejected_for_non_rcpo(monkeypatch: pytest.MonkeyPa
     )
     with pytest.raises(SystemExit):
         train.parse_args()
+
+
+def test_reward_correction_flags_are_mutually_exclusive(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["train.py", "--algo", "ppo_unconstrained", "--use-drc", "--use-gdrc"],
+    )
+    with pytest.raises(SystemExit):
+        train.parse_args()
+
+
+def test_reward_correction_flags_are_rejected_for_equal_weight(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["train.py", "--algo", "equal_weight", "--use-drc"],
+    )
+    with pytest.raises(SystemExit):
+        train.parse_args()
+
+
+def test_reward_correction_flags_are_allowed_for_ppo(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["train.py", "--algo", "ppo_unconstrained", "--use-gdrc"],
+    )
+    args = train.parse_args()
+    assert args.use_gdrc

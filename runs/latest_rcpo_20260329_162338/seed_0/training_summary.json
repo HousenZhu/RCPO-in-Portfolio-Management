@@ -1,0 +1,19 @@
+{
+  "algo": "rcpo",
+  "seed": 0,
+  "alpha": 2.2664785888082406e-05,
+  "best_validation": {
+    "annualized_return": 0.09656360149383544,
+    "annualized_volatility": 0.10727903050125027,
+    "downside_deviation": 0.07511675028860265,
+    "sortino": 1.6606399414676478,
+    "max_drawdown": -0.08925402164459229,
+    "average_turnover": 0.00972629226744175,
+    "average_downside_cost": 2.3596110258949922e-05,
+    "episode_average_downside_cost": 2.3596110258949922e-05,
+    "episodes": 5,
+    "constraint_violation_rate": 0.4,
+    "split": "validation"
+  },
+  "lambda_final": 0.0007697760612421763
+}

@@ -1,0 +1,21 @@
+{
+  "annualized_return": -0.02768462896347046,
+  "annualized_volatility": 0.139098383250765,
+  "downside_deviation": 0.09660168794038686,
+  "sortino": -0.28658535429064874,
+  "max_drawdown": -0.11445313692092896,
+  "average_turnover": 0.022172989323735237,
+  "average_downside_cost": 3.703129186760634e-05,
+  "episode_average_downside_cost": 3.703129186760634e-05,
+  "episode_average_constraint_cost": 0.37031295895576477,
+  "average_constraint_cost": 0.37031295895576477,
+  "average_sortino_violation_cost": 3.1214287698365966,
+  "average_step_sortino_ratio": -0.2763096324586678,
+  "average_group_a_min_violation_cost": 0.0,
+  "average_group_b_max_violation_cost": 0.0,
+  "average_group_a_weight": 0.4103147340199304,
+  "average_group_b_weight": 0.46334440426694024,
+  "episodes": 1,
+  "constraint_violation_rate": 0.0,
+  "split": "validation"
+}

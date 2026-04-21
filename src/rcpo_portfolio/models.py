@@ -36,6 +36,9 @@ class ActorCritic(nn.Module):
         self.cost_value = nn.Linear(feature_dim, 1)
         self.log_std = nn.Parameter(torch.full((action_dim,), config.init_log_std))
         self.min_log_std = config.min_log_std
+        if config.equal_weight_policy_init:
+            nn.init.zeros_(self.policy_mean.weight)
+            nn.init.zeros_(self.policy_mean.bias)
 
     def forward(self, obs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         features = self.backbone(obs)

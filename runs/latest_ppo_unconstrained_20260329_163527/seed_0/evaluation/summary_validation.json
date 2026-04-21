@@ -1,0 +1,13 @@
+{
+  "annualized_return": 0.022590446472167968,
+  "annualized_volatility": 0.1258009500330423,
+  "downside_deviation": 0.09145485609660493,
+  "sortino": 0.38279435895157377,
+  "max_drawdown": -0.120211923122406,
+  "average_turnover": 0.11197514832019806,
+  "average_downside_cost": 3.411903271626216e-05,
+  "episode_average_downside_cost": 3.411903271626216e-05,
+  "episodes": 5,
+  "constraint_violation_rate": 0.0,
+  "split": "validation"
+}

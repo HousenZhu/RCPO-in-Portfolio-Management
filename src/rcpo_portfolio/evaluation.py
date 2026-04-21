@@ -5,11 +5,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
 from .config import ProjectConfig, sync_rcpo_constraint_settings
+from .devices import resolve_device
 from .env import PortfolioEnv
 from .market import generate_market_splits
 from .models import ActorCritic
@@ -102,6 +106,9 @@ def evaluate_policy(
         group_b_max_violation_costs: list[float] = []
         group_a_weights: list[float] = []
         group_b_weights: list[float] = []
+        concentrations: list[float] = []
+        excess_concentration_costs: list[float] = []
+        diversification_costs: list[float] = []
         turnover: list[float] = []
         weights: list[np.ndarray] = []
         while True:
@@ -117,6 +124,9 @@ def evaluate_policy(
             group_b_max_violation_costs.append(float(info["group_b_max_violation_cost"]))
             group_a_weights.append(float(info["group_a_weight"]))
             group_b_weights.append(float(info["group_b_weight"]))
+            concentrations.append(float(info["concentration"]))
+            excess_concentration_costs.append(float(info["excess_concentration_cost"]))
+            diversification_costs.append(float(info["diversification_cost"]))
             turnover.append(float(info["turnover"]))
             weights.append(np.asarray(info["weights"], dtype=np.float32))
             if terminated or truncated:
@@ -137,6 +147,13 @@ def evaluate_policy(
         episode_summary["average_group_b_max_violation_cost"] = float(np.mean(group_b_max_violation_costs))
         episode_summary["average_group_a_weight"] = float(np.mean(group_a_weights))
         episode_summary["average_group_b_weight"] = float(np.mean(group_b_weights))
+        episode_summary["average_concentration"] = float(np.mean(concentrations))
+        episode_summary["average_excess_concentration_cost"] = float(
+            np.mean(excess_concentration_costs)
+        )
+        episode_summary["average_diversification_cost"] = float(
+            np.mean(diversification_costs)
+        )
         episode_summaries.append(episode_summary)
         episode_return_paths.append(episode_returns)
         equal_weight_return_paths.append(
@@ -155,6 +172,12 @@ def evaluate_policy(
                 "turnover": episode_turnover,
                 "group_a_weights": np.asarray(group_a_weights, dtype=np.float32),
                 "group_b_weights": np.asarray(group_b_weights, dtype=np.float32),
+                "concentrations": np.asarray(concentrations, dtype=np.float32),
+                "excess_concentration_costs": np.asarray(
+                    excess_concentration_costs,
+                    dtype=np.float32,
+                ),
+                "diversification_costs": np.asarray(diversification_costs, dtype=np.float32),
                 "weights": np.asarray(weights, dtype=np.float32),
             }
     if first_episode is None:
@@ -408,6 +431,52 @@ def save_training_progress_artifacts(
     fig.savefig(output_path / "training_turnover.png")
     plt.close(fig)
 
+    reward_modes = {str(row.get("reward_correction_mode", "none")) for row in metrics_rows}
+    if reward_modes != {"none"}:
+        observed_rewards = np.asarray(
+            [row.get("observed_reward_mean", np.nan) for row in metrics_rows],
+            dtype=np.float32,
+        )
+        corrected_rewards = np.asarray(
+            [row.get("corrected_reward_mean", np.nan) for row in metrics_rows],
+            dtype=np.float32,
+        )
+        correction_abs = np.asarray(
+            [row.get("reward_correction_delta_abs_mean", np.nan) for row in metrics_rows],
+            dtype=np.float32,
+        )
+        fig, axis = plt.subplots(figsize=(10, 4.5))
+        axis.plot(updates, observed_rewards, label="Observed Reward", color="#1f77b4")
+        axis.plot(updates, corrected_rewards, label="Corrected Reward", color="#ff7f0e")
+        axis.plot(
+            updates,
+            correction_abs,
+            label="Mean Abs Correction",
+            color="#2ca02c",
+            alpha=0.85,
+        )
+        axis.set_title("Training Reward Correction")
+        axis.set_xlabel("Update")
+        axis.set_ylabel("Reward")
+        axis.legend()
+        fig.tight_layout()
+        fig.savefig(output_path / "training_reward_correction.png")
+        plt.close(fig)
+
+    selected_bins = np.asarray(
+        [row.get("gdrc_selected_bins", 0) for row in metrics_rows],
+        dtype=np.float32,
+    )
+    if np.any(selected_bins > 0):
+        fig, axis = plt.subplots(figsize=(10, 4.5))
+        axis.step(updates, selected_bins, where="mid", color="#6a3d9a")
+        axis.set_title("GDRC Selected Reward Bins")
+        axis.set_xlabel("Update")
+        axis.set_ylabel("Selected Bins")
+        fig.tight_layout()
+        fig.savefig(output_path / "gdrc_selected_bins.png")
+        plt.close(fig)
+
 
 def load_checkpoint_for_evaluation(
     run_dir: str | Path,
@@ -418,7 +487,8 @@ def load_checkpoint_for_evaluation(
 
     config = load_config(run_path / "config_snapshot.yaml")
     sync_rcpo_constraint_settings(config)
-    checkpoint = torch.load(run_path / checkpoint_name, map_location="cpu")
+    device = resolve_device(config.runtime.device)
+    checkpoint = torch.load(run_path / checkpoint_name, map_location=device)
     market_splits = generate_market_splits(config.market, int(checkpoint["seed"]))
     environments = {
         split_name: PortfolioEnv(config.environment, market, config.market, seed=int(checkpoint["seed"]))
@@ -428,7 +498,7 @@ def load_checkpoint_for_evaluation(
         obs_dim=environments["train"].observation_space.shape[0],
         action_dim=environments["train"].action_space.shape[0],
         config=config.network,
-    )
+    ).to(device)
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
     metadata = {
@@ -437,5 +507,6 @@ def load_checkpoint_for_evaluation(
         "alpha": float(checkpoint["alpha"]) if checkpoint["alpha"] is not None else None,
         "constraint_mode": checkpoint.get("constraint_mode", config.rcpo.constraint_mode),
         "lambda_value": float(checkpoint["lambda_value"]),
+        "device": str(device),
     }
     return config, metadata, model, environments

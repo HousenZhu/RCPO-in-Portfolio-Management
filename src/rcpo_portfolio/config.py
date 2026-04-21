@@ -15,10 +15,16 @@ class ExperimentConfig:
 
 
 @dataclass
+class RuntimeConfig:
+    device: str = "auto"
+
+
+@dataclass
 class MarketConfig:
     num_risky_assets: int = 5
     lookback: int = 20
-    train_steps: int = 10080
+    train_market_count: int = 8
+    train_steps: int = 5040
     validation_steps: int = 252
     test_steps: int = 252
     low_vol_drift: float = 0.0007
@@ -26,6 +32,18 @@ class MarketConfig:
     low_vol_scale: float = 0.008
     high_vol_scale: float = 0.02
     base_correlation: float = 0.25
+    low_vol_correlation: float = 0.15
+    high_vol_correlation: float = 0.55
+    enable_learnable_structure: bool = True
+    regime_drift_adjustments: dict[str, list[float]] = field(
+        default_factory=lambda: {
+            "low_vol": [0.00080, 0.00065, -0.00040, -0.00045, -0.00045],
+            "high_vol": [-0.00100, -0.00080, -0.00060, 0.00040, 0.00060],
+        }
+    )
+    momentum_strength: float = 0.20
+    momentum_decay: float = 0.94
+    momentum_clip: float = 0.01
     transition_matrix: list[list[float]] = field(
         default_factory=lambda: [[0.95, 0.05], [0.10, 0.90]]
     )
@@ -34,7 +52,7 @@ class MarketConfig:
 @dataclass
 class EnvironmentConfig:
     episode_length: int = 252
-    transaction_cost_bps: float = 10.0
+    transaction_cost_bps: float = 1.0
     turnover_cap: float = 0.40
     constraint_mode: str = "downside"
     downside_cost_scale: float = 1e-4
@@ -42,6 +60,7 @@ class EnvironmentConfig:
     sortino_window: int = 252
     sortino_min_periods: int = 20
     sortino_cost_scale: float = 1.0
+    diversification_beta: float = 0.03
     group_a_indices: list[int] = field(default_factory=lambda: [0, 1])
     group_b_indices: list[int] = field(default_factory=lambda: [2, 3, 4])
     active_constraint_preset: str = "c2"
@@ -63,56 +82,57 @@ class EnvironmentConfig:
 class NetworkConfig:
     hidden_sizes: list[int] = field(default_factory=lambda: [128, 128])
     activation: str = "tanh"
-    init_log_std: float = -0.5
-    min_log_std: float = -1.5
+    init_log_std: float = -1.5
+    min_log_std: float = -2.5
+    equal_weight_policy_init: bool = True
 
 
 @dataclass
 class OptimizationConfig:
-    total_updates: int = 200
-    rollout_steps: int = 1024
-    epochs: int = 8
-    minibatch_size: int = 256
-    learning_rate: float = 3e-4
+    total_updates: int = 800
+    rollout_steps: int = 2048
+    epochs: int = 4
+    minibatch_size: int = 512
+    learning_rate: float = 1.5e-4
     gamma: float = 0.99
     gae_lambda: float = 0.95
-    clip_epsilon: float = 0.2
-    entropy_coef: float = 1e-3
+    clip_epsilon: float = 0.15
+    entropy_coef: float = 5e-4
     reward_value_coef: float = 0.5
     cost_value_coef: float = 0.5
     max_grad_norm: float = 0.5
-    learning_rate_final: float | None = None
-    target_kl: float | None = None
-    early_stop_patience: int | None = None
-    early_stop_min_delta: float = 0.0
+    learning_rate_final: float | None = 3e-5
+    target_kl: float | None = 0.02
+    early_stop_patience: int | None = 50
+    early_stop_min_delta: float = 0.001
 
 
 @dataclass
 class PPOOptimizationConfig:
-    total_updates: int = 2000
+    total_updates: int = 800
     rollout_steps: int = 2048
     epochs: int = 4
     minibatch_size: int = 512
-    learning_rate: float = 1e-4
-    learning_rate_final: float | None = 1e-5
+    learning_rate: float = 3e-4
+    learning_rate_final: float | None = 2e-5
     gamma: float = 0.99
     gae_lambda: float = 0.95
     clip_epsilon: float = 0.15
-    entropy_coef: float = 2e-3
+    entropy_coef: float = 2e-4
     reward_value_coef: float = 0.5
     cost_value_coef: float = 0.0
     max_grad_norm: float = 0.5
     target_kl: float | None = 0.02
-    early_stop_patience: int | None = 250
+    early_stop_patience: int | None = 50
     early_stop_min_delta: float = 0.001
 
 
 @dataclass
 class RCPOConfig:
     initial_lambda: float = 0.0
-    lambda_lr: float = 0.05
+    lambda_lr: float = 0.02
     alpha: float | None = None
-    calibration_episodes: int = 8
+    calibration_episodes: int = 16
     calibration_scale: float = 0.9
     constraint_mode: str = "downside"
     sortino_target: float = 1.0
@@ -122,21 +142,42 @@ class RCPOConfig:
 
 
 @dataclass
+class RewardCorrectionConfig:
+    mode: str = "none"
+    reward_min: float = -0.04
+    reward_max: float = 0.07
+    hidden_sizes: list[int] = field(default_factory=lambda: [128, 128])
+    learning_rate: float = 1e-3
+    train_epochs_per_update: int = 3
+    num_bins: int = 21
+    gdrc_num_candidates: int = 6
+    gdrc_vote_decay: float = 0.9
+    gdrc_range_window_updates: int = 10
+    gdrc_range_percentiles: list[float] = field(default_factory=lambda: [0.5, 99.5])
+
+
+@dataclass
 class EvaluationConfig:
-    episodes: int = 5
+    episodes: int = 1
     deterministic: bool = True
     rolling_risk_window: int = 20
+    validation_branch_count: int = 5
+    test_branch_count: int = 10
+    validation_interval_updates: int = 5
+    checkpoint_score: str = "validation_mean_excess_cumulative_return"
 
 
 @dataclass
 class ProjectConfig:
     experiment: ExperimentConfig = field(default_factory=ExperimentConfig)
+    runtime: RuntimeConfig = field(default_factory=RuntimeConfig)
     market: MarketConfig = field(default_factory=MarketConfig)
     environment: EnvironmentConfig = field(default_factory=EnvironmentConfig)
     network: NetworkConfig = field(default_factory=NetworkConfig)
     optimization: OptimizationConfig = field(default_factory=OptimizationConfig)
     ppo: PPOOptimizationConfig = field(default_factory=PPOOptimizationConfig)
     rcpo: RCPOConfig = field(default_factory=RCPOConfig)
+    reward_correction: RewardCorrectionConfig = field(default_factory=RewardCorrectionConfig)
     evaluation: EvaluationConfig = field(default_factory=EvaluationConfig)
 
     def to_dict(self) -> dict[str, Any]:
@@ -151,6 +192,33 @@ def sync_rcpo_constraint_settings(config: ProjectConfig) -> None:
     config.environment.sortino_window = config.rcpo.sortino_window
     config.environment.sortino_min_periods = config.rcpo.sortino_min_periods
     config.environment.sortino_cost_scale = config.rcpo.sortino_cost_scale
+
+
+def validate_reward_correction_settings(config: ProjectConfig) -> None:
+    reward_config = config.reward_correction
+    if reward_config.mode not in {"none", "drc", "gdrc"}:
+        raise ValueError("reward_correction.mode must be one of: none, drc, gdrc.")
+    if reward_config.reward_max <= reward_config.reward_min:
+        raise ValueError("reward_correction.reward_max must be greater than reward_min.")
+    if reward_config.learning_rate <= 0.0:
+        raise ValueError("reward_correction.learning_rate must be positive.")
+    if reward_config.train_epochs_per_update < 0:
+        raise ValueError("reward_correction.train_epochs_per_update cannot be negative.")
+    if reward_config.num_bins < 2:
+        raise ValueError("reward_correction.num_bins must be at least 2.")
+    if reward_config.gdrc_num_candidates < 1:
+        raise ValueError("reward_correction.gdrc_num_candidates must be positive.")
+    if not 0.0 <= reward_config.gdrc_vote_decay <= 1.0:
+        raise ValueError("reward_correction.gdrc_vote_decay must be between 0 and 1.")
+    if reward_config.gdrc_range_window_updates < 1:
+        raise ValueError("reward_correction.gdrc_range_window_updates must be positive.")
+    if len(reward_config.gdrc_range_percentiles) != 2:
+        raise ValueError("reward_correction.gdrc_range_percentiles must contain two values.")
+    low, high = reward_config.gdrc_range_percentiles
+    if not 0.0 <= low < high <= 100.0:
+        raise ValueError(
+            "reward_correction.gdrc_range_percentiles must satisfy 0 <= low < high <= 100."
+        )
 
 
 def _merge_dicts(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
@@ -172,12 +240,16 @@ def _dataclass_from_dict(cls: type[Any], payload: dict[str, Any]) -> Any:
 def _from_dict(payload: dict[str, Any]) -> ProjectConfig:
     return ProjectConfig(
         experiment=_dataclass_from_dict(ExperimentConfig, payload.get("experiment", {})),
+        runtime=_dataclass_from_dict(RuntimeConfig, payload.get("runtime", {})),
         market=_dataclass_from_dict(MarketConfig, payload.get("market", {})),
         environment=_dataclass_from_dict(EnvironmentConfig, payload.get("environment", {})),
         network=_dataclass_from_dict(NetworkConfig, payload.get("network", {})),
         optimization=_dataclass_from_dict(OptimizationConfig, payload.get("optimization", {})),
         ppo=_dataclass_from_dict(PPOOptimizationConfig, payload.get("ppo", {})),
         rcpo=_dataclass_from_dict(RCPOConfig, payload.get("rcpo", {})),
+        reward_correction=_dataclass_from_dict(
+            RewardCorrectionConfig, payload.get("reward_correction", {})
+        ),
         evaluation=_dataclass_from_dict(EvaluationConfig, payload.get("evaluation", {})),
     )
 

@@ -85,6 +85,8 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             raise ValueError("sortino_min_periods must be positive.")
         if self.config.sortino_cost_scale <= 0.0:
             raise ValueError("sortino_cost_scale must be positive.")
+        if self.config.diversification_beta < 0.0:
+            raise ValueError("diversification_beta cannot be negative.")
 
     def available_start_indices(self) -> np.ndarray:
         return self._valid_start_indices.copy()
@@ -124,6 +126,17 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
         group_weights = self._group_weights(weights)
         group_a_min_weight = float(self._resolved_constraint_preset["group_a_min_weight"])
         group_b_max_weight = float(self._resolved_constraint_preset["group_b_max_weight"])
+        concentration = float(np.sum(np.square(weights)))
+        equal_weight_concentration = 1.0 / float(self.num_assets)
+        excess_concentration = max(0.0, concentration - equal_weight_concentration)
+        if excess_concentration < 1e-7:
+            excess_concentration = 0.0
+        excess_concentration_cost = float(
+            excess_concentration / max(1.0 - equal_weight_concentration, 1e-12)
+        )
+        diversification_cost = float(
+            self.config.diversification_beta * excess_concentration_cost
+        )
         group_a_min_violation = float(
             (
                 max(group_a_min_weight - group_weights["group_a_weight"], 0.0)
@@ -144,6 +157,9 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             "group_b_max_violation_cost": group_b_max_violation,
             "group_a_min_weight": group_a_min_weight,
             "group_b_max_weight": group_b_max_weight,
+            "concentration": concentration,
+            "excess_concentration_cost": excess_concentration_cost,
+            "diversification_cost": diversification_cost,
         }
 
     def _sortino_components(self, net_simple_return: float) -> dict[str, float]:
@@ -254,7 +270,10 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
         sortino_components = self._sortino_components(net_simple_return)
         normalized_downside_cost = downside_cost / float(self.config.downside_cost_scale)
         if self.config.constraint_mode == "downside":
-            constraint_cost = float(normalized_downside_cost)
+            constraint_cost = float(
+                normalized_downside_cost
+                + constraint_components["diversification_cost"]
+            )
         else:
             constraint_cost = float(sortino_components["sortino_violation_cost"])
 

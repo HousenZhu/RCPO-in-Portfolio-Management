@@ -1,0 +1,26 @@
+{
+  "algo": "ppo_unconstrained",
+  "seed": 0,
+  "alpha": null,
+  "constraint_preset": "c3",
+  "best_test": {
+    "annualized_return": 0.09519588947296143,
+    "annualized_volatility": 0.10607136858165664,
+    "downside_deviation": 0.07428148313484603,
+    "sortino": 1.6623617248282407,
+    "max_drawdown": -0.0893060803413391,
+    "average_turnover": 0.009340125136077404,
+    "average_downside_cost": 2.308124621777097e-05,
+    "episode_average_downside_cost": 2.308124621777097e-05,
+    "episode_average_constraint_cost": 0.23081245124340058,
+    "average_constraint_cost": 0.23081245124340058,
+    "average_group_a_min_violation_cost": 0.0,
+    "average_group_b_max_violation_cost": 0.0,
+    "average_group_a_weight": 0.3462430463896857,
+    "average_group_b_weight": 0.49020712096539754,
+    "episodes": 5,
+    "constraint_violation_rate": 0.0,
+    "split": "test"
+  },
+  "lambda_final": 0.0
+}

@@ -11,7 +11,7 @@ build/
 dist/
 *.egg-info/
 
-runs/
+
 runs_*/
 
 .DS_Store

@@ -1,0 +1,53 @@
+experiment:
+  output_root: runs
+  run_name: latest
+  seeds:
+  - 0
+market:
+  num_risky_assets: 5
+  lookback: 20
+  train_steps: 2200
+  validation_steps: 900
+  test_steps: 900
+  low_vol_drift: 0.0007
+  high_vol_drift: -0.0004
+  low_vol_scale: 0.008
+  high_vol_scale: 0.02
+  base_correlation: 0.25
+  transition_matrix:
+  - - 0.95
+    - 0.05
+  - - 0.1
+    - 0.9
+environment:
+  episode_length: 252
+  transaction_cost_bps: 10.0
+network:
+  hidden_sizes:
+  - 128
+  - 128
+  activation: tanh
+  init_log_std: -0.5
+optimization:
+  total_updates: 20
+  rollout_steps: 1024
+  epochs: 8
+  minibatch_size: 256
+  learning_rate: 0.0003
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_epsilon: 0.2
+  entropy_coef: 0.001
+  reward_value_coef: 0.5
+  cost_value_coef: 0.5
+  max_grad_norm: 0.5
+rcpo:
+  initial_lambda: 0.0
+  lambda_lr: 0.05
+  alpha: null
+  calibration_episodes: 8
+  calibration_scale: 0.9
+evaluation:
+  episodes: 5
+  deterministic: true
+  rolling_risk_window: 20

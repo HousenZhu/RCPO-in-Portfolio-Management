@@ -48,6 +48,17 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Use Sortino target-violation cost as the RCPO constraint cost.",
     )
+    reward_group = parser.add_mutually_exclusive_group()
+    reward_group.add_argument(
+        "--use-drc",
+        action="store_true",
+        help="Train with a distributional reward critic reward-correction layer.",
+    )
+    reward_group.add_argument(
+        "--use-gdrc",
+        action="store_true",
+        help="Train with a general distributional reward critic ensemble.",
+    )
     parser.add_argument(
         "--resume-run-dir",
         default=None,
@@ -64,6 +75,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("RCPO requires exactly one of --constraint-downside or --constraint-sortino.")
     if args.algo != "rcpo" and has_constraint_flag:
         parser.error("--constraint-downside and --constraint-sortino are only valid with --algo rcpo.")
+    if args.algo == "equal_weight" and (args.use_drc or args.use_gdrc):
+        parser.error("--use-drc and --use-gdrc are not valid with --algo equal_weight.")
     return args
 
 
@@ -80,6 +93,10 @@ def main() -> None:
         config.environment.active_constraint_preset = args.constraint_preset
     if args.algo == "rcpo":
         config.rcpo.constraint_mode = "sortino" if args.constraint_sortino else "downside"
+    if args.use_drc:
+        config.reward_correction.mode = "drc"
+    elif args.use_gdrc:
+        config.reward_correction.mode = "gdrc"
     sync_rcpo_constraint_settings(config)
     if resume_run_dir is not None:
         run_dir = resume_experiment(
