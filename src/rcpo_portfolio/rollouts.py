@@ -65,6 +65,8 @@ def collect_rollout(
     optimization,
     reward_corrector: RewardCorrector,
     device: torch.device | None = None,
+    alpha_budget_ratio: float | None = None,
+    drawdown_cost_scale: float | None = None,
 ) -> RolloutBatch:
     device = device or next(model.parameters()).device
     observations: list[np.ndarray] = []
@@ -77,10 +79,15 @@ def collect_rollout(
     reward_values: list[float] = []
     cost_values: list[float] = []
     episode_metrics: list[dict[str, float]] = []
-    downside_costs: list[float] = []
-    normalized_downside_costs: list[float] = []
-    sortino_violation_costs: list[float] = []
-    sortino_ratios: list[float] = []
+    current_drawdowns: list[float] = []
+    max_drawdowns: list[float] = []
+    benchmark_current_drawdowns: list[float] = []
+    benchmark_max_drawdowns: list[float] = []
+    effective_drawdown_budgets: list[float] = []
+    alpha_targets: list[float] = []
+    drawdown_gaps: list[float] = []
+    drawdown_violations: list[float] = []
+    drawdown_constraint_costs: list[float] = []
     group_a_min_violation_costs: list[float] = []
     group_b_max_violation_costs: list[float] = []
     group_a_weights: list[float] = []
@@ -113,10 +120,23 @@ def collect_rollout(
         dones.append(float(done))
         reward_values.append(float(reward_value_tensor.item()))
         cost_values.append(float(cost_value_tensor.item()))
-        downside_costs.append(float(info["downside_cost"]))
-        normalized_downside_costs.append(float(info["normalized_downside_cost"]))
-        sortino_violation_costs.append(float(info["sortino_violation_cost"]))
-        sortino_ratios.append(float(info["sortino_ratio"]))
+        current_drawdowns.append(float(info["current_drawdown"]))
+        max_drawdowns.append(float(info["max_drawdown"]))
+        benchmark_current_drawdowns.append(float(info["benchmark_current_drawdown"]))
+        benchmark_max_drawdowns.append(float(info["benchmark_max_drawdown"]))
+        effective_drawdown_budgets.append(float(info["effective_drawdown_budget"]))
+        if alpha_budget_ratio is not None:
+            if drawdown_cost_scale is None:
+                raise ValueError("drawdown_cost_scale is required with alpha_budget_ratio.")
+            alpha_targets.append(
+                float(
+                    (alpha_budget_ratio * float(info["effective_drawdown_budget"])) ** 2
+                    / max(drawdown_cost_scale, 1e-12)
+                )
+            )
+        drawdown_gaps.append(float(info["drawdown_gap"]))
+        drawdown_violations.append(float(info["drawdown_violation"]))
+        drawdown_constraint_costs.append(float(info["drawdown_constraint_cost"]))
         group_a_min_violation_costs.append(float(info["group_a_min_violation_cost"]))
         group_b_max_violation_costs.append(float(info["group_b_max_violation_cost"]))
         group_a_weights.append(float(info["group_a_weight"]))
@@ -196,10 +216,19 @@ def collect_rollout(
         "batch_reward_mean": float(rewards_tensor.mean().item()),
         "batch_observed_reward_mean": float(observed_rewards_tensor.mean().item()),
         "batch_constraint_cost_mean": float(np.mean(costs)),
-        "batch_downside_cost_mean": float(np.mean(downside_costs)),
-        "batch_normalized_downside_cost_mean": float(np.mean(normalized_downside_costs)),
-        "batch_sortino_violation_cost_mean": float(np.mean(sortino_violation_costs)),
-        "batch_sortino_ratio_mean": float(np.mean(sortino_ratios)),
+        "batch_current_drawdown_mean": float(np.mean(current_drawdowns)),
+        "batch_max_drawdown_mean": float(np.mean(max_drawdowns)),
+        "batch_benchmark_current_drawdown_mean": float(
+            np.mean(benchmark_current_drawdowns)
+        ),
+        "batch_benchmark_max_drawdown_mean": float(np.mean(benchmark_max_drawdowns)),
+        "batch_effective_drawdown_budget_mean": float(
+            np.mean(effective_drawdown_budgets)
+        ),
+        "batch_alpha_target_mean": float(np.mean(alpha_targets)) if alpha_targets else 0.0,
+        "batch_drawdown_gap_mean": float(np.mean(drawdown_gaps)),
+        "batch_drawdown_violation_mean": float(np.mean(drawdown_violations)),
+        "batch_drawdown_constraint_cost_mean": float(np.mean(drawdown_constraint_costs)),
         "batch_group_a_min_violation_cost_mean": float(np.mean(group_a_min_violation_costs)),
         "batch_group_b_max_violation_cost_mean": float(np.mean(group_b_max_violation_costs)),
         "batch_group_a_weight_mean": float(np.mean(group_a_weights)),

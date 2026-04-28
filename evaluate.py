@@ -166,6 +166,9 @@ def main() -> None:
             policy_fn=policy_fn,
             episodes=config.evaluation.episodes,
             alpha=metadata["alpha"],
+            alpha_budget_ratio=(
+                metadata["alpha_budget_ratio"] if metadata["alpha"] is None else None
+            ),
             split_name=split_name,
         )
         model_mean_returns, equal_weight_mean_returns = future_branch_returns(split_name)
@@ -199,6 +202,9 @@ def main() -> None:
             policy_fn=policy_fn,
             episodes=1,
             alpha=metadata["alpha"],
+            alpha_budget_ratio=(
+                metadata["alpha_budget_ratio"] if metadata["alpha"] is None else None
+            ),
             split_name="train_seed_future",
         )
         save_evaluation_artifacts(

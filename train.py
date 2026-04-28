@@ -37,16 +37,10 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional override for the active long-only group-constraint preset.",
     )
-    constraint_group = parser.add_mutually_exclusive_group()
-    constraint_group.add_argument(
-        "--constraint-downside",
+    parser.add_argument(
+        "--constraint-drawdown",
         action="store_true",
-        help="Use normalized downside semivariance as the RCPO constraint cost.",
-    )
-    constraint_group.add_argument(
-        "--constraint-sortino",
-        action="store_true",
-        help="Use Sortino target-violation cost as the RCPO constraint cost.",
+        help="Use maximum drawdown target-violation cost as the RCPO constraint cost.",
     )
     reward_group = parser.add_mutually_exclusive_group()
     reward_group.add_argument(
@@ -70,11 +64,10 @@ def parse_args() -> argparse.Namespace:
         help="Checkpoint file inside --resume-run-dir to continue from.",
     )
     args = parser.parse_args()
-    has_constraint_flag = args.constraint_downside or args.constraint_sortino
-    if args.algo == "rcpo" and not has_constraint_flag:
-        parser.error("RCPO requires exactly one of --constraint-downside or --constraint-sortino.")
-    if args.algo != "rcpo" and has_constraint_flag:
-        parser.error("--constraint-downside and --constraint-sortino are only valid with --algo rcpo.")
+    if args.algo == "rcpo" and not args.constraint_drawdown:
+        parser.error("RCPO requires --constraint-drawdown.")
+    if args.algo != "rcpo" and args.constraint_drawdown:
+        parser.error("--constraint-drawdown is only valid with --algo rcpo.")
     if args.algo == "equal_weight" and (args.use_drc or args.use_gdrc):
         parser.error("--use-drc and --use-gdrc are not valid with --algo equal_weight.")
     return args
@@ -92,7 +85,7 @@ def main() -> None:
     if args.constraint_preset is not None:
         config.environment.active_constraint_preset = args.constraint_preset
     if args.algo == "rcpo":
-        config.rcpo.constraint_mode = "sortino" if args.constraint_sortino else "downside"
+        config.rcpo.constraint_mode = "max_drawdown"
     if args.use_drc:
         config.reward_correction.mode = "drc"
     elif args.use_gdrc:

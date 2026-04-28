@@ -12,7 +12,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from .config import ProjectConfig, sync_rcpo_constraint_settings
+from .config import (
+    BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION,
+    ProjectConfig,
+    sync_rcpo_constraint_settings,
+)
 from .devices import resolve_device
 from .env import PortfolioEnv
 from .market import generate_market_splits
@@ -31,24 +35,19 @@ class EvaluationResult:
 def compute_drawdown(returns: np.ndarray) -> np.ndarray:
     wealth = np.cumprod(1.0 + returns)
     running_peak = np.maximum.accumulate(wealth)
-    return wealth / running_peak - 1.0
+    return (running_peak - wealth) / np.maximum(running_peak, 1e-12)
 
 
-def summarize_returns(returns: np.ndarray, downside_costs: np.ndarray, turnover: np.ndarray) -> dict[str, float]:
+def summarize_returns(returns: np.ndarray, turnover: np.ndarray) -> dict[str, float]:
     log_growth = np.log1p(np.clip(returns, -0.999999, None))
     annualized_return = float(np.exp(log_growth.mean() * 252.0) - 1.0)
     annualized_volatility = float(np.std(returns) * np.sqrt(252.0))
-    downside_deviation = float(np.sqrt(np.mean(np.square(np.minimum(returns, 0.0)))) * np.sqrt(252.0))
-    max_drawdown = float(np.min(compute_drawdown(returns)))
-    sortino = float(annualized_return / downside_deviation) if downside_deviation > 1e-12 else 0.0
+    max_drawdown = float(np.max(compute_drawdown(returns)))
     return {
         "annualized_return": annualized_return,
         "annualized_volatility": annualized_volatility,
-        "downside_deviation": downside_deviation,
-        "sortino": sortino,
         "max_drawdown": max_drawdown,
         "average_turnover": float(np.mean(turnover)),
-        "average_downside_cost": float(np.mean(downside_costs)),
     }
 
 
@@ -86,6 +85,7 @@ def evaluate_policy(
     policy_fn: Callable[[np.ndarray], np.ndarray],
     episodes: int,
     alpha: float | None,
+    alpha_budget_ratio: float | None,
     split_name: str,
 ) -> EvaluationResult:
     episode_summaries: list[dict[str, float]] = []
@@ -98,10 +98,16 @@ def evaluate_policy(
     for start_index in start_indices:
         obs, _ = env.reset(options={"start_index": int(start_index)})
         net_returns: list[float] = []
-        downside_costs: list[float] = []
         constraint_costs: list[float] = []
-        sortino_violation_costs: list[float] = []
-        sortino_ratios: list[float] = []
+        current_drawdowns: list[float] = []
+        max_drawdowns: list[float] = []
+        benchmark_current_drawdowns: list[float] = []
+        benchmark_max_drawdowns: list[float] = []
+        effective_drawdown_budgets: list[float] = []
+        alpha_targets: list[float] = []
+        drawdown_gaps: list[float] = []
+        drawdown_violations: list[float] = []
+        drawdown_constraint_costs: list[float] = []
         group_a_min_violation_costs: list[float] = []
         group_b_max_violation_costs: list[float] = []
         group_a_weights: list[float] = []
@@ -116,10 +122,22 @@ def evaluate_policy(
             obs, reward, terminated, truncated, info = env.step(action)
             del reward
             net_returns.append(float(info["net_return"]))
-            downside_costs.append(float(info["downside_cost"]))
             constraint_costs.append(float(info["constraint_cost"]))
-            sortino_violation_costs.append(float(info["sortino_violation_cost"]))
-            sortino_ratios.append(float(info["sortino_ratio"]))
+            current_drawdowns.append(float(info["current_drawdown"]))
+            max_drawdowns.append(float(info["max_drawdown"]))
+            benchmark_current_drawdowns.append(float(info["benchmark_current_drawdown"]))
+            benchmark_max_drawdowns.append(float(info["benchmark_max_drawdown"]))
+            effective_drawdown_budgets.append(float(info["effective_drawdown_budget"]))
+            if alpha_budget_ratio is not None:
+                alpha_targets.append(
+                    float(
+                        (alpha_budget_ratio * float(info["effective_drawdown_budget"])) ** 2
+                        / max(float(env.config.drawdown_cost_scale), 1e-12)
+                    )
+                )
+            drawdown_gaps.append(float(info["drawdown_gap"]))
+            drawdown_violations.append(float(info["drawdown_violation"]))
+            drawdown_constraint_costs.append(float(info["drawdown_constraint_cost"]))
             group_a_min_violation_costs.append(float(info["group_a_min_violation_cost"]))
             group_b_max_violation_costs.append(float(info["group_b_max_violation_cost"]))
             group_a_weights.append(float(info["group_a_weight"]))
@@ -132,17 +150,57 @@ def evaluate_policy(
             if terminated or truncated:
                 break
         episode_returns = np.asarray(net_returns, dtype=np.float32)
-        episode_downside = np.asarray(downside_costs, dtype=np.float32)
         episode_constraint = np.asarray(constraint_costs, dtype=np.float32)
         episode_turnover = np.asarray(turnover, dtype=np.float32)
-        episode_summary = summarize_returns(episode_returns, episode_downside, episode_turnover)
-        episode_summary["episode_average_downside_cost"] = float(np.mean(episode_downside))
+        episode_current_drawdown = np.asarray(current_drawdowns, dtype=np.float32)
+        episode_max_drawdown = np.asarray(max_drawdowns, dtype=np.float32)
+        episode_benchmark_current_drawdown = np.asarray(
+            benchmark_current_drawdowns,
+            dtype=np.float32,
+        )
+        episode_benchmark_max_drawdown = np.asarray(
+            benchmark_max_drawdowns,
+            dtype=np.float32,
+        )
+        episode_effective_drawdown_budget = np.asarray(
+            effective_drawdown_budgets,
+            dtype=np.float32,
+        )
+        episode_alpha_target = np.asarray(alpha_targets, dtype=np.float32)
+        episode_drawdown_gap = np.asarray(drawdown_gaps, dtype=np.float32)
+        episode_drawdown_violation = np.asarray(drawdown_violations, dtype=np.float32)
+        episode_drawdown_constraint_cost = np.asarray(
+            drawdown_constraint_costs,
+            dtype=np.float32,
+        )
+        episode_summary = summarize_returns(episode_returns, episode_turnover)
         episode_summary["episode_average_constraint_cost"] = float(np.mean(episode_constraint))
         episode_summary["average_constraint_cost"] = float(np.mean(episode_constraint))
-        episode_summary["average_sortino_violation_cost"] = float(
-            np.mean(sortino_violation_costs)
+        episode_summary["average_current_drawdown"] = float(np.mean(episode_current_drawdown))
+        episode_summary["average_step_max_drawdown"] = float(np.mean(episode_max_drawdown))
+        episode_summary["average_benchmark_current_drawdown"] = float(
+            np.mean(episode_benchmark_current_drawdown)
         )
-        episode_summary["average_step_sortino_ratio"] = float(np.mean(sortino_ratios))
+        episode_summary["average_step_benchmark_max_drawdown"] = float(
+            np.mean(episode_benchmark_max_drawdown)
+        )
+        episode_summary["benchmark_max_drawdown"] = float(
+            episode_benchmark_max_drawdown[-1]
+        )
+        episode_summary["effective_drawdown_budget"] = float(
+            episode_effective_drawdown_budget[-1]
+        )
+        episode_summary["average_effective_drawdown_budget"] = float(
+            np.mean(episode_effective_drawdown_budget)
+        )
+        episode_summary["average_alpha_target"] = float(
+            np.mean(episode_alpha_target)
+        ) if len(episode_alpha_target) > 0 else (float(alpha) if alpha is not None else 0.0)
+        episode_summary["average_drawdown_gap"] = float(np.mean(episode_drawdown_gap))
+        episode_summary["average_drawdown_violation"] = float(np.mean(episode_drawdown_violation))
+        episode_summary["average_drawdown_constraint_cost"] = float(
+            np.mean(episode_drawdown_constraint_cost)
+        )
         episode_summary["average_group_a_min_violation_cost"] = float(np.mean(group_a_min_violation_costs))
         episode_summary["average_group_b_max_violation_cost"] = float(np.mean(group_b_max_violation_costs))
         episode_summary["average_group_a_weight"] = float(np.mean(group_a_weights))
@@ -159,16 +217,30 @@ def evaluate_policy(
         equal_weight_return_paths.append(
             _rollout_returns(env, lambda _obs: _equal_weight_logits(env), int(start_index))
         )
-        if alpha is not None and episode_summary["episode_average_constraint_cost"] > alpha:
+        episode_alpha_threshold = (
+            episode_summary["average_alpha_target"]
+            if alpha_budget_ratio is not None
+            else alpha
+        )
+        if (
+            episode_alpha_threshold is not None
+            and episode_summary["episode_average_constraint_cost"] > episode_alpha_threshold
+        ):
             violation_count += 1
         if first_episode is None:
             first_start_index = int(start_index)
             first_episode = {
                 "net_returns": episode_returns,
-                "downside_costs": episode_downside,
                 "constraint_costs": episode_constraint,
-                "sortino_violation_costs": np.asarray(sortino_violation_costs, dtype=np.float32),
-                "sortino_ratios": np.asarray(sortino_ratios, dtype=np.float32),
+                "current_drawdowns": episode_current_drawdown,
+                "max_drawdowns": episode_max_drawdown,
+                "benchmark_current_drawdowns": episode_benchmark_current_drawdown,
+                "benchmark_max_drawdowns": episode_benchmark_max_drawdown,
+                "effective_drawdown_budgets": episode_effective_drawdown_budget,
+                "alpha_targets": episode_alpha_target,
+                "drawdown_gaps": episode_drawdown_gap,
+                "drawdown_violations": episode_drawdown_violation,
+                "drawdown_constraint_costs": episode_drawdown_constraint_cost,
                 "turnover": episode_turnover,
                 "group_a_weights": np.asarray(group_a_weights, dtype=np.float32),
                 "group_b_weights": np.asarray(group_b_weights, dtype=np.float32),
@@ -190,7 +262,9 @@ def evaluate_policy(
     }
     aggregate["episodes"] = len(episode_summaries)
     aggregate["constraint_violation_rate"] = (
-        float(violation_count / len(episode_summaries)) if alpha is not None else 0.0
+        float(violation_count / len(episode_summaries))
+        if (alpha is not None or alpha_budget_ratio is not None)
+        else 0.0
     )
     aggregate["split"] = split_name
     return EvaluationResult(
@@ -220,20 +294,14 @@ def save_evaluation_artifacts(
         json.dump(result.summary, handle, indent=2)
 
     returns = result.first_episode["net_returns"]
-    downside_costs = result.first_episode["downside_costs"]
     turnover = result.first_episode["turnover"]
     weights = result.first_episode["weights"]
     drawdown = compute_drawdown(returns)
+    drawdown_constraint_costs = result.first_episode["drawdown_constraint_costs"]
     cumulative_return = np.cumprod(1.0 + returns) - 1.0
     equal_weight_cumulative_return = (
         np.cumprod(1.0 + result.equal_weight_first_episode_returns) - 1.0
     )
-    rolling_downside = np.convolve(
-        downside_costs,
-        np.ones(rolling_window, dtype=np.float32) / float(rolling_window),
-        mode="same",
-    )
-
     plt.figure(figsize=(8, 4))
     plt.plot(cumulative_return, label="Model")
     plt.plot(equal_weight_cumulative_return, label="Equal Weight", linestyle="--")
@@ -244,9 +312,13 @@ def save_evaluation_artifacts(
     plt.close()
 
     plots = [
-        ("rolling_downside_risk", rolling_downside, "Rolling Downside Risk"),
         ("turnover", turnover, "Turnover"),
         ("drawdown", drawdown, "Drawdown"),
+        (
+            "drawdown_constraint_cost",
+            drawdown_constraint_costs,
+            "Drawdown Constraint Cost",
+        ),
     ]
     for file_stem, series, title in plots:
         plt.figure(figsize=(8, 4))
@@ -296,6 +368,25 @@ def save_evaluation_artifacts(
         plt.savefig(output_path / f"mean_cumulative_return_{split_name}.png")
         plt.close()
 
+    save_group_weights_artifact(result, output_path, split_name)
+
+    if lambda_history is not None:
+        plt.figure(figsize=(8, 4))
+        plt.plot(lambda_history)
+        plt.title("Lambda Trajectory")
+        plt.tight_layout()
+        plt.savefig(output_path / "lambda_trajectory.png")
+        plt.close()
+
+
+def save_group_weights_artifact(
+    result: EvaluationResult,
+    output_dir: str | Path,
+    split_name: str,
+) -> None:
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    weights = result.first_episode["weights"]
     plt.figure(figsize=(10, 5))
     asset_labels = ["Cash", *[f"Asset {index}" for index in range(1, weights.shape[1])]]
     for asset_index, label in enumerate(asset_labels):
@@ -307,14 +398,6 @@ def save_evaluation_artifacts(
     plt.tight_layout()
     plt.savefig(output_path / f"group_weights_{split_name}.png")
     plt.close()
-
-    if lambda_history is not None:
-        plt.figure(figsize=(8, 4))
-        plt.plot(lambda_history)
-        plt.title("Lambda Trajectory")
-        plt.tight_layout()
-        plt.savefig(output_path / "lambda_trajectory.png")
-        plt.close()
 
 
 def save_training_progress_artifacts(
@@ -336,15 +419,21 @@ def save_training_progress_artifacts(
     )
     rollout_violation = np.asarray(
         [
-            (row["alpha"] is not None) and (row["batch_constraint_cost_mean"] > row["alpha"])
+            (
+                row["alpha"] is not None
+                and row["batch_constraint_cost_mean"] > row["alpha"]
+            )
             for row in metrics_rows
         ],
         dtype=bool,
     )
     evaluation_violation = np.asarray(
         [
-            (row["alpha"] is not None)
-            and (row[f"{evaluation_prefix}_constraint_cost"] > row["alpha"])
+            (
+                row.get(f"{evaluation_prefix}_alpha_target", row["alpha"]) is not None
+                and row[f"{evaluation_prefix}_constraint_cost"]
+                > row.get(f"{evaluation_prefix}_alpha_target", row["alpha"])
+            )
             for row in metrics_rows
         ],
         dtype=bool,
@@ -384,8 +473,10 @@ def save_training_progress_artifacts(
             )
             evaluation_label_used = True
 
-    constraint_mode = metrics_rows[0].get("constraint_mode", "selected")
-    axis.set_title(f"Training Return With {constraint_mode.title()} Constraint Violations")
+    constraint_mode = str(metrics_rows[0].get("constraint_mode", "selected"))
+    axis.set_title(
+        f"Training Return With {constraint_mode.replace('_', ' ').title()} Constraint Violations"
+    )
     axis.set_xlabel("Update")
     axis.set_ylabel("Return")
     axis.legend()
@@ -489,6 +580,36 @@ def load_checkpoint_for_evaluation(
     sync_rcpo_constraint_settings(config)
     device = resolve_device(config.runtime.device)
     checkpoint = torch.load(run_path / checkpoint_name, map_location=device)
+    if checkpoint.get("algo") == "rcpo":
+        checkpoint_constraint_mode = checkpoint.get("constraint_mode")
+        if checkpoint_constraint_mode != config.rcpo.constraint_mode:
+            raise ValueError(
+                f"Checkpoint constraint mode {checkpoint_constraint_mode!r} does not match "
+                f"config_snapshot {config.rcpo.constraint_mode!r}."
+            )
+        checkpoint_semantics = checkpoint.get("constraint_semantics")
+        if checkpoint_semantics != BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION:
+            raise ValueError(
+                "RCPO checkpoint uses incompatible drawdown constraint semantics. "
+                "Legacy fixed-budget drawdown checkpoints are not supported."
+            )
+        if not np.isclose(
+            float(checkpoint.get("drawdown_budget_floor", np.nan)),
+            float(config.environment.drawdown_budget_floor),
+        ):
+            raise ValueError("Checkpoint drawdown_budget_floor does not match config_snapshot.")
+        if not np.isclose(
+            float(checkpoint.get("benchmark_drawdown_margin", np.nan)),
+            float(config.environment.benchmark_drawdown_margin),
+        ):
+            raise ValueError(
+                "Checkpoint benchmark_drawdown_margin does not match config_snapshot."
+            )
+        if not np.isclose(
+            float(checkpoint.get("drawdown_cost_scale", np.nan)),
+            float(config.environment.drawdown_cost_scale),
+        ):
+            raise ValueError("Checkpoint drawdown_cost_scale does not match config_snapshot.")
     market_splits = generate_market_splits(config.market, int(checkpoint["seed"]))
     environments = {
         split_name: PortfolioEnv(config.environment, market, config.market, seed=int(checkpoint["seed"]))
@@ -505,7 +626,14 @@ def load_checkpoint_for_evaluation(
         "algo": checkpoint["algo"],
         "seed": int(checkpoint["seed"]),
         "alpha": float(checkpoint["alpha"]) if checkpoint["alpha"] is not None else None,
+        "alpha_budget_ratio": float(
+            checkpoint.get("alpha_budget_ratio", config.rcpo.alpha_budget_ratio)
+        ),
         "constraint_mode": checkpoint.get("constraint_mode", config.rcpo.constraint_mode),
+        "constraint_semantics": checkpoint.get(
+            "constraint_semantics",
+            BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION,
+        ),
         "lambda_value": float(checkpoint["lambda_value"]),
         "device": str(device),
     }

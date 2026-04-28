@@ -17,6 +17,7 @@ from .algorithms import (
     update_rcpo_actor_critic,
 )
 from .config import (
+    BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION,
     ProjectConfig,
     save_config,
     sync_rcpo_constraint_settings,
@@ -29,6 +30,7 @@ from .evaluation import (
     EvaluationResult,
     evaluate_policy,
     save_evaluation_artifacts,
+    save_group_weights_artifact,
     save_training_progress_artifacts,
 )
 from .market import generate_continuation_splits, generate_train_markets
@@ -124,9 +126,14 @@ class RCPOTrainer:
             f"train_market_count={len(self.train_markets)} "
             f"validation_branches={len(self.validation_markets)} "
             f"test_branches={len(self.test_markets)} "
-            f"rollout_steps={self.optimization.rollout_steps} alpha={self.alpha} "
+            f"rollout_steps={self.optimization.rollout_steps} "
+            f"alpha={'dynamic' if self.alpha is None else self.alpha} "
+            f"alpha_budget_ratio={self.config.rcpo.alpha_budget_ratio} "
+            f"lambda_lr_up={self.config.rcpo.lambda_lr_up} "
+            f"lambda_lr_down={self.config.rcpo.lambda_lr_down} "
             f"constraint_mode={self.config.rcpo.constraint_mode} "
-            f"sortino_target={self.config.rcpo.sortino_target} "
+            f"drawdown_budget_floor={self.config.environment.drawdown_budget_floor} "
+            f"benchmark_drawdown_margin={self.config.environment.benchmark_drawdown_margin} "
             f"preset={self._resolved_preset['preset_name']} "
             f"group_a_min={self._resolved_preset['group_a_min_weight']} "
             f"group_b_max={self._resolved_preset['group_b_max_weight']} "
@@ -155,14 +162,17 @@ class RCPOTrainer:
                 f"reward_oce={metric_row['reward_correction_oce']:.6f} "
                 f"gdrc_bins={metric_row['gdrc_selected_bins']} "
                 f"batch_constraint={metric_row['batch_constraint_cost_mean']:.6f} "
-                f"batch_downside={metric_row['batch_downside_cost_mean']:.6f} "
+                f"batch_max_drawdown={metric_row['batch_max_drawdown_mean']:.6f} "
+                f"batch_benchmark_max_drawdown={metric_row['batch_benchmark_max_drawdown_mean']:.6f} "
+                f"batch_budget={metric_row['batch_effective_drawdown_budget_mean']:.6f} "
+                f"batch_dd_violation={metric_row['batch_drawdown_violation_mean']:.6f} "
                 f"episode_return={metric_row['episode_return_mean']:.6f} "
                 f"turnover={metric_row['batch_turnover_mean']:.6f} "
                 f"policy_loss={metric_row['policy_loss']:.6f} "
                 f"value_loss_r={metric_row['reward_value_loss']:.6f} "
                 f"value_loss_c={metric_row['cost_value_loss']:.6f} "
                 f"lambda={metric_row['lambda_value']:.6f} "
-                f"alpha={metric_row['alpha']} "
+                f"alpha={metric_row['alpha']:.6f} "
                 f"kl={metric_row['approx_kl']:.6f} "
                 f"clip_frac={metric_row['clip_fraction']:.4f} "
                 f"lr={metric_row['learning_rate']:.8f} "
@@ -170,7 +180,10 @@ class RCPOTrainer:
                 f"val_return={metric_row['validation_annualized_return']:.6f} "
                 f"val_excess={metric_row['validation_mean_excess_cumulative_return']:.6f} "
                 f"val_win={metric_row['validation_win_rate_vs_equal_weight']:.3f} "
-                f"val_sortino={metric_row['validation_sortino']:.6f} "
+                f"val_max_drawdown={metric_row['validation_max_drawdown']:.6f} "
+                f"val_benchmark_max_drawdown={metric_row['validation_benchmark_max_drawdown']:.6f} "
+                f"val_budget={metric_row['validation_effective_drawdown_budget']:.6f} "
+                f"val_alpha={metric_row['validation_alpha_target']:.6f} "
                 f"val_constraint={metric_row['validation_constraint_cost']:.6f} "
                 f"score={validation_score:.6f}{best_marker}"
             ),
@@ -198,25 +211,10 @@ class RCPOTrainer:
 
     def _resolve_alpha(self) -> float | None:
         if self.algo == "ppo_unconstrained":
-            return self.config.rcpo.alpha
+            return 0.0
         if self.config.rcpo.alpha is not None:
             return float(self.config.rcpo.alpha)
-        if self.config.rcpo.constraint_mode == "sortino":
-            return 0.0
-        calibration = evaluate_policy(
-            self.train_env,
-            policy_fn=lambda _obs: self._equal_weight_action(),
-            episodes=self.config.rcpo.calibration_episodes,
-            alpha=None,
-            split_name="train_calibration",
-        )
-        return float(
-            max(
-                1e-6,
-                calibration.summary["average_constraint_cost"]
-                * self.config.rcpo.calibration_scale,
-            )
-        )
+        return None
 
     def _collect_rollout(self) -> RolloutBatch:
         return collect_rollout(
@@ -225,6 +223,16 @@ class RCPOTrainer:
             optimization=self.optimization,
             reward_corrector=self.reward_corrector,
             device=self.device,
+            alpha_budget_ratio=(
+                self.config.rcpo.alpha_budget_ratio
+                if self.algo == "rcpo" and self.alpha is None
+                else None
+            ),
+            drawdown_cost_scale=(
+                self.config.environment.drawdown_cost_scale
+                if self.algo == "rcpo" and self.alpha is None
+                else None
+            ),
         )
 
     def _update_model(self, batch: RolloutBatch) -> dict[str, float]:
@@ -235,15 +243,28 @@ class RCPOTrainer:
                 batch=batch,
                 optimization=self.optimization,
             )
+        effective_alpha = (
+            self.alpha
+            if self.alpha is not None
+            else float(batch.info_summary["batch_alpha_target_mean"])
+        )
+        lambda_gap = float(batch.info_summary["batch_constraint_cost_mean"]) - float(
+            effective_alpha
+        )
         losses, self.lambda_value, lambda_updates = update_rcpo_actor_critic(
             model=self.model,
             optimizer=self.optimizer,
             batch=batch,
             optimization=self.optimization,
             lambda_value=self.lambda_value,
-            alpha=self.alpha,
+            alpha=effective_alpha,
             lambda_lr=self.config.rcpo.lambda_lr,
+            lambda_lr_up=self.config.rcpo.lambda_lr_up,
+            lambda_lr_down=self.config.rcpo.lambda_lr_down,
         )
+        losses["lambda_gap"] = lambda_gap
+        losses["lambda_lr_up"] = float(self.config.rcpo.lambda_lr_up)
+        losses["lambda_lr_down"] = float(self.config.rcpo.lambda_lr_down)
         self.lambda_history.extend(lambda_updates)
         return losses
 
@@ -257,7 +278,16 @@ class RCPOTrainer:
                 "algo": self.algo,
                 "seed": self.seed,
                 "alpha": self.alpha,
+                "alpha_budget_ratio": float(self.config.rcpo.alpha_budget_ratio),
                 "constraint_mode": self.config.rcpo.constraint_mode,
+                "constraint_semantics": BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION,
+                "drawdown_budget_floor": float(self.config.environment.drawdown_budget_floor),
+                "benchmark_drawdown_margin": float(
+                    self.config.environment.benchmark_drawdown_margin
+                ),
+                "drawdown_cost_scale": float(self.config.environment.drawdown_cost_scale),
+                "lambda_lr_up": float(self.config.rcpo.lambda_lr_up),
+                "lambda_lr_down": float(self.config.rcpo.lambda_lr_down),
                 "reward_correction_mode": self.config.reward_correction.mode,
                 "device": str(self.device),
                 "lambda_value": self.lambda_value,
@@ -284,20 +314,67 @@ class RCPOTrainer:
                 f"Checkpoint seed {checkpoint_seed!r} does not match requested seed {self.seed!r}."
             )
         checkpoint_constraint_mode = checkpoint.get("constraint_mode")
-        if (
-            self.algo == "rcpo"
-            and checkpoint_constraint_mode is not None
-            and checkpoint_constraint_mode != self.config.rcpo.constraint_mode
-        ):
-            raise ValueError(
-                f"Checkpoint constraint mode {checkpoint_constraint_mode!r} does not match "
-                f"requested {self.config.rcpo.constraint_mode!r}."
-            )
+        if self.algo == "rcpo":
+            if checkpoint_constraint_mode is None:
+                raise ValueError(
+                    "RCPO resume requires checkpoints saved with constraint_mode='max_drawdown'. "
+                    "Legacy downside/sortino checkpoints are not supported."
+                )
+            if checkpoint_constraint_mode != self.config.rcpo.constraint_mode:
+                raise ValueError(
+                    f"Checkpoint constraint mode {checkpoint_constraint_mode!r} does not match "
+                    f"requested {self.config.rcpo.constraint_mode!r}. Legacy downside/sortino "
+                    "checkpoints are not supported."
+                )
+            checkpoint_semantics = checkpoint.get("constraint_semantics")
+            if checkpoint_semantics != BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION:
+                raise ValueError(
+                    "RCPO resume requires checkpoints saved with the benchmark-relative "
+                    "drawdown constraint semantics. Legacy fixed-budget drawdown checkpoints "
+                    "are not supported."
+                )
+            if not math.isclose(
+                float(checkpoint.get("drawdown_budget_floor", math.nan)),
+                float(self.config.environment.drawdown_budget_floor),
+                rel_tol=0.0,
+                abs_tol=1e-12,
+            ):
+                raise ValueError(
+                    "Checkpoint drawdown_budget_floor does not match the current config."
+                )
+            if not math.isclose(
+                float(checkpoint.get("benchmark_drawdown_margin", math.nan)),
+                float(self.config.environment.benchmark_drawdown_margin),
+                rel_tol=0.0,
+                abs_tol=1e-12,
+            ):
+                raise ValueError(
+                    "Checkpoint benchmark_drawdown_margin does not match the current config."
+                )
+            if not math.isclose(
+                float(checkpoint.get("drawdown_cost_scale", math.nan)),
+                float(self.config.environment.drawdown_cost_scale),
+                rel_tol=0.0,
+                abs_tol=1e-12,
+            ):
+                raise ValueError(
+                    "Checkpoint drawdown_cost_scale does not match the current config."
+                )
         checkpoint_reward_mode = checkpoint.get("reward_correction_mode", "none")
         if checkpoint_reward_mode != self.config.reward_correction.mode:
             raise ValueError(
                 f"Checkpoint reward correction mode {checkpoint_reward_mode!r} does not match "
                 f"requested {self.config.reward_correction.mode!r}."
+            )
+        checkpoint_alpha_budget_ratio = checkpoint.get("alpha_budget_ratio")
+        if checkpoint_alpha_budget_ratio is not None and not math.isclose(
+            float(checkpoint_alpha_budget_ratio),
+            float(self.config.rcpo.alpha_budget_ratio),
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        ):
+            raise ValueError(
+                "Checkpoint alpha_budget_ratio does not match the current config."
             )
 
         self.model.load_state_dict(checkpoint["model_state_dict"])
@@ -415,6 +492,9 @@ class RCPOTrainer:
                 policy_fn=policy_fn,
                 episodes=1,
                 alpha=self.alpha,
+                alpha_budget_ratio=(
+                    self.config.rcpo.alpha_budget_ratio if self.alpha is None else None
+                ),
                 split_name=split_name,
             )
             model_path = result.episode_returns[0]
@@ -476,15 +556,17 @@ class RCPOTrainer:
             "validation_win_rate_vs_equal_weight": summary["win_rate_vs_equal_weight"],
             "validation_return_std": summary["return_std"],
             "validation_branches": summary["branches"],
-            "validation_sortino": summary["sortino"],
             "validation_max_drawdown": summary["max_drawdown"],
+            "validation_benchmark_max_drawdown": summary["benchmark_max_drawdown"],
+            "validation_effective_drawdown_budget": summary["effective_drawdown_budget"],
+            "validation_alpha_target": summary["average_alpha_target"],
             "validation_turnover": summary["average_turnover"],
             "validation_constraint_cost": summary["average_constraint_cost"],
-            "validation_downside_cost": summary["average_downside_cost"],
-            "validation_sortino_violation_cost": summary[
-                "average_sortino_violation_cost"
+            "validation_drawdown_gap": summary["average_drawdown_gap"],
+            "validation_drawdown_violation": summary["average_drawdown_violation"],
+            "validation_drawdown_constraint_cost": summary[
+                "average_drawdown_constraint_cost"
             ],
-            "validation_step_sortino_ratio": summary["average_step_sortino_ratio"],
             "validation_group_a_weight": summary["average_group_a_weight"],
             "validation_group_b_weight": summary["average_group_b_weight"],
             "validation_group_a_min_violation_cost": summary[
@@ -588,11 +670,21 @@ class RCPOTrainer:
                     split_name="validation",
                     policy_fn=lambda obs: self._policy_action(obs, deterministic=True),
                 )
+                save_group_weights_artifact(
+                    validation_result,
+                    self.run_dir / "evaluation",
+                    "validation",
+                )
                 last_validation_summary = validation_result.summary
             if last_validation_summary is None:
                 validation_result, _, _ = self._evaluate_branch_set(
                     split_name="validation",
                     policy_fn=lambda obs: self._policy_action(obs, deterministic=True),
+                )
+                save_group_weights_artifact(
+                    validation_result,
+                    self.run_dir / "evaluation",
+                    "validation",
                 )
                 last_validation_summary = validation_result.summary
                 validation_evaluated = True
@@ -600,7 +692,13 @@ class RCPOTrainer:
             metric_row = {
                 "update": update_index,
                 "algo": self.algo,
-                "alpha": self.alpha,
+                "alpha": (
+                    self.alpha
+                    if self.alpha is not None
+                    else float(rollout.info_summary["batch_alpha_target_mean"])
+                ),
+                "alpha_mode": "fixed" if self.alpha is not None else "budget_ratio",
+                "alpha_budget_ratio": float(self.config.rcpo.alpha_budget_ratio),
                 "constraint_mode": self.config.rcpo.constraint_mode,
                 "reward_correction_mode": self.config.reward_correction.mode,
                 "lambda_value": self.lambda_value,
@@ -670,6 +768,9 @@ class RCPOTrainer:
             "algo": self.algo,
             "seed": self.seed,
             "alpha": self.alpha,
+            "alpha_budget_ratio": float(self.config.rcpo.alpha_budget_ratio),
+            "lambda_lr_up": float(self.config.rcpo.lambda_lr_up),
+            "lambda_lr_down": float(self.config.rcpo.lambda_lr_down),
             "constraint_mode": self.config.rcpo.constraint_mode,
             "reward_correction_mode": self.config.reward_correction.mode,
             "device": str(self.device),
@@ -700,6 +801,9 @@ class RCPOTrainer:
                 policy_fn=lambda _obs: self._equal_weight_action(),
                 episodes=self.config.evaluation.episodes,
                 alpha=self.alpha,
+                alpha_budget_ratio=(
+                    self.config.rcpo.alpha_budget_ratio if self.alpha is None else None
+                ),
                 split_name=split_name,
             )
             save_evaluation_artifacts(
@@ -714,6 +818,9 @@ class RCPOTrainer:
             "algo": self.algo,
             "seed": self.seed,
             "alpha": self.alpha,
+            "alpha_budget_ratio": float(self.config.rcpo.alpha_budget_ratio),
+            "lambda_lr_up": float(self.config.rcpo.lambda_lr_up),
+            "lambda_lr_down": float(self.config.rcpo.lambda_lr_down),
             "constraint_mode": self.config.rcpo.constraint_mode,
             "reward_correction_mode": self.config.reward_correction.mode,
             "device": str(self.device),

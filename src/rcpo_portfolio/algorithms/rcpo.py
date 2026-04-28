@@ -19,9 +19,18 @@ def update_lagrange_multiplier(
     lambda_value: float,
     observed_cost: float,
     alpha: float,
-    learning_rate: float,
+    learning_rate: float | None = None,
+    learning_rate_up: float | None = None,
+    learning_rate_down: float | None = None,
 ) -> float:
-    return max(0.0, float(lambda_value + learning_rate * (observed_cost - alpha)))
+    gap = float(observed_cost - alpha)
+    if learning_rate_up is None or learning_rate_down is None:
+        if learning_rate is None:
+            raise ValueError("A lambda learning rate is required.")
+        learning_rate_up = learning_rate
+        learning_rate_down = learning_rate
+    selected_learning_rate = learning_rate_up if gap > 0.0 else learning_rate_down
+    return max(0.0, float(lambda_value + float(selected_learning_rate) * gap))
 
 
 def update_rcpo_actor_critic(
@@ -32,6 +41,8 @@ def update_rcpo_actor_critic(
     lambda_value: float,
     alpha: float | None,
     lambda_lr: float,
+    lambda_lr_up: float | None = None,
+    lambda_lr_down: float | None = None,
 ) -> tuple[dict[str, float], float, list[float]]:
     combined_advantages = combine_advantages(
         batch.reward_advantages,
@@ -56,7 +67,9 @@ def update_rcpo_actor_critic(
                 lambda_value,
                 float(batch.info_summary["batch_constraint_cost_mean"]),
                 alpha,
-                lambda_lr,
+                learning_rate=lambda_lr,
+                learning_rate_up=lambda_lr_up,
+                learning_rate_down=lambda_lr_down,
             )
             lambda_updates.append(float(lambda_value))
     return metrics, float(lambda_value), lambda_updates

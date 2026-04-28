@@ -21,6 +21,26 @@ def test_lagrange_multiplier_moves_with_constraint_gap() -> None:
     assert stalled < 0.2
 
 
+def test_lagrange_multiplier_uses_asymmetric_learning_rates() -> None:
+    increased = update_lagrange_multiplier(
+        lambda_value=0.2,
+        observed_cost=0.5,
+        alpha=0.1,
+        learning_rate_up=0.015,
+        learning_rate_down=0.03,
+    )
+    decreased = update_lagrange_multiplier(
+        lambda_value=0.2,
+        observed_cost=0.05,
+        alpha=0.1,
+        learning_rate_up=0.015,
+        learning_rate_down=0.03,
+    )
+
+    assert increased == pytest.approx(0.2 + 0.015 * 0.4)
+    assert decreased == pytest.approx(0.2 + 0.03 * -0.05)
+
+
 def test_combined_advantage_matches_reward_advantage_when_lambda_zero() -> None:
     reward_advantages = torch.tensor([1.0, 2.0, 3.0])
     cost_advantages = torch.tensor([0.5, 0.25, 0.75])
@@ -40,17 +60,34 @@ def test_rcpo_constraint_flags_are_required(monkeypatch: pytest.MonkeyPatch) -> 
     with pytest.raises(SystemExit):
         train.parse_args()
 
-    monkeypatch.setattr(sys, "argv", ["train.py", "--algo", "rcpo", "--constraint-downside"])
+    monkeypatch.setattr(sys, "argv", ["train.py", "--algo", "rcpo", "--constraint-drawdown"])
     args = train.parse_args()
-    assert args.constraint_downside
-    assert not args.constraint_sortino
+    assert args.constraint_drawdown
 
 
 def test_constraint_flags_are_rejected_for_non_rcpo(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         sys,
         "argv",
-        ["train.py", "--algo", "ppo_unconstrained", "--constraint-downside"],
+        ["train.py", "--algo", "ppo_unconstrained", "--constraint-drawdown"],
+    )
+    with pytest.raises(SystemExit):
+        train.parse_args()
+
+
+def test_legacy_constraint_flags_are_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["train.py", "--algo", "rcpo", "--constraint-downside"],
+    )
+    with pytest.raises(SystemExit):
+        train.parse_args()
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["train.py", "--algo", "rcpo", "--constraint-sortino"],
     )
     with pytest.raises(SystemExit):
         train.parse_args()

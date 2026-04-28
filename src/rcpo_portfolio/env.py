@@ -19,6 +19,15 @@ class EpisodeState:
     weights: np.ndarray
     previous_turnover: float
     net_returns: list[float]
+    portfolio_value: float
+    running_peak_value: float
+    current_drawdown: float
+    max_drawdown: float
+    benchmark_portfolio_value: float
+    benchmark_running_peak_value: float
+    benchmark_current_drawdown: float
+    benchmark_max_drawdown: float
+    benchmark_has_rebalanced: bool
 
 
 class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
@@ -42,6 +51,18 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
         self.rng = np.random.default_rng(seed)
         self.state: EpisodeState | None = None
         self._valid_start_indices = self._compute_start_indices()
+        self._equal_weight_weights = np.full(
+            self.num_assets, 1.0 / float(self.num_assets), dtype=np.float32
+        )
+        self._equal_weight_risky_weights = self._equal_weight_weights[1:]
+        self._initial_cash_weights = np.zeros(self.num_assets, dtype=np.float32)
+        self._initial_cash_weights[0] = 1.0
+        self._equal_weight_raw_returns = (
+            self.market.risky_returns @ self._equal_weight_risky_weights
+        ).astype(np.float32)
+        self._equal_weight_initial_turnover = float(
+            np.sum(np.abs(self._equal_weight_weights - self._initial_cash_weights))
+        )
         self._validate_constraint_settings()
         self._resolved_constraint_preset = self._resolve_constraint_preset()
 
@@ -73,18 +94,16 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
         return np.arange(self.lookback, last_start + 1, dtype=np.int64)
 
     def _validate_constraint_settings(self) -> None:
-        if self.config.constraint_mode not in {"downside", "sortino"}:
+        if self.config.constraint_mode != "max_drawdown":
             raise ValueError(
-                "Environment constraint_mode must be either 'downside' or 'sortino'."
+                "Environment constraint_mode must be 'max_drawdown'."
             )
-        if self.config.downside_cost_scale <= 0.0:
-            raise ValueError("downside_cost_scale must be positive.")
-        if self.config.sortino_window <= 0:
-            raise ValueError("sortino_window must be positive.")
-        if self.config.sortino_min_periods <= 0:
-            raise ValueError("sortino_min_periods must be positive.")
-        if self.config.sortino_cost_scale <= 0.0:
-            raise ValueError("sortino_cost_scale must be positive.")
+        if self.config.drawdown_budget_floor < 0.0:
+            raise ValueError("drawdown_budget_floor cannot be negative.")
+        if self.config.benchmark_drawdown_margin <= 0.0:
+            raise ValueError("benchmark_drawdown_margin must be positive.")
+        if self.config.drawdown_cost_scale <= 0.0:
+            raise ValueError("drawdown_cost_scale must be positive.")
         if self.config.diversification_beta < 0.0:
             raise ValueError("diversification_beta cannot be negative.")
 
@@ -162,32 +181,92 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             "diversification_cost": diversification_cost,
         }
 
-    def _sortino_components(self, net_simple_return: float) -> dict[str, float]:
+    @staticmethod
+    def _updated_drawdown_state(
+        portfolio_value: float,
+        running_peak_value: float,
+        max_drawdown: float,
+        net_simple_return: float,
+    ) -> dict[str, float]:
+        growth = max(1e-12, 1.0 + float(net_simple_return))
+        next_portfolio_value = float(portfolio_value * growth)
+        next_running_peak_value = float(max(running_peak_value, next_portfolio_value))
+        current_drawdown = float(
+            (next_running_peak_value - next_portfolio_value)
+            / max(next_running_peak_value, 1e-12)
+        )
+        next_max_drawdown = float(max(max_drawdown, current_drawdown))
+        return {
+            "portfolio_value": next_portfolio_value,
+            "running_peak_value": next_running_peak_value,
+            "current_drawdown": current_drawdown,
+            "max_drawdown": next_max_drawdown,
+        }
+
+    def _benchmark_drawdown_components(self) -> dict[str, float]:
         if self.state is None:
             raise RuntimeError("Environment has not been reset.")
-        episode_returns = [*self.state.net_returns, float(net_simple_return)]
-        window = min(int(self.config.sortino_window), len(episode_returns))
-        trailing_returns = np.asarray(episode_returns[-window:], dtype=np.float32)
-        if len(trailing_returns) < int(self.config.sortino_min_periods):
-            return {
-                "sortino_ratio": 0.0,
-                "sortino_violation_cost": 0.0,
-            }
-
-        mean_return = float(np.mean(trailing_returns))
-        downside_deviation = float(
-            np.sqrt(np.mean(np.square(np.minimum(trailing_returns, 0.0))))
+        raw_simple_return = float(self._equal_weight_raw_returns[self.state.current_index])
+        turnover = (
+            0.0
+            if self.state.benchmark_has_rebalanced
+            else self._equal_weight_initial_turnover
         )
-        if downside_deviation <= 1e-12:
-            sortino_ratio = float(self.config.sortino_target) if mean_return > 0.0 else 0.0
-        else:
-            sortino_ratio = float(np.sqrt(252.0) * mean_return / downside_deviation)
-        violation = max(0.0, float(self.config.sortino_target) - sortino_ratio)
+        transaction_cost = float(self.transaction_cost_rate * turnover)
+        net_simple_return = raw_simple_return - transaction_cost
+        drawdown_state = self._updated_drawdown_state(
+            portfolio_value=self.state.benchmark_portfolio_value,
+            running_peak_value=self.state.benchmark_running_peak_value,
+            max_drawdown=self.state.benchmark_max_drawdown,
+            net_simple_return=net_simple_return,
+        )
+        effective_drawdown_budget = float(
+            max(
+                float(self.config.drawdown_budget_floor),
+                float(self.config.benchmark_drawdown_margin)
+                * float(drawdown_state["max_drawdown"]),
+            )
+        )
         return {
-            "sortino_ratio": sortino_ratio,
-            "sortino_violation_cost": float(
-                violation**2 / max(float(self.config.sortino_cost_scale), 1e-12)
-            ),
+            "benchmark_raw_return": raw_simple_return,
+            "benchmark_turnover": float(turnover),
+            "benchmark_transaction_cost": transaction_cost,
+            "benchmark_net_return": net_simple_return,
+            "benchmark_portfolio_value": float(drawdown_state["portfolio_value"]),
+            "benchmark_running_peak_value": float(drawdown_state["running_peak_value"]),
+            "benchmark_current_drawdown": float(drawdown_state["current_drawdown"]),
+            "benchmark_max_drawdown": float(drawdown_state["max_drawdown"]),
+            "effective_drawdown_budget": effective_drawdown_budget,
+        }
+
+    def _drawdown_components(
+        self,
+        net_simple_return: float,
+        effective_drawdown_budget: float,
+    ) -> dict[str, float]:
+        if self.state is None:
+            raise RuntimeError("Environment has not been reset.")
+        drawdown_state = self._updated_drawdown_state(
+            portfolio_value=self.state.portfolio_value,
+            running_peak_value=self.state.running_peak_value,
+            max_drawdown=self.state.max_drawdown,
+            net_simple_return=net_simple_return,
+        )
+        drawdown_gap = float(drawdown_state["max_drawdown"] - effective_drawdown_budget)
+        drawdown_violation = float(
+            max(0.0, drawdown_gap)
+        )
+        drawdown_constraint_cost = float(
+            drawdown_violation**2 / max(float(self.config.drawdown_cost_scale), 1e-12)
+        )
+        return {
+            "portfolio_value": float(drawdown_state["portfolio_value"]),
+            "running_peak_value": float(drawdown_state["running_peak_value"]),
+            "current_drawdown": float(drawdown_state["current_drawdown"]),
+            "max_drawdown": float(drawdown_state["max_drawdown"]),
+            "drawdown_gap": drawdown_gap,
+            "drawdown_violation": drawdown_violation,
+            "drawdown_constraint_cost": drawdown_constraint_cost,
         }
 
     def _get_observation(self) -> np.ndarray:
@@ -251,6 +330,15 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             weights=initial_weights,
             previous_turnover=0.0,
             net_returns=[],
+            portfolio_value=1.0,
+            running_peak_value=1.0,
+            current_drawdown=0.0,
+            max_drawdown=0.0,
+            benchmark_portfolio_value=1.0,
+            benchmark_running_peak_value=1.0,
+            benchmark_current_drawdown=0.0,
+            benchmark_max_drawdown=0.0,
+            benchmark_has_rebalanced=False,
         )
         return self._get_observation(), {"start_index": start_index}
 
@@ -265,21 +353,34 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
         transaction_cost = float(self.transaction_cost_rate * turnover)
         net_simple_return = raw_simple_return - transaction_cost
         reward = float(np.log1p(np.clip(net_simple_return, -0.999999, None)))
-        downside_cost = float(max(0.0, -net_simple_return) ** 2)
         constraint_components = self._constraint_components(weights)
-        sortino_components = self._sortino_components(net_simple_return)
-        normalized_downside_cost = downside_cost / float(self.config.downside_cost_scale)
-        if self.config.constraint_mode == "downside":
-            constraint_cost = float(
-                normalized_downside_cost
-                + constraint_components["diversification_cost"]
-            )
-        else:
-            constraint_cost = float(sortino_components["sortino_violation_cost"])
+        benchmark_components = self._benchmark_drawdown_components()
+        drawdown_components = self._drawdown_components(
+            net_simple_return,
+            benchmark_components["effective_drawdown_budget"],
+        )
+        constraint_cost = float(drawdown_components["drawdown_constraint_cost"])
 
         self.state.weights = weights
         self.state.previous_turnover = turnover
         self.state.net_returns.append(net_simple_return)
+        self.state.portfolio_value = float(drawdown_components["portfolio_value"])
+        self.state.running_peak_value = float(drawdown_components["running_peak_value"])
+        self.state.current_drawdown = float(drawdown_components["current_drawdown"])
+        self.state.max_drawdown = float(drawdown_components["max_drawdown"])
+        self.state.benchmark_portfolio_value = float(
+            benchmark_components["benchmark_portfolio_value"]
+        )
+        self.state.benchmark_running_peak_value = float(
+            benchmark_components["benchmark_running_peak_value"]
+        )
+        self.state.benchmark_current_drawdown = float(
+            benchmark_components["benchmark_current_drawdown"]
+        )
+        self.state.benchmark_max_drawdown = float(
+            benchmark_components["benchmark_max_drawdown"]
+        )
+        self.state.benchmark_has_rebalanced = True
         self.state.current_index += 1
         self.state.steps_elapsed += 1
 
@@ -295,11 +396,10 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             "net_return": net_simple_return,
             "transaction_cost": transaction_cost,
             "turnover": turnover,
-            "downside_cost": downside_cost,
-            "normalized_downside_cost": normalized_downside_cost,
             "constraint_cost": constraint_cost,
             "constraint_mode": self.config.constraint_mode,
-            **sortino_components,
+            **drawdown_components,
+            **benchmark_components,
             "weights": weights.copy(),
             "regime": int(self.market.regimes[self.state.current_index - 1]),
             **constraint_components,

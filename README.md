@@ -1,94 +1,154 @@
 # RCPO Portfolio Management Prototype
 
-This project builds a synthetic portfolio management problem and solves it with a reward-constrained PPO variant inspired by Reward Constrained Policy Optimization (RCPO).
+This project builds a synthetic portfolio management problem and trains policy-gradient agents with PyTorch and Gymnasium. The main methods are unconstrained PPO and an RCPO-style PPO variant that maximizes net portfolio log return while enforcing a benchmark-relative maximum drawdown constraint.
 
 ## Features
 
-- Synthetic 2-regime market with 5 risky assets plus cash
-- Gymnasium-compatible portfolio environment
+- Synthetic multi-market generator with 5 risky assets plus cash
 - Long-only portfolio weights via softmax-transformed policy logits
-- RCPO-style constrained optimization with separate reward and cost critics
-- Baselines for unconstrained PPO and equal-weight allocation
-- Config-driven training, evaluation, metrics, checkpoints, and plots
+- PPO baseline and RCPO with a reward critic, cost critic, and Lagrange multiplier
+- Benchmark-relative maximum drawdown constraint for RCPO
+- Optional DRC/GDRC reward correction for PPO or RCPO
+- Config-driven training, resume, evaluation, checkpoints, metrics, and plots
 
-## Quickstart
+## Install
 
 ```powershell
-python -m pip install -e .[dev]
-python train.py --algo rcpo --constraint-downside --config configs/default.yaml
-python train.py --algo rcpo --constraint-sortino --config configs/default.yaml
-python train.py --algo ppo_unconstrained --config configs/default.yaml
-python train.py --algo ppo_unconstrained --use-drc --config configs/default.yaml
-python train.py --algo ppo_unconstrained --use-gdrc --config configs/default.yaml
-python train.py --algo rcpo --constraint-downside --use-drc --config configs/default.yaml
-python train.py --algo rcpo --constraint-downside --use-gdrc --config configs/default.yaml
-python train.py --algo rcpo --constraint-sortino --use-gdrc --config configs/default.yaml
-python evaluate.py --run-dir runs/latest_rcpo_seed0
-pytest
+py -3.11 -m pip install -e .[dev]
 ```
+
+## Commands
+
+Train PPO:
+
+```powershell
 py -3.11 train.py --algo ppo_unconstrained --config configs/default.yaml
+```
 
-py -3.11 train.py --algo rcpo --constraint-downside --use-gdrc --config configs/default.yaml
-py -3.11 train.py --algo rcpo --constraint-downside --resume-run-dir "runs\new_rcpo_none_20260420_201503\seed_0"
-py -3.11 train.py --algo ppo_unconstrained --resume-run-dir "runs\new_ppo_unconstrained_none_20260420_195339\seed_0"
+Train PPO with reward correction:
 
-py -3.11 evaluate.py --run-dir "runs\latest_ppo_unconstrained_20260416_220423\seed_0" --checkpoint checkpoint_last.pt --future-market-count 10
-py -3.11 evaluate.py --run-dir "runs\latest_rcpo_20260417_183003\seed_0" --checkpoint checkpoint_last.pt --include-train-seed-future --train-seed-future-steps 252
+```powershell
+py -3.11 train.py --algo ppo_unconstrained --use-drc --config configs/default.yaml
+py -3.11 train.py --algo ppo_unconstrained --use-gdrc --config configs/default.yaml
+```
 
-latest_rcpo_20260417_183003
-latest_rcpo_gdrc_20260419_173123
-latest_ppo_unconstrained_20260416_220423
-new_rcpo_none_20260420_201503
-new_ppo_unconstrained_none_20260420_195339
+Train RCPO with the maximum drawdown constraint:
 
-Train on many markets, not one train path. Select checkpoints by mean validation over many branches. Increase train length to 5040. Raise transaction_cost_bps to 1.0. Use equal weight as a prior - start near equal weight, then let the policy learn small tilts. Modify the market to show RL can beat equal weight - Add learnable structure: regime-dependent asset winners, momentum, mean reversion, volatility forecasting, or changing correlations - analyze these market modification and choose which to implement. Add diversification regularization - as an RCPO cost:
+```powershell
+py -3.11 train.py --algo rcpo --constraint-drawdown --config configs/default.yaml
+```
 
-constraint_cost = downside_cost + beta * concentration_cost; concentration = sum(weights^2). 
+Train RCPO with reward correction:
 
-i am required to explain the whole project to my professor. summarize environement, algorithm and results so far from below files:
-latest_rcpo_none_20260419_173124, latest_rcpo_20260417_183003, latest_rcpo_gdrc_20260419_173123, latest_ppo_unconstrained_20260416_220423.
-generate detailed report and leave the place for proper figures
+```powershell
+py -3.11 train.py --algo rcpo --constraint-drawdown --use-drc --config configs/default.yaml
+py -3.11 train.py --algo rcpo --constraint-drawdown --use-gdrc --config configs/default.yaml
+```
 
-为啥turnover一开始0后面涨起来
-  synthetic two-regime market and long-only portfolio weights. 
- 
-  downside and Sortino constraint modes
+Run the equal-weight baseline:
 
-  optional DRC/GDRC reward correction
+```powershell
+py -3.11 train.py --algo equal_weight --config configs/default.yaml
+```
 
-  robust multi-market design intended to reduce train-path overfitting.
+Resume RCPO from the last checkpoint:
 
-The central empirical finding so far is that PPO and RCPO can learn high-return policies on the training paths, but early versions often overfit a small number of synthetic market paths. RCPO variants improved validation return but also produced very high turnover. GDRC did not fully solve something. 
+```powershell
+py -3.11 train.py --algo rcpo --constraint-drawdown --resume-run-dir "runs\new_rcpo_none_20260427_184555\seed_0"
+```
 
-current robust upgrade: 
-train on many markets, 
-select checkpoints using mean validation performance over multiple future branches, 
-initialize near equal weight, 
-add learnable market structure
+Resume RCPO with GDRC:
 
+```powershell
+py -3.11 train.py --algo rcpo --constraint-drawdown --use-gdrc --resume-run-dir "runs\new_rcpo_gdrc_YYYYMMDD_HHMMSS\seed_0"
+```
+
+Resume PPO:
+
+```powershell
+py -3.11 train.py --algo ppo_unconstrained --resume-run-dir "runs\new_ppo_unconstrained_none_20260424_170155\seed_0"
+```
+
+To resume from a specific checkpoint file inside the run directory:
+
+```powershell
+py -3.11 train.py --algo rcpo --constraint-drawdown --resume-run-dir "runs\new_rcpo_none_YYYYMMDD_HHMMSS\seed_0" --resume-checkpoint checkpoint_best.pt
+```
+
+## Evaluation Commands
+
+Evaluate the best checkpoint:
+
+```powershell
+py -3.11 evaluate.py --run-dir "runs\latest_rcpo_none_YYYYMMDD_HHMMSS\seed_0" --checkpoint checkpoint_best.pt
+```
+
+Evaluate the last checkpoint with 20 future continuation markets:
+
+```powershell
+py -3.11 evaluate.py --run-dir "runs\new_ppo_unconstrained_none_20260424_170155\seed_0" --checkpoint checkpoint_last.pt --future-market-count 20
+```
+
+Evaluate one future market that uses the same numeric seed as the train split:
+
+```powershell
+py -3.11 evaluate.py --run-dir "runs\latest_rcpo_none_YYYYMMDD_HHMMSS\seed_0" --checkpoint checkpoint_last.pt --include-train-seed-future --train-seed-future-steps 252
+```
 
 ## Constraint Definition
 
-- Reward: net portfolio log return after transaction costs
-- `--constraint-downside`: cost is normalized downside semivariance `max(0, -r_t)^2 / downside_cost_scale`
-- `--constraint-sortino`: cost is a target-violation penalty `max(0, sortino_target - rolling_sortino)^2 / sortino_cost_scale`
-- Group allocation bounds remain available in config and reports as diagnostics only; they do not affect RCPO training.
+Reward is net portfolio log return after transaction costs:
+
+```text
+reward_t = log(1 + net_simple_return_t)
+```
+
+RCPO uses a benchmark-relative maximum drawdown constraint. During each episode, the environment tracks the agent portfolio path and an online equal-weight benchmark path under the same transaction-cost model:
+
+```text
+agent_current_drawdown_t = (agent_running_peak_t - agent_portfolio_value_t) / agent_running_peak_t
+agent_max_drawdown_t = max(previous_agent_max_drawdown, agent_current_drawdown_t)
+equal_weight_max_drawdown_t = max(previous_equal_weight_max_drawdown, equal_weight_current_drawdown_t)
+budget_t = max(drawdown_budget_floor, benchmark_drawdown_margin * equal_weight_max_drawdown_t)
+drawdown_violation_t = max(0, agent_max_drawdown_t - budget_t)
+constraint_cost = drawdown_violation^2 / drawdown_cost_scale
+```
+
+Default settings:
+
+```yaml
+environment:
+  drawdown_budget_floor: 0.02
+  benchmark_drawdown_margin: 0.90
+  drawdown_cost_scale: 0.01
+
+rcpo:
+  alpha: null
+  alpha_budget_ratio: 0.05
+```
+
+This means the policy can seek return, but RCPO penalizes episode paths whose running maximum drawdown exceeds a budget defined online from equal weight. The `0.90` margin asks the policy to stay about 10% safer than equal weight on drawdown, subject to the `0.02` minimum floor. With `alpha_budget_ratio: 0.05`, the Lagrange multiplier tolerates about 5% of the current effective drawdown budget as average violation before it increases.
 
 ## DRC / GDRC Reward Correction
 
-Optional reward-correction modes are available for both PPO and RCPO:
+Optional reward-correction modes are available for PPO and RCPO:
 
 - No flag: train on the environment reward directly.
-- `--use-drc`: train a single distributional reward critic and use its corrected reward for reward advantages/value targets.
+- `--use-drc`: train a single distributional reward critic and use corrected rewards for reward advantages/value targets.
 - `--use-gdrc`: train an ensemble of DRC critics and select the active critic using ordinal-cross-entropy behavior.
 
 DRC/GDRC only change the reward stream used for training. Evaluation summaries and plots still report actual portfolio returns from the environment.
 
-The default GDRC settings are tuned for the current synthetic portfolio reward scale: six candidate critics use bin counts `2, 4, 6, 8, 10, 12`; the adaptive reward range uses recent rewards between the `0.5` and `99.5` percentiles; and each corrector trains for `3` epochs per rollout update to reduce rollout memorization.
-
 ## Device Selection
 
-Training selects the PyTorch device from YAML only. The default is `runtime.device: auto`, which uses CUDA when PyTorch can see a GPU and otherwise falls back to CPU. Set `runtime.device: cpu` in the config to force CPU.
+Training selects the PyTorch device from YAML only:
+
+```yaml
+runtime:
+  device: auto
+```
+
+`auto` uses CUDA when PyTorch can see a GPU and otherwise falls back to CPU. Set `runtime.device: cpu` to force CPU.
 
 ## Outputs
 
@@ -98,5 +158,15 @@ Training creates a run directory containing:
 - `metrics.jsonl`
 - `checkpoint_last.pt`
 - `checkpoint_best.pt`
-- `evaluation/summary_*.json`
-- `evaluation/*.png`
+- `training_summary.json`
+- `evaluation/`
+- `evaluation_best/`
+- `evaluation_last/`
+
+Evaluation folders contain JSON summaries and PNG plots for cumulative return, mean cumulative return across future branches, portfolio weights, turnover, drawdown, drawdown constraint cost, and lambda trajectory.
+
+## Tests
+
+```powershell
+py -3.11 -m pytest
+```

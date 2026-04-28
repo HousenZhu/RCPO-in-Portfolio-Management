@@ -6,6 +6,8 @@ from typing import Any
 
 import yaml
 
+BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION = "benchmark_relative_equal_weight_drawdown_v1"
+
 
 @dataclass
 class ExperimentConfig:
@@ -54,12 +56,10 @@ class EnvironmentConfig:
     episode_length: int = 252
     transaction_cost_bps: float = 1.0
     turnover_cap: float = 0.40
-    constraint_mode: str = "downside"
-    downside_cost_scale: float = 1e-4
-    sortino_target: float = 1.0
-    sortino_window: int = 252
-    sortino_min_periods: int = 20
-    sortino_cost_scale: float = 1.0
+    constraint_mode: str = "max_drawdown"
+    drawdown_budget_floor: float = 0.02
+    benchmark_drawdown_margin: float = 0.90
+    drawdown_cost_scale: float = 0.01
     diversification_beta: float = 0.03
     group_a_indices: list[int] = field(default_factory=lambda: [0, 1])
     group_b_indices: list[int] = field(default_factory=lambda: [2, 3, 4])
@@ -73,7 +73,6 @@ class EnvironmentConfig:
     )
     resolved_group_a_min_weight: float | None = None
     resolved_group_b_max_weight: float | None = None
-    downside_cost_weight: float = 1.0
     group_a_min_cost_weight: float = 0.35
     group_b_max_cost_weight: float = 0.35
 
@@ -131,14 +130,11 @@ class PPOOptimizationConfig:
 class RCPOConfig:
     initial_lambda: float = 0.0
     lambda_lr: float = 0.02
+    lambda_lr_up: float = 0.015
+    lambda_lr_down: float = 0.03
     alpha: float | None = None
-    calibration_episodes: int = 16
-    calibration_scale: float = 0.9
-    constraint_mode: str = "downside"
-    sortino_target: float = 1.0
-    sortino_window: int = 252
-    sortino_min_periods: int = 20
-    sortino_cost_scale: float = 1.0
+    alpha_budget_ratio: float = 0.05
+    constraint_mode: str = "max_drawdown"
 
 
 @dataclass
@@ -185,13 +181,21 @@ class ProjectConfig:
 
 
 def sync_rcpo_constraint_settings(config: ProjectConfig) -> None:
-    if config.rcpo.constraint_mode not in {"downside", "sortino"}:
-        raise ValueError("rcpo.constraint_mode must be either 'downside' or 'sortino'.")
+    if config.rcpo.constraint_mode != "max_drawdown":
+        raise ValueError("rcpo.constraint_mode must be 'max_drawdown'.")
     config.environment.constraint_mode = config.rcpo.constraint_mode
-    config.environment.sortino_target = config.rcpo.sortino_target
-    config.environment.sortino_window = config.rcpo.sortino_window
-    config.environment.sortino_min_periods = config.rcpo.sortino_min_periods
-    config.environment.sortino_cost_scale = config.rcpo.sortino_cost_scale
+    if config.environment.drawdown_budget_floor < 0.0:
+        raise ValueError("environment.drawdown_budget_floor cannot be negative.")
+    if config.environment.benchmark_drawdown_margin <= 0.0:
+        raise ValueError("environment.benchmark_drawdown_margin must be positive.")
+    if config.environment.drawdown_cost_scale <= 0.0:
+        raise ValueError("environment.drawdown_cost_scale must be positive.")
+    if config.rcpo.alpha_budget_ratio < 0.0:
+        raise ValueError("rcpo.alpha_budget_ratio cannot be negative.")
+    if config.rcpo.lambda_lr_up <= 0.0:
+        raise ValueError("rcpo.lambda_lr_up must be positive.")
+    if config.rcpo.lambda_lr_down <= 0.0:
+        raise ValueError("rcpo.lambda_lr_down must be positive.")
 
 
 def validate_reward_correction_settings(config: ProjectConfig) -> None:

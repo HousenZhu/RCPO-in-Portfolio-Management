@@ -35,12 +35,10 @@ environment:
   episode_length: 252
   transaction_cost_bps: 1.0
   turnover_cap: 0.40
-  constraint_mode: downside
-  downside_cost_scale: 0.0001
-  sortino_target: 1.0
-  sortino_window: 252
-  sortino_min_periods: 20
-  sortino_cost_scale: 1.0
+  constraint_mode: max_drawdown
+  drawdown_budget_floor: 0.05
+  benchmark_drawdown_margin: 0.96
+  drawdown_cost_scale: 0.01
   diversification_beta: 0.0
   group_a_indices: [0, 1]
   group_b_indices: [2, 3, 4]
@@ -55,7 +53,6 @@ environment:
     c3:
       group_a_min_weight: 0.30
       group_b_max_weight: 0.50
-  downside_cost_weight: 1.0
   group_a_min_cost_weight: 0.35
   group_b_max_cost_weight: 0.35
 
@@ -67,11 +64,11 @@ network:
   equal_weight_policy_init: true
 
 optimization:
-  total_updates: 800
+  total_updates: 1000
   rollout_steps: 2048
-  epochs: 8
-  minibatch_size: 256
-  learning_rate: 0.0005
+  epochs: 4
+  minibatch_size: 512
+  learning_rate: 0.00023
   learning_rate_final: 0.00004
   gamma: 0.99
   gae_lambda: 0.95
@@ -105,14 +102,11 @@ ppo:
 rcpo:
   initial_lambda: 0.0
   lambda_lr: 0.05
+  lambda_lr_up: 0.01
+  lambda_lr_down: 0.05
   alpha:
-  calibration_episodes: 16
-  calibration_scale: 0.9
-  constraint_mode: downside
-  sortino_target: 1.0
-  sortino_window: 252
-  sortino_min_periods: 20
-  sortino_cost_scale: 1.0
+  alpha_budget_ratio: 0.05
+  constraint_mode: max_drawdown
 
 reward_correction:
   mode: none

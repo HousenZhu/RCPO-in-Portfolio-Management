@@ -24,10 +24,19 @@ def tiny_config(tmp_path: Path) -> ProjectConfig:
     config.market.validation_steps = 96
     config.market.test_steps = 96
     config.environment.episode_length = 32
+    config.environment.drawdown_budget_floor = 0.02
+    config.environment.benchmark_drawdown_margin = 0.90
+    config.environment.drawdown_cost_scale = 0.01
+    config.rcpo.alpha = None
+    config.rcpo.alpha_budget_ratio = 0.05
+    config.rcpo.lambda_lr_up = 0.015
+    config.rcpo.lambda_lr_down = 0.03
     config.optimization.total_updates = 1
     config.optimization.rollout_steps = 64
     config.optimization.epochs = 1
     config.optimization.minibatch_size = 32
+    config.optimization.target_kl = 10.0
+    config.optimization.early_stop_patience = None
     config.ppo.total_updates = 1
     config.ppo.rollout_steps = 64
     config.ppo.epochs = 1
@@ -39,7 +48,6 @@ def tiny_config(tmp_path: Path) -> ProjectConfig:
     config.evaluation.episodes = 1
     config.evaluation.validation_branch_count = 2
     config.evaluation.test_branch_count = 2
-    config.rcpo.calibration_episodes = 1
     config.reward_correction.hidden_sizes = [16]
     config.reward_correction.train_epochs_per_update = 1
     config.reward_correction.num_bins = 5
@@ -53,17 +61,13 @@ def test_short_training_runs_for_rcpo_and_ppo(tmp_path: Path) -> None:
     runs: dict[tuple[str, str], Path] = {}
     for reward_mode in ["none", "drc", "gdrc"]:
         config.reward_correction.mode = reward_mode
-        config.rcpo.constraint_mode = "downside"
         config.experiment.run_name = f"tiny_rcpo_{reward_mode}"
         runs[("rcpo", reward_mode)] = run_experiment(config, algo="rcpo")[0]
         config.experiment.run_name = f"tiny_ppo_{reward_mode}"
         runs[("ppo_unconstrained", reward_mode)] = run_experiment(
             config, algo="ppo_unconstrained"
         )[0]
-    config.reward_correction.mode = "gdrc"
-    config.rcpo.constraint_mode = "sortino"
-    config.experiment.run_name = "tiny_sortino_gdrc"
-    sortino_run = run_experiment(config, algo="rcpo")[0]
+
     rcpo_run = runs[("rcpo", "none")]
     ppo_run = runs[("ppo_unconstrained", "none")]
     rcpo_drc_run = runs[("rcpo", "drc")]
@@ -73,13 +77,15 @@ def test_short_training_runs_for_rcpo_and_ppo(tmp_path: Path) -> None:
 
     assert (rcpo_run / "checkpoint_last.pt").exists()
     assert (rcpo_run / "checkpoint_best.pt").exists()
-    assert (sortino_run / "checkpoint_last.pt").exists()
-    assert (sortino_run / "checkpoint_best.pt").exists()
     assert (rcpo_drc_run / "checkpoint_best.pt").exists()
     assert (rcpo_gdrc_run / "checkpoint_best.pt").exists()
+    assert (ppo_run / "checkpoint_last.pt").exists()
+    assert (ppo_run / "checkpoint_best.pt").exists()
     assert (ppo_drc_run / "checkpoint_best.pt").exists()
     assert (ppo_gdrc_run / "checkpoint_best.pt").exists()
+
     assert (rcpo_run / "metrics.jsonl").exists()
+    assert (rcpo_run / "evaluation" / "group_weights_validation.png").exists()
     assert (rcpo_run / "evaluation" / "training_return.png").exists()
     assert (rcpo_run / "evaluation" / "training_turnover.png").exists()
     assert (rcpo_run / "evaluation_best" / "summary_validation.json").exists()
@@ -87,27 +93,37 @@ def test_short_training_runs_for_rcpo_and_ppo(tmp_path: Path) -> None:
     assert (rcpo_run / "evaluation_last" / "summary_validation.json").exists()
     assert (rcpo_run / "evaluation_last" / "summary_test.json").exists()
     assert not (rcpo_run / "evaluation" / "summary_test.json").exists()
-    assert (ppo_run / "checkpoint_last.pt").exists()
-    assert (ppo_run / "checkpoint_best.pt").exists()
+    assert (rcpo_run / "evaluation_best" / "mean_cumulative_return_test.png").exists()
+    assert (rcpo_run / "evaluation_best" / "cumulative_return_test.png").exists()
+    assert (rcpo_run / "evaluation_best" / "drawdown_test.png").exists()
+    assert (rcpo_run / "evaluation_best" / "drawdown_constraint_cost_test.png").exists()
     assert (ppo_run / "evaluation_best" / "summary_test.json").exists()
+
     with (rcpo_run / "evaluation_best" / "summary_test.json").open("r", encoding="utf-8") as handle:
         payload = json.load(handle)
     assert "average_constraint_cost" in payload
+    assert "benchmark_max_drawdown" in payload
+    assert "effective_drawdown_budget" in payload
+    assert "average_drawdown_gap" in payload
+    assert "average_drawdown_violation" in payload
+    assert "average_drawdown_constraint_cost" in payload
     assert "average_group_a_min_violation_cost" in payload
     assert "average_group_a_weight" in payload
-    assert (rcpo_run / "evaluation_best" / "mean_cumulative_return_test.png").exists()
-    assert (rcpo_run / "evaluation_best" / "cumulative_return_test.png").exists()
+
     with (rcpo_run / "config_snapshot.yaml").open("r", encoding="utf-8") as handle:
         snapshot = handle.read()
     assert "active_constraint_preset: c2" in snapshot
-    assert "constraint_mode: downside" in snapshot
+    assert "constraint_mode: max_drawdown" in snapshot
+    assert "drawdown_budget_floor: 0.02" in snapshot
+    assert "benchmark_drawdown_margin: 0.9" in snapshot
+    assert "drawdown_cost_scale: 0.01" in snapshot
+    assert "alpha_budget_ratio: 0.05" in snapshot
+    assert "lambda_lr_up: 0.015" in snapshot
+    assert "lambda_lr_down: 0.03" in snapshot
     assert "runtime:" in snapshot
     assert "device: cpu" in snapshot
     assert "resolved_group_a_min_weight: 0.25" in snapshot
-    with (sortino_run / "config_snapshot.yaml").open("r", encoding="utf-8") as handle:
-        sortino_snapshot = handle.read()
-    assert "constraint_mode: sortino" in sortino_snapshot
-    assert "mode: gdrc" in sortino_snapshot
+
     with (ppo_run / "metrics.jsonl").open("r", encoding="utf-8") as handle:
         ppo_metric = json.loads(handle.readline())
     assert "approx_kl" in ppo_metric
@@ -115,24 +131,48 @@ def test_short_training_runs_for_rcpo_and_ppo(tmp_path: Path) -> None:
     assert "learning_rate" in ppo_metric
     assert "validation_annualized_return" in ppo_metric
     assert ppo_metric["learning_rate"] == config.ppo.learning_rate
+
     with (rcpo_run / "metrics.jsonl").open("r", encoding="utf-8") as handle:
         rcpo_metric = json.loads(handle.readline())
     assert rcpo_metric["learning_rate"] == config.optimization.learning_rate
+    assert rcpo_metric["constraint_mode"] == "max_drawdown"
+    assert rcpo_metric["alpha_mode"] == "budget_ratio"
+    assert rcpo_metric["alpha_budget_ratio"] == config.rcpo.alpha_budget_ratio
+    assert rcpo_metric["lambda_lr_up"] == config.rcpo.lambda_lr_up
+    assert rcpo_metric["lambda_lr_down"] == config.rcpo.lambda_lr_down
+    assert "lambda_gap" in rcpo_metric
+    assert rcpo_metric["alpha"] == rcpo_metric["batch_alpha_target_mean"]
+    assert rcpo_metric["alpha"] > 0.0
     assert "validation_turnover" in rcpo_metric
     assert "validation_mean_excess_cumulative_return" in rcpo_metric
     assert "validation_win_rate_vs_equal_weight" in rcpo_metric
-    assert rcpo_metric["validation_evaluated"] == 1
-    assert rcpo_metric["validation_interval_updates"] == config.evaluation.validation_interval_updates
+    assert "validation_max_drawdown" in rcpo_metric
+    assert "validation_benchmark_max_drawdown" in rcpo_metric
+    assert "validation_effective_drawdown_budget" in rcpo_metric
+    assert "validation_alpha_target" in rcpo_metric
+    assert "validation_drawdown_gap" in rcpo_metric
+    assert "validation_drawdown_violation" in rcpo_metric
+    assert "validation_drawdown_constraint_cost" in rcpo_metric
+    assert "batch_current_drawdown_mean" in rcpo_metric
+    assert "batch_max_drawdown_mean" in rcpo_metric
+    assert "batch_benchmark_max_drawdown_mean" in rcpo_metric
+    assert "batch_effective_drawdown_budget_mean" in rcpo_metric
+    assert "batch_alpha_target_mean" in rcpo_metric
+    assert "batch_drawdown_gap_mean" in rcpo_metric
+    assert "batch_drawdown_violation_mean" in rcpo_metric
     assert "batch_concentration_mean" in rcpo_metric
     assert "batch_diversification_cost_mean" in rcpo_metric
-    assert "turnover_cap" in rcpo_metric
+    assert rcpo_metric["validation_evaluated"] == 1
+    assert rcpo_metric["validation_interval_updates"] == config.evaluation.validation_interval_updates
     assert rcpo_metric["device"] == "cpu"
     assert rcpo_metric["reward_correction_mode"] == "none"
+
     with (rcpo_drc_run / "metrics.jsonl").open("r", encoding="utf-8") as handle:
         rcpo_drc_metric = json.loads(handle.readline())
     assert rcpo_drc_metric["reward_correction_mode"] == "drc"
     assert "reward_correction_delta_abs_mean" in rcpo_drc_metric
     assert (rcpo_drc_run / "evaluation" / "training_reward_correction.png").exists()
+
     with (rcpo_gdrc_run / "metrics.jsonl").open("r", encoding="utf-8") as handle:
         rcpo_gdrc_metric = json.loads(handle.readline())
     assert rcpo_gdrc_metric["reward_correction_mode"] == "gdrc"
@@ -141,11 +181,30 @@ def test_short_training_runs_for_rcpo_and_ppo(tmp_path: Path) -> None:
 
     original_metric_count = sum(1 for _ in (ppo_run / "metrics.jsonl").open("r", encoding="utf-8"))
     config.reward_correction.mode = "none"
-    config.rcpo.constraint_mode = "downside"
     config.ppo.total_updates = 1
     resumed_run = resume_experiment(config, algo="ppo_unconstrained", run_dir=ppo_run)
     resumed_metric_count = sum(1 for _ in (resumed_run / "metrics.jsonl").open("r", encoding="utf-8"))
     assert resumed_metric_count == original_metric_count + 1
+
+
+def test_resume_rejects_legacy_rcpo_constraint_mode(tmp_path: Path) -> None:
+    config = tiny_config(tmp_path)
+    config.reward_correction.mode = "none"
+    config.experiment.run_name = "tiny_rcpo_resume_guard"
+    run_dir = run_experiment(config, algo="rcpo")[0]
+
+    checkpoint_path = run_dir / "checkpoint_legacy.pt"
+    payload = torch.load(run_dir / "checkpoint_last.pt", map_location="cpu")
+    payload["constraint_semantics"] = "fixed_drawdown_v0"
+    torch.save(payload, checkpoint_path)
+
+    with pytest.raises(ValueError, match="Legacy fixed-budget drawdown checkpoints are not supported"):
+        resume_experiment(
+            config,
+            algo="rcpo",
+            run_dir=run_dir,
+            checkpoint_name="checkpoint_legacy.pt",
+        )
 
 
 def test_load_config_supports_validation_and_legacy_train_test_only(tmp_path: Path) -> None:
@@ -214,7 +273,6 @@ def test_short_training_can_use_cuda_when_configured(tmp_path: Path) -> None:
     config = tiny_config(tmp_path)
     config.runtime.device = "cuda"
     config.reward_correction.mode = "none"
-    config.rcpo.constraint_mode = "downside"
     config.experiment.run_name = "tiny_cuda_rcpo"
 
     run_dir = run_experiment(config, algo="rcpo")[0]
