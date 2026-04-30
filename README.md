@@ -45,6 +45,15 @@ py -3.11 train.py --algo rcpo --constraint-drawdown --use-drc --config configs/d
 py -3.11 train.py --algo rcpo --constraint-drawdown --use-gdrc --config configs/default.yaml
 ```
 
+Train with Gaussian reward noise when `reward_noise.enabled: true` in `configs/default.yaml`:
+
+```powershell
+py -3.11 train.py --algo ppo_unconstrained --config configs/default.yaml
+py -3.11 train.py --algo ppo_unconstrained --use-gdrc --config configs/default.yaml
+py -3.11 train.py --algo rcpo --constraint-drawdown --config configs/default.yaml
+py -3.11 train.py --algo rcpo --constraint-drawdown --use-gdrc --config configs/default.yaml
+```
+
 Run the equal-weight baseline:
 
 ```powershell
@@ -60,13 +69,13 @@ py -3.11 train.py --algo rcpo --constraint-drawdown --resume-run-dir "runs\new_r
 Resume RCPO with GDRC:
 
 ```powershell
-py -3.11 train.py --algo rcpo --constraint-drawdown --use-gdrc --resume-run-dir "runs\new_rcpo_gdrc_YYYYMMDD_HHMMSS\seed_0"
+py -3.11 train.py --algo rcpo --constraint-drawdown --use-gdrc --resume-run-dir "runs\noise_v1_rcpo_gdrc_20260429_121506\seed_0"
 ```
 
 Resume PPO:
 
 ```powershell
-py -3.11 train.py --algo ppo_unconstrained --resume-run-dir "runs\new_ppo_unconstrained_none_20260424_170155\seed_0"
+py -3.11 train.py --algo ppo_unconstrained  --resume-run-dir "runs\new_ppo_unconstrained_none_20260424_170155\seed_0"
 ```
 
 To resume from a specific checkpoint file inside the run directory:
@@ -74,6 +83,7 @@ To resume from a specific checkpoint file inside the run directory:
 ```powershell
 py -3.11 train.py --algo rcpo --constraint-drawdown --resume-run-dir "runs\new_rcpo_none_YYYYMMDD_HHMMSS\seed_0" --resume-checkpoint checkpoint_best.pt
 ```
+noise_v1_ppo_unconstrained_gdrc_20260429_153756
 
 ## Evaluation Commands
 
@@ -135,9 +145,42 @@ Optional reward-correction modes are available for PPO and RCPO:
 
 - No flag: train on the environment reward directly.
 - `--use-drc`: train a single distributional reward critic and use corrected rewards for reward advantages/value targets.
-- `--use-gdrc`: train an ensemble of DRC critics and select the active critic using ordinal-cross-entropy behavior.
+- `--use-gdrc`: train a fine-bin GDRC ensemble and select between 48-bin and 64-bin reward critics.
 
 DRC/GDRC only change the reward stream used for training. Evaluation summaries and plots still report actual portfolio returns from the environment.
+
+The current GDRC stabilization settings are:
+
+```yaml
+reward_correction:
+  mode: gdrc
+  num_bins: 48
+  gdrc_candidate_bins: [48, 64]
+  correction_coef: 0.50
+  correction_delta_clip: 0.0015
+```
+
+`correction_coef` applies only part of the critic's suggested reward correction, and `correction_delta_clip` caps the final per-step correction used for training.
+
+## Reward Noise
+
+`configs/default.yaml` includes an optional Gaussian training reward-noise channel. The current experiment config is set to `enabled: true`; set it to `false` for clean-reward training.
+
+```yaml
+reward_noise:
+  enabled: true
+  mode: gaussian
+  std: 0.003
+  seed_offset: 30000
+```
+
+With `enabled: true`, rollout collection trains on noisy observed rewards:
+
+```text
+observed_reward_t = true_reward_t + Normal(0, 0.003)
+```
+
+Only rollout training rewards are corrupted. Validation, test evaluation, checkpoint scoring, drawdown costs, and equal-weight comparisons continue to use clean portfolio returns.
 
 ## Device Selection
 

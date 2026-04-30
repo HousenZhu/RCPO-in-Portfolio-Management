@@ -52,6 +52,7 @@ def tiny_config(tmp_path: Path) -> ProjectConfig:
     config.reward_correction.train_epochs_per_update = 1
     config.reward_correction.num_bins = 5
     config.reward_correction.gdrc_num_candidates = 2
+    config.reward_correction.gdrc_candidate_bins = [48, 64]
     config.reward_correction.gdrc_range_window_updates = 2
     return config
 
@@ -120,6 +121,8 @@ def test_short_training_runs_for_rcpo_and_ppo(tmp_path: Path) -> None:
     assert "alpha_budget_ratio: 0.05" in snapshot
     assert "lambda_lr_up: 0.015" in snapshot
     assert "lambda_lr_down: 0.03" in snapshot
+    assert "reward_noise:" in snapshot
+    assert "enabled: false" in snapshot
     assert "runtime:" in snapshot
     assert "device: cpu" in snapshot
     assert "resolved_group_a_min_weight: 0.25" in snapshot
@@ -131,6 +134,8 @@ def test_short_training_runs_for_rcpo_and_ppo(tmp_path: Path) -> None:
     assert "learning_rate" in ppo_metric
     assert "validation_annualized_return" in ppo_metric
     assert ppo_metric["learning_rate"] == config.ppo.learning_rate
+    assert ppo_metric["reward_noise_enabled"] == 0
+    assert ppo_metric["batch_reward_noise_std"] == 0.0
 
     with (rcpo_run / "metrics.jsonl").open("r", encoding="utf-8") as handle:
         rcpo_metric = json.loads(handle.readline())
@@ -162,6 +167,11 @@ def test_short_training_runs_for_rcpo_and_ppo(tmp_path: Path) -> None:
     assert "batch_drawdown_violation_mean" in rcpo_metric
     assert "batch_concentration_mean" in rcpo_metric
     assert "batch_diversification_cost_mean" in rcpo_metric
+    assert "batch_true_reward_mean" in rcpo_metric
+    assert "batch_observed_reward_mean" in rcpo_metric
+    assert "batch_reward_noise_mean" in rcpo_metric
+    assert "batch_reward_noise_std" in rcpo_metric
+    assert rcpo_metric["reward_noise_enabled"] == 0
     assert rcpo_metric["validation_evaluated"] == 1
     assert rcpo_metric["validation_interval_updates"] == config.evaluation.validation_interval_updates
     assert rcpo_metric["device"] == "cpu"
@@ -176,7 +186,12 @@ def test_short_training_runs_for_rcpo_and_ppo(tmp_path: Path) -> None:
     with (rcpo_gdrc_run / "metrics.jsonl").open("r", encoding="utf-8") as handle:
         rcpo_gdrc_metric = json.loads(handle.readline())
     assert rcpo_gdrc_metric["reward_correction_mode"] == "gdrc"
-    assert rcpo_gdrc_metric["gdrc_selected_bins"] in {2, 4}
+    assert rcpo_gdrc_metric["gdrc_selected_bins"] in {48, 64}
+    assert rcpo_gdrc_metric["gdrc_candidate_bins"] == [48, 64]
+    assert rcpo_gdrc_metric["reward_correction_coef"] == pytest.approx(0.50)
+    assert rcpo_gdrc_metric["reward_correction_delta_clip"] == pytest.approx(0.0015)
+    assert "reward_correction_raw_delta_abs_mean" in rcpo_gdrc_metric
+    assert "reward_correction_effective_delta_abs_mean" in rcpo_gdrc_metric
     assert (rcpo_gdrc_run / "evaluation" / "gdrc_selected_bins.png").exists()
 
     original_metric_count = sum(1 for _ in (ppo_run / "metrics.jsonl").open("r", encoding="utf-8"))
@@ -185,6 +200,44 @@ def test_short_training_runs_for_rcpo_and_ppo(tmp_path: Path) -> None:
     resumed_run = resume_experiment(config, algo="ppo_unconstrained", run_dir=ppo_run)
     resumed_metric_count = sum(1 for _ in (resumed_run / "metrics.jsonl").open("r", encoding="utf-8"))
     assert resumed_metric_count == original_metric_count + 1
+
+
+def test_short_noisy_reward_training_runs(tmp_path: Path) -> None:
+    config = tiny_config(tmp_path)
+    config.reward_noise.enabled = True
+    config.reward_noise.std = 0.003
+    config.reward_correction.mode = "none"
+    config.experiment.run_name = "tiny_noisy_ppo"
+    ppo_run = run_experiment(config, algo="ppo_unconstrained")[0]
+
+    config.reward_correction.mode = "gdrc"
+    config.experiment.run_name = "tiny_noisy_ppo_gdrc"
+    ppo_gdrc_run = run_experiment(config, algo="ppo_unconstrained")[0]
+
+    config.reward_correction.mode = "none"
+    config.experiment.run_name = "tiny_noisy_rcpo"
+    rcpo_run = run_experiment(config, algo="rcpo")[0]
+
+    with (ppo_run / "metrics.jsonl").open("r", encoding="utf-8") as handle:
+        ppo_metric = json.loads(handle.readline())
+    assert ppo_metric["reward_noise_enabled"] == 1
+    assert ppo_metric["reward_noise_std"] == pytest.approx(0.003)
+    assert ppo_metric["batch_reward_noise_std"] > 0.0
+    assert ppo_metric["batch_true_reward_mean"] != ppo_metric["batch_observed_reward_mean"]
+
+    with (ppo_gdrc_run / "metrics.jsonl").open("r", encoding="utf-8") as handle:
+        ppo_gdrc_metric = json.loads(handle.readline())
+    assert ppo_gdrc_metric["reward_noise_enabled"] == 1
+    assert ppo_gdrc_metric["reward_correction_mode"] == "gdrc"
+    assert ppo_gdrc_metric["gdrc_selected_bins"] in {48, 64}
+    assert "reward_correction_delta_abs_mean" in ppo_gdrc_metric
+    assert "reward_correction_raw_delta_abs_mean" in ppo_gdrc_metric
+
+    with (rcpo_run / "metrics.jsonl").open("r", encoding="utf-8") as handle:
+        rcpo_metric = json.loads(handle.readline())
+    assert rcpo_metric["reward_noise_enabled"] == 1
+    assert rcpo_metric["constraint_mode"] == "max_drawdown"
+    assert "batch_drawdown_constraint_cost_mean" in rcpo_metric
 
 
 def test_resume_rejects_legacy_rcpo_constraint_mode(tmp_path: Path) -> None:

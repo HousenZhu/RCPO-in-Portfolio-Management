@@ -1,0 +1,113 @@
+{
+  "branch_count_per_policy": 20,
+  "checkpoint": "checkpoint_best.pt",
+  "future_seed_start": 10000,
+  "equal_weight_anchor_seed": 10000,
+  "methodology": "Models use continuation branches from their own training endpoints. Each plot shows exactly one solid equal-weight baseline generated from a seed-10000 equal-weight anchor.",
+  "groups": {
+    "clean": {
+      "branch_count_per_policy": 20,
+      "checkpoint": "checkpoint_best.pt",
+      "future_seed_start": 10000,
+      "methodology": "Models use continuation branches from their own anchor training endpoints. Each plot includes one solid equal-weight baseline generated from the equal-weight seed-10000 anchor.",
+      "policies": {
+        "PPO": {
+          "mean_final_cumulative_return": 0.2148304173069529,
+          "mean_excess_cumulative_return_vs_equal_weight_seed_anchor": 0.0933033612637936,
+          "win_rate_vs_equal_weight_seed_anchor": 0.75,
+          "mean_max_drawdown": 0.16582873473059295,
+          "mean_max_drawdown_gap_vs_equal_weight_seed_anchor": 0.030808473892481102,
+          "mean_average_turnover": 0.12758603877903496
+        },
+        "RCPO": {
+          "mean_final_cumulative_return": 0.18963175652229364,
+          "mean_excess_cumulative_return_vs_equal_weight_seed_anchor": 0.06810470047913432,
+          "win_rate_vs_equal_weight_seed_anchor": 0.7,
+          "mean_max_drawdown": 0.13061361417275266,
+          "mean_max_drawdown_gap_vs_equal_weight_seed_anchor": -0.004406646665359186,
+          "mean_average_turnover": 0.18456243466750336
+        },
+        "Equal Weight": {
+          "mean_final_cumulative_return": 0.1215270560431593,
+          "mean_excess_cumulative_return_vs_equal_weight_seed_anchor": 0.0,
+          "win_rate_vs_equal_weight_seed_anchor": 0.0,
+          "mean_max_drawdown": 0.13502026083811186,
+          "mean_max_drawdown_gap_vs_equal_weight_seed_anchor": 0.0,
+          "mean_average_turnover": 0.0066137559830196325
+        }
+      },
+      "equal_weight_anchor": {
+        "anchor_source": "equal_weight_seed_anchor",
+        "anchor_seed": 10000,
+        "train_market_seed": 10011,
+        "future_seed_start": 10000
+      }
+    },
+    "noisy": {
+      "branch_count_per_policy": 20,
+      "checkpoint": "checkpoint_best.pt",
+      "future_seed_start": 10000,
+      "methodology": "Models use continuation branches from their own anchor training endpoints. Each plot includes one solid equal-weight baseline generated from the equal-weight seed-10000 anchor.",
+      "policies": {
+        "Noisy PPO": {
+          "mean_final_cumulative_return": 0.14259746454455696,
+          "mean_excess_cumulative_return_vs_equal_weight_seed_anchor": 0.02107040850139766,
+          "win_rate_vs_equal_weight_seed_anchor": 0.55,
+          "mean_max_drawdown": 0.14273615292985004,
+          "mean_max_drawdown_gap_vs_equal_weight_seed_anchor": 0.007715892091738186,
+          "mean_average_turnover": 0.2971761737055781
+        },
+        "Noisy RCPO": {
+          "mean_final_cumulative_return": 0.1956565424871291,
+          "mean_excess_cumulative_return_vs_equal_weight_seed_anchor": 0.0741294864439698,
+          "win_rate_vs_equal_weight_seed_anchor": 0.75,
+          "mean_max_drawdown": 0.13461626403045565,
+          "mean_max_drawdown_gap_vs_equal_weight_seed_anchor": -0.00040399680765622407,
+          "mean_average_turnover": 0.25645486485279567
+        },
+        "PPO+GDRC": {
+          "mean_final_cumulative_return": 0.11577977584404811,
+          "mean_excess_cumulative_return_vs_equal_weight_seed_anchor": -0.005747280199111149,
+          "win_rate_vs_equal_weight_seed_anchor": 0.6,
+          "mean_max_drawdown": 0.1381973309266923,
+          "mean_max_drawdown_gap_vs_equal_weight_seed_anchor": 0.003177070088580462,
+          "mean_average_turnover": 0.2649798104406468
+        },
+        "RCPO+GDRC": {
+          "mean_final_cumulative_return": 0.1937641335968357,
+          "mean_excess_cumulative_return_vs_equal_weight_seed_anchor": 0.07223707755367642,
+          "win_rate_vs_equal_weight_seed_anchor": 0.75,
+          "mean_max_drawdown": 0.14877872506915663,
+          "mean_max_drawdown_gap_vs_equal_weight_seed_anchor": 0.013758464231044784,
+          "mean_average_turnover": 0.3430953976262124
+        },
+        "Equal Weight": {
+          "mean_final_cumulative_return": 0.1215270560431593,
+          "mean_excess_cumulative_return_vs_equal_weight_seed_anchor": 0.0,
+          "win_rate_vs_equal_weight_seed_anchor": 0.0,
+          "mean_max_drawdown": 0.13502026083811186,
+          "mean_max_drawdown_gap_vs_equal_weight_seed_anchor": 0.0,
+          "mean_average_turnover": 0.0066137559830196325
+        }
+      },
+      "equal_weight_anchor": {
+        "anchor_source": "equal_weight_seed_anchor",
+        "anchor_seed": 10000,
+        "train_market_seed": 10011,
+        "future_seed_start": 10000
+      }
+    }
+  },
+  "outputs": {
+    "clean": {
+      "csv": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\evaluation\\clean_branch_metrics.csv",
+      "cumulative_plot": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\evaluation\\clean_cumulative_return_comparison.png",
+      "max_drawdown_plot": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\evaluation\\clean_max_drawdown_comparison.png"
+    },
+    "noisy": {
+      "csv": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\evaluation\\noisy_branch_metrics.csv",
+      "cumulative_plot": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\evaluation\\noisy_cumulative_return_comparison.png",
+      "max_drawdown_plot": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\evaluation\\noisy_max_drawdown_comparison.png"
+    }
+  }
+}

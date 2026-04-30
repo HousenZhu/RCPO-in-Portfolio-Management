@@ -81,7 +81,7 @@ network:
   min_log_std: -2.5
   equal_weight_policy_init: true
 optimization:
-  total_updates: 1000
+  total_updates: 2000
   rollout_steps: 2048
   epochs: 4
   minibatch_size: 512
@@ -133,11 +133,21 @@ reward_correction:
   train_epochs_per_update: 3
   num_bins: 21
   gdrc_num_candidates: 6
+  gdrc_candidate_bins:
+  - 48
+  - 64
   gdrc_vote_decay: 0.9
   gdrc_range_window_updates: 10
   gdrc_range_percentiles:
   - 0.5
   - 99.5
+  correction_coef: 0.5
+  correction_delta_clip: 0.0015
+reward_noise:
+  enabled: false
+  mode: gaussian
+  std: 0.003
+  seed_offset: 30000
 evaluation:
   episodes: 1
   deterministic: true

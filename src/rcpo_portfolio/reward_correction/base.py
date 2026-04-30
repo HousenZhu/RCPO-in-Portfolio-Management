@@ -9,7 +9,7 @@ import torch
 @dataclass
 class RewardCorrectionOutput:
     corrected_rewards: torch.Tensor
-    metrics: dict[str, float | int | str]
+    metrics: dict[str, Any]
 
 
 class RewardCorrector:
@@ -55,9 +55,14 @@ class NoRewardCorrector(RewardCorrector):
                 "corrected_reward_mean": float(corrected.mean().item()),
                 "reward_correction_delta_mean": 0.0,
                 "reward_correction_delta_abs_mean": 0.0,
+                "reward_correction_raw_delta_abs_mean": 0.0,
+                "reward_correction_effective_delta_abs_mean": 0.0,
+                "reward_correction_coef": 0.0,
+                "reward_correction_delta_clip": 0.0,
                 "reward_correction_oce": 0.0,
                 "reward_correction_clamp_rate": 0.0,
                 "gdrc_selected_bins": 0,
+                "gdrc_candidate_bins": [],
                 "gdrc_reward_min": 0.0,
                 "gdrc_reward_max": 0.0,
             },

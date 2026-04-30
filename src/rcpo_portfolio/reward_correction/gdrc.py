@@ -11,6 +11,7 @@ from ..devices import move_optimizer_state_to_device
 from .base import RewardCorrectionOutput, RewardCorrector
 from .drc import (
     RewardDistributionCritic,
+    apply_correction_delta,
     correction_inputs,
     ordinal_cross_entropy,
     reward_labels,
@@ -30,7 +31,7 @@ class GDRCRewardCorrector(RewardCorrector):
         self.config = config
         self.reward_min = float(config.reward_min)
         self.reward_max = float(config.reward_max)
-        self.bin_counts = [2 * index for index in range(1, config.gdrc_num_candidates + 1)]
+        self.bin_counts = [int(candidate) for candidate in config.gdrc_candidate_bins]
         input_dim = obs_dim + action_dim + obs_dim
         self.models = torch.nn.ModuleList(
             [
@@ -144,10 +145,12 @@ class GDRCRewardCorrector(RewardCorrector):
         with torch.no_grad():
             logits = selected_model(inputs)
             predicted_labels = torch.argmax(logits, dim=-1)
-            corrected_rewards = observed_rewards + (
-                predicted_labels - labels
-            ).float() * float(bin_width)
-            delta = corrected_rewards - observed_rewards
+            raw_delta = (predicted_labels - labels).float() * float(bin_width)
+            corrected_rewards, raw_delta, effective_delta = apply_correction_delta(
+                observed_rewards,
+                raw_delta,
+                self.config,
+            )
             selected_oce = ordinal_cross_entropy(logits, labels)
 
         return RewardCorrectionOutput(
@@ -156,11 +159,22 @@ class GDRCRewardCorrector(RewardCorrector):
                 "reward_correction_mode": self.mode,
                 "observed_reward_mean": float(observed_rewards.mean().item()),
                 "corrected_reward_mean": float(corrected_rewards.mean().item()),
-                "reward_correction_delta_mean": float(delta.mean().item()),
-                "reward_correction_delta_abs_mean": float(torch.abs(delta).mean().item()),
+                "reward_correction_delta_mean": float(effective_delta.mean().item()),
+                "reward_correction_delta_abs_mean": float(
+                    torch.abs(effective_delta).mean().item()
+                ),
+                "reward_correction_raw_delta_abs_mean": float(
+                    torch.abs(raw_delta).mean().item()
+                ),
+                "reward_correction_effective_delta_abs_mean": float(
+                    torch.abs(effective_delta).mean().item()
+                ),
+                "reward_correction_coef": float(self.config.correction_coef),
+                "reward_correction_delta_clip": float(self.config.correction_delta_clip),
                 "reward_correction_oce": float(selected_oce.detach().item()),
                 "reward_correction_clamp_rate": float(clamp_mask.float().mean().item()),
                 "gdrc_selected_bins": int(selected_bins),
+                "gdrc_candidate_bins": list(self.bin_counts),
                 "gdrc_reward_min": float(self.reward_min),
                 "gdrc_reward_max": float(self.reward_max),
                 "gdrc_oce_mean": float(np.mean(oce_values)) if oce_values else 0.0,

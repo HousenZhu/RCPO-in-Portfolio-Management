@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 import torch
 
+from .config import RewardNoiseConfig
 from .env import PortfolioEnv
 from .models import ActorCritic
 from .reward_correction import RewardCorrector
@@ -16,6 +17,7 @@ class RolloutBatch:
     actions: torch.Tensor
     next_observations: torch.Tensor
     log_probs: torch.Tensor
+    true_rewards: torch.Tensor
     observed_rewards: torch.Tensor
     rewards: torch.Tensor
     costs: torch.Tensor
@@ -67,13 +69,15 @@ def collect_rollout(
     device: torch.device | None = None,
     alpha_budget_ratio: float | None = None,
     drawdown_cost_scale: float | None = None,
+    reward_noise_config: RewardNoiseConfig | None = None,
+    reward_noise_rng: np.random.Generator | None = None,
 ) -> RolloutBatch:
     device = device or next(model.parameters()).device
     observations: list[np.ndarray] = []
     actions: list[np.ndarray] = []
     next_observations: list[np.ndarray] = []
     log_probs: list[float] = []
-    observed_rewards: list[float] = []
+    true_rewards: list[float] = []
     costs: list[float] = []
     dones: list[float] = []
     reward_values: list[float] = []
@@ -115,7 +119,7 @@ def collect_rollout(
         actions.append(action.astype(np.float32))
         next_observations.append(next_obs.astype(np.float32))
         log_probs.append(float(log_prob_tensor.item()))
-        observed_rewards.append(float(reward))
+        true_rewards.append(float(reward))
         costs.append(float(info["constraint_cost"]))
         dones.append(float(done))
         reward_values.append(float(reward_value_tensor.item()))
@@ -177,9 +181,27 @@ def collect_rollout(
     next_observations_tensor = torch.as_tensor(
         np.asarray(next_observations), dtype=torch.float32, device=device
     )
-    observed_rewards_tensor = torch.as_tensor(
-        observed_rewards, dtype=torch.float32, device=device
+    true_rewards_tensor = torch.as_tensor(true_rewards, dtype=torch.float32, device=device)
+    reward_noise_enabled = bool(
+        reward_noise_config is not None and reward_noise_config.enabled
     )
+    reward_noise_std = (
+        float(reward_noise_config.std)
+        if reward_noise_config is not None
+        else 0.0
+    )
+    if reward_noise_enabled and reward_noise_std > 0.0:
+        if reward_noise_rng is None:
+            raise ValueError("reward_noise_rng is required when reward noise is enabled.")
+        reward_noise = reward_noise_rng.normal(
+            loc=0.0,
+            scale=reward_noise_std,
+            size=len(true_rewards),
+        ).astype(np.float32)
+    else:
+        reward_noise = np.zeros(len(true_rewards), dtype=np.float32)
+    reward_noise_tensor = torch.as_tensor(reward_noise, dtype=torch.float32, device=device)
+    observed_rewards_tensor = true_rewards_tensor + reward_noise_tensor
     correction = reward_corrector.update_and_correct(
         observations_tensor,
         actions_tensor,
@@ -214,7 +236,12 @@ def collect_rollout(
 
     info_summary: dict[str, float | int | str] = {
         "batch_reward_mean": float(rewards_tensor.mean().item()),
+        "batch_true_reward_mean": float(true_rewards_tensor.mean().item()),
         "batch_observed_reward_mean": float(observed_rewards_tensor.mean().item()),
+        "batch_reward_noise_mean": float(reward_noise_tensor.mean().item()),
+        "batch_reward_noise_std": float(reward_noise_tensor.std(unbiased=False).item()),
+        "reward_noise_enabled": int(reward_noise_enabled),
+        "reward_noise_std": reward_noise_std,
         "batch_constraint_cost_mean": float(np.mean(costs)),
         "batch_current_drawdown_mean": float(np.mean(current_drawdowns)),
         "batch_max_drawdown_mean": float(np.mean(max_drawdowns)),
@@ -246,6 +273,7 @@ def collect_rollout(
         actions=actions_tensor,
         next_observations=next_observations_tensor,
         log_probs=torch.as_tensor(log_probs, dtype=torch.float32, device=device),
+        true_rewards=true_rewards_tensor,
         observed_rewards=observed_rewards_tensor,
         rewards=rewards_tensor.detach(),
         costs=costs_tensor,

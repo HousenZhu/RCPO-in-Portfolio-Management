@@ -2,7 +2,14 @@ from __future__ import annotations
 
 import torch
 
-from rcpo_portfolio.config import RewardCorrectionConfig
+import pytest
+
+from rcpo_portfolio.config import (
+    ProjectConfig,
+    RewardCorrectionConfig,
+    load_config,
+    validate_reward_correction_settings,
+)
 from rcpo_portfolio.reward_correction.drc import (
     DRCRewardCorrector,
     RewardDistributionCritic,
@@ -37,7 +44,37 @@ def test_drc_forward_returns_probabilities() -> None:
     torch.testing.assert_close(probabilities.sum(dim=1), torch.ones(3))
 
 
-def test_drc_corrected_rewards_follow_source_formula() -> None:
+def test_reward_correction_config_loads_fine_bin_defaults() -> None:
+    config = load_config("configs/default.yaml")
+
+    assert config.reward_correction.num_bins == 48
+    assert config.reward_correction.gdrc_candidate_bins == [48, 64]
+    assert config.reward_correction.correction_coef == pytest.approx(0.50)
+    assert config.reward_correction.correction_delta_clip == pytest.approx(0.0015)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "value", "message"),
+    [
+        ("correction_coef", -0.1, "correction_coef"),
+        ("correction_delta_clip", -0.1, "correction_delta_clip"),
+        ("gdrc_candidate_bins", [], "gdrc_candidate_bins"),
+        ("gdrc_candidate_bins", [1], "gdrc_candidate_bins"),
+    ],
+)
+def test_reward_correction_config_rejects_invalid_stabilization_settings(
+    field_name: str,
+    value,
+    message: str,
+) -> None:
+    config = ProjectConfig()
+    setattr(config.reward_correction, field_name, value)
+
+    with pytest.raises(ValueError, match=message):
+        validate_reward_correction_settings(config)
+
+
+def test_drc_corrected_rewards_are_scaled_and_clipped() -> None:
     config = RewardCorrectionConfig(
         mode="drc",
         reward_min=-0.05,
@@ -46,6 +83,8 @@ def test_drc_corrected_rewards_follow_source_formula() -> None:
         learning_rate=1e-3,
         train_epochs_per_update=0,
         num_bins=5,
+        correction_coef=0.5,
+        correction_delta_clip=0.0015,
     )
     corrector = DRCRewardCorrector(config=config, obs_dim=1, action_dim=1)
     with torch.no_grad():
@@ -62,8 +101,16 @@ def test_drc_corrected_rewards_follow_source_formula() -> None:
     )
 
     labels, _, bin_width = reward_labels(observed_rewards, -0.05, 0.05, 5)
-    expected = observed_rewards + (torch.tensor([3, 3]) - labels).float() * bin_width
+    raw_delta = (torch.tensor([3, 3]) - labels).float() * bin_width
+    effective_delta = torch.clamp(0.5 * raw_delta, min=-0.0015, max=0.0015)
+    expected = observed_rewards + effective_delta
     torch.testing.assert_close(output.corrected_rewards, expected)
+    assert output.metrics["reward_correction_raw_delta_abs_mean"] > output.metrics[
+        "reward_correction_effective_delta_abs_mean"
+    ]
+    assert output.metrics["reward_correction_delta_abs_mean"] == output.metrics[
+        "reward_correction_effective_delta_abs_mean"
+    ]
 
 
 def test_gdrc_updates_range_and_selects_valid_candidate() -> None:
@@ -74,7 +121,7 @@ def test_gdrc_updates_range_and_selects_valid_candidate() -> None:
         hidden_sizes=[8],
         learning_rate=1e-3,
         train_epochs_per_update=1,
-        gdrc_num_candidates=3,
+        gdrc_candidate_bins=[48, 64],
         gdrc_range_percentiles=[1, 99],
     )
     corrector = GDRCRewardCorrector(
@@ -90,8 +137,12 @@ def test_gdrc_updates_range_and_selects_valid_candidate() -> None:
         observed_rewards=torch.linspace(-0.02, 0.03, 8),
     )
 
-    assert output.metrics["gdrc_selected_bins"] in {2, 4, 6}
+    assert corrector.bin_counts == [48, 64]
+    assert output.metrics["gdrc_selected_bins"] in {48, 64}
+    assert output.metrics["gdrc_candidate_bins"] == [48, 64]
     assert output.metrics["gdrc_reward_min"] < output.metrics["gdrc_reward_max"]
+    assert output.metrics["reward_correction_effective_delta_abs_mean"] <= 0.0015
     state = corrector.state_dict()
     assert state["selected_index"] >= 0
-    assert len(state["votes"]) == 3
+    assert state["bin_counts"] == [48, 64]
+    assert len(state["votes"]) == 2

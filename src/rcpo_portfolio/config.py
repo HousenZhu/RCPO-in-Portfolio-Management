@@ -145,11 +145,22 @@ class RewardCorrectionConfig:
     hidden_sizes: list[int] = field(default_factory=lambda: [128, 128])
     learning_rate: float = 1e-3
     train_epochs_per_update: int = 3
-    num_bins: int = 21
+    num_bins: int = 48
     gdrc_num_candidates: int = 6
+    gdrc_candidate_bins: list[int] = field(default_factory=lambda: [48, 64])
     gdrc_vote_decay: float = 0.9
     gdrc_range_window_updates: int = 10
     gdrc_range_percentiles: list[float] = field(default_factory=lambda: [0.5, 99.5])
+    correction_coef: float = 0.50
+    correction_delta_clip: float = 0.0015
+
+
+@dataclass
+class RewardNoiseConfig:
+    enabled: bool = False
+    mode: str = "gaussian"
+    std: float = 0.003
+    seed_offset: int = 30_000
 
 
 @dataclass
@@ -174,6 +185,7 @@ class ProjectConfig:
     ppo: PPOOptimizationConfig = field(default_factory=PPOOptimizationConfig)
     rcpo: RCPOConfig = field(default_factory=RCPOConfig)
     reward_correction: RewardCorrectionConfig = field(default_factory=RewardCorrectionConfig)
+    reward_noise: RewardNoiseConfig = field(default_factory=RewardNoiseConfig)
     evaluation: EvaluationConfig = field(default_factory=EvaluationConfig)
 
     def to_dict(self) -> dict[str, Any]:
@@ -212,6 +224,12 @@ def validate_reward_correction_settings(config: ProjectConfig) -> None:
         raise ValueError("reward_correction.num_bins must be at least 2.")
     if reward_config.gdrc_num_candidates < 1:
         raise ValueError("reward_correction.gdrc_num_candidates must be positive.")
+    if not reward_config.gdrc_candidate_bins:
+        raise ValueError("reward_correction.gdrc_candidate_bins cannot be empty.")
+    if any(int(candidate) < 2 for candidate in reward_config.gdrc_candidate_bins):
+        raise ValueError(
+            "reward_correction.gdrc_candidate_bins must contain integers at least 2."
+        )
     if not 0.0 <= reward_config.gdrc_vote_decay <= 1.0:
         raise ValueError("reward_correction.gdrc_vote_decay must be between 0 and 1.")
     if reward_config.gdrc_range_window_updates < 1:
@@ -223,6 +241,18 @@ def validate_reward_correction_settings(config: ProjectConfig) -> None:
         raise ValueError(
             "reward_correction.gdrc_range_percentiles must satisfy 0 <= low < high <= 100."
         )
+    if reward_config.correction_coef < 0.0:
+        raise ValueError("reward_correction.correction_coef cannot be negative.")
+    if reward_config.correction_delta_clip < 0.0:
+        raise ValueError("reward_correction.correction_delta_clip cannot be negative.")
+
+
+def validate_reward_noise_settings(config: ProjectConfig) -> None:
+    noise_config = config.reward_noise
+    if noise_config.mode != "gaussian":
+        raise ValueError("reward_noise.mode must be 'gaussian'.")
+    if noise_config.std < 0.0:
+        raise ValueError("reward_noise.std cannot be negative.")
 
 
 def _merge_dicts(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
@@ -253,6 +283,9 @@ def _from_dict(payload: dict[str, Any]) -> ProjectConfig:
         rcpo=_dataclass_from_dict(RCPOConfig, payload.get("rcpo", {})),
         reward_correction=_dataclass_from_dict(
             RewardCorrectionConfig, payload.get("reward_correction", {})
+        ),
+        reward_noise=_dataclass_from_dict(
+            RewardNoiseConfig, payload.get("reward_noise", {})
         ),
         evaluation=_dataclass_from_dict(EvaluationConfig, payload.get("evaluation", {})),
     )

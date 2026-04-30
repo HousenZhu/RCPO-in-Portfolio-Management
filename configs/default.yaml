@@ -1,6 +1,6 @@
 experiment:
   output_root: runs
-  run_name: new
+  run_name: noise_v1
   seeds: [0]
 
 runtime:
@@ -64,7 +64,7 @@ network:
   equal_weight_policy_init: true
 
 optimization:
-  total_updates: 1000
+  total_updates: 8000
   rollout_steps: 2048
   epochs: 4
   minibatch_size: 512
@@ -82,11 +82,11 @@ optimization:
   early_stop_min_delta: 0.001
 
 ppo:
-  total_updates: 2000
+  total_updates: 8000
   rollout_steps: 2048
   epochs: 4
   minibatch_size: 512
-  learning_rate: 0.0004
+  learning_rate: 0.0003
   learning_rate_final: 0.0002
   gamma: 0.99
   gae_lambda: 0.95
@@ -109,17 +109,26 @@ rcpo:
   constraint_mode: max_drawdown
 
 reward_correction:
-  mode: none
+  mode: gdrc
   reward_min: -0.04
   reward_max: 0.07
-  hidden_sizes: [128, 128]
-  learning_rate: 0.001
-  train_epochs_per_update: 3
-  num_bins: 21
-  gdrc_num_candidates: 6
-  gdrc_vote_decay: 0.9
-  gdrc_range_window_updates: 10
-  gdrc_range_percentiles: [0.5, 99.5]
+  hidden_sizes: [256, 256]
+  learning_rate: 0.0005
+  train_epochs_per_update: 5
+  num_bins: 64
+  gdrc_num_candidates: 2
+  gdrc_candidate_bins: [48, 64]
+  gdrc_vote_decay: 0.95
+  gdrc_range_window_updates: 20
+  gdrc_range_percentiles: [1.0, 99.0]
+  correction_coef: 1
+  correction_delta_clip: 0.0015
+
+reward_noise:
+  enabled: true
+  mode: gaussian
+  std: 0.003
+  seed_offset: 30000
 
 evaluation:
   episodes: 1

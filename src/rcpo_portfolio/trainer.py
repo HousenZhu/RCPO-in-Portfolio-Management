@@ -22,6 +22,7 @@ from .config import (
     save_config,
     sync_rcpo_constraint_settings,
     validate_reward_correction_settings,
+    validate_reward_noise_settings,
 )
 from .devices import move_optimizer_state_to_device, resolve_device
 from .env import PortfolioEnv
@@ -64,7 +65,11 @@ class RCPOTrainer:
         set_global_seeds(seed)
         sync_rcpo_constraint_settings(config)
         validate_reward_correction_settings(config)
+        validate_reward_noise_settings(config)
         self.device = resolve_device(config.runtime.device)
+        self.reward_noise_rng = np.random.default_rng(
+            seed + int(config.reward_noise.seed_offset)
+        )
 
         self.train_markets = generate_train_markets(config.market, seed)
         self.train_market = self.train_markets[0]
@@ -131,6 +136,8 @@ class RCPOTrainer:
             f"alpha_budget_ratio={self.config.rcpo.alpha_budget_ratio} "
             f"lambda_lr_up={self.config.rcpo.lambda_lr_up} "
             f"lambda_lr_down={self.config.rcpo.lambda_lr_down} "
+            f"reward_noise_enabled={self.config.reward_noise.enabled} "
+            f"reward_noise_std={self.config.reward_noise.std} "
             f"constraint_mode={self.config.rcpo.constraint_mode} "
             f"drawdown_budget_floor={self.config.environment.drawdown_budget_floor} "
             f"benchmark_drawdown_margin={self.config.environment.benchmark_drawdown_margin} "
@@ -233,6 +240,8 @@ class RCPOTrainer:
                 if self.algo == "rcpo" and self.alpha is None
                 else None
             ),
+            reward_noise_config=self.config.reward_noise,
+            reward_noise_rng=self.reward_noise_rng,
         )
 
     def _update_model(self, batch: RolloutBatch) -> dict[str, float]:
@@ -288,6 +297,11 @@ class RCPOTrainer:
                 "drawdown_cost_scale": float(self.config.environment.drawdown_cost_scale),
                 "lambda_lr_up": float(self.config.rcpo.lambda_lr_up),
                 "lambda_lr_down": float(self.config.rcpo.lambda_lr_down),
+                "reward_noise_enabled": bool(self.config.reward_noise.enabled),
+                "reward_noise_mode": self.config.reward_noise.mode,
+                "reward_noise_std": float(self.config.reward_noise.std),
+                "reward_noise_seed_offset": int(self.config.reward_noise.seed_offset),
+                "reward_noise_rng_state": self.reward_noise_rng.bit_generator.state,
                 "reward_correction_mode": self.config.reward_correction.mode,
                 "device": str(self.device),
                 "lambda_value": self.lambda_value,
@@ -376,6 +390,23 @@ class RCPOTrainer:
             raise ValueError(
                 "Checkpoint alpha_budget_ratio does not match the current config."
             )
+        checkpoint_noise_enabled = checkpoint.get("reward_noise_enabled")
+        if checkpoint_noise_enabled is not None and bool(checkpoint_noise_enabled) != bool(
+            self.config.reward_noise.enabled
+        ):
+            raise ValueError(
+                "Checkpoint reward_noise.enabled does not match the current config."
+            )
+        checkpoint_noise_std = checkpoint.get("reward_noise_std")
+        if checkpoint_noise_std is not None and not math.isclose(
+            float(checkpoint_noise_std),
+            float(self.config.reward_noise.std),
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        ):
+            raise ValueError("Checkpoint reward_noise.std does not match the current config.")
+        if "reward_noise_rng_state" in checkpoint:
+            self.reward_noise_rng.bit_generator.state = checkpoint["reward_noise_rng_state"]
 
         self.model.load_state_dict(checkpoint["model_state_dict"])
         if "optimizer_state_dict" in checkpoint:
@@ -771,6 +802,9 @@ class RCPOTrainer:
             "alpha_budget_ratio": float(self.config.rcpo.alpha_budget_ratio),
             "lambda_lr_up": float(self.config.rcpo.lambda_lr_up),
             "lambda_lr_down": float(self.config.rcpo.lambda_lr_down),
+            "reward_noise_enabled": bool(self.config.reward_noise.enabled),
+            "reward_noise_mode": self.config.reward_noise.mode,
+            "reward_noise_std": float(self.config.reward_noise.std),
             "constraint_mode": self.config.rcpo.constraint_mode,
             "reward_correction_mode": self.config.reward_correction.mode,
             "device": str(self.device),
@@ -821,6 +855,9 @@ class RCPOTrainer:
             "alpha_budget_ratio": float(self.config.rcpo.alpha_budget_ratio),
             "lambda_lr_up": float(self.config.rcpo.lambda_lr_up),
             "lambda_lr_down": float(self.config.rcpo.lambda_lr_down),
+            "reward_noise_enabled": bool(self.config.reward_noise.enabled),
+            "reward_noise_mode": self.config.reward_noise.mode,
+            "reward_noise_std": float(self.config.reward_noise.std),
             "constraint_mode": self.config.rcpo.constraint_mode,
             "reward_correction_mode": self.config.reward_correction.mode,
             "device": str(self.device),
