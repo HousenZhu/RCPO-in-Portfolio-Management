@@ -93,7 +93,7 @@ def main() -> None:
         return action.squeeze(0).cpu().numpy()
 
     def equal_weight_action(env: PortfolioEnv):
-        return np.zeros(env.action_space.shape[0], dtype=np.float32)
+        return env.neutral_action()
 
     def rollout_returns(env: PortfolioEnv, action_fn):
         obs, _ = env.reset(options={"start_index": int(env.available_start_indices()[0])})

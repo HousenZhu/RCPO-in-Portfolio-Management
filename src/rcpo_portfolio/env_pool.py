@@ -44,3 +44,9 @@ class PortfolioEnvPool:
 
     def resolved_constraint_preset(self) -> dict[str, float]:
         return self.envs[0].resolved_constraint_preset()
+
+    def simplex_branch_sizes(self) -> list[int]:
+        return self.envs[0].simplex_branch_sizes()
+
+    def neutral_action(self):
+        return self.envs[0].neutral_action()

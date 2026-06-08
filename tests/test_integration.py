@@ -24,7 +24,10 @@ def tiny_config(tmp_path: Path) -> ProjectConfig:
     config.market.validation_steps = 96
     config.market.test_steps = 96
     config.environment.episode_length = 32
+    config.environment.action_mode = "simplex_decomposition"
+    config.network.policy_architecture = "simplex_branch_gaussian"
     config.environment.drawdown_budget_floor = 0.02
+    config.environment.drawdown_benchmark_mode = "constrained_neutral"
     config.environment.benchmark_drawdown_margin = 0.90
     config.environment.drawdown_cost_scale = 0.01
     config.rcpo.alpha = None
@@ -108,14 +111,19 @@ def test_short_training_runs_for_rcpo_and_ppo(tmp_path: Path) -> None:
     assert "average_drawdown_gap" in payload
     assert "average_drawdown_violation" in payload
     assert "average_drawdown_constraint_cost" in payload
-    assert "average_group_a_min_violation_cost" in payload
-    assert "average_group_a_weight" in payload
+    assert "average_allocation_constraint_1_violation_cost" in payload
+    assert "average_allocation_constraint_1_weight" in payload
+    assert "average_simplex_z1" in payload
 
     with (rcpo_run / "config_snapshot.yaml").open("r", encoding="utf-8") as handle:
         snapshot = handle.read()
+    assert "action_mode: simplex_decomposition" in snapshot
+    assert "simplex_action_format: branch_logits" in snapshot
+    assert "policy_architecture: simplex_branch_gaussian" in snapshot
     assert "active_constraint_preset: c2" in snapshot
     assert "constraint_mode: max_drawdown" in snapshot
     assert "drawdown_budget_floor: 0.02" in snapshot
+    assert "drawdown_benchmark_mode: constrained_neutral" in snapshot
     assert "benchmark_drawdown_margin: 0.9" in snapshot
     assert "drawdown_cost_scale: 0.01" in snapshot
     assert "alpha_budget_ratio: 0.05" in snapshot
@@ -125,7 +133,7 @@ def test_short_training_runs_for_rcpo_and_ppo(tmp_path: Path) -> None:
     assert "enabled: false" in snapshot
     assert "runtime:" in snapshot
     assert "device: cpu" in snapshot
-    assert "resolved_group_a_min_weight: 0.25" in snapshot
+    assert "resolved_allocation_constraint_1_min_weight: 0.4" in snapshot
 
     with (ppo_run / "metrics.jsonl").open("r", encoding="utf-8") as handle:
         ppo_metric = json.loads(handle.readline())
@@ -141,6 +149,10 @@ def test_short_training_runs_for_rcpo_and_ppo(tmp_path: Path) -> None:
         rcpo_metric = json.loads(handle.readline())
     assert rcpo_metric["learning_rate"] == config.optimization.learning_rate
     assert rcpo_metric["constraint_mode"] == "max_drawdown"
+    assert rcpo_metric["action_mode"] == "simplex_decomposition"
+    assert rcpo_metric["simplex_action_format"] == "branch_logits"
+    assert rcpo_metric["policy_architecture"] == "simplex_branch_gaussian"
+    assert rcpo_metric["drawdown_benchmark_mode"] == "constrained_neutral"
     assert rcpo_metric["alpha_mode"] == "budget_ratio"
     assert rcpo_metric["alpha_budget_ratio"] == config.rcpo.alpha_budget_ratio
     assert rcpo_metric["lambda_lr_up"] == config.rcpo.lambda_lr_up
@@ -153,6 +165,7 @@ def test_short_training_runs_for_rcpo_and_ppo(tmp_path: Path) -> None:
     assert "validation_win_rate_vs_equal_weight" in rcpo_metric
     assert "validation_max_drawdown" in rcpo_metric
     assert "validation_benchmark_max_drawdown" in rcpo_metric
+    assert rcpo_metric["validation_drawdown_benchmark_mode"] == "constrained_neutral"
     assert "validation_effective_drawdown_budget" in rcpo_metric
     assert "validation_alpha_target" in rcpo_metric
     assert "validation_drawdown_gap" in rcpo_metric
@@ -171,6 +184,15 @@ def test_short_training_runs_for_rcpo_and_ppo(tmp_path: Path) -> None:
     assert "batch_observed_reward_mean" in rcpo_metric
     assert "batch_reward_noise_mean" in rcpo_metric
     assert "batch_reward_noise_std" in rcpo_metric
+    assert "batch_allocation_constraint_1_violation_cost_mean" in rcpo_metric
+    assert "batch_allocation_constraint_2_violation_cost_mean" in rcpo_metric
+    assert "batch_allocation_constraint_1_weight_mean" in rcpo_metric
+    assert "batch_allocation_constraint_2_weight_mean" in rcpo_metric
+    assert "batch_simplex_z1_mean" in rcpo_metric
+    assert "validation_allocation_constraint_1_weight" in rcpo_metric
+    assert "validation_allocation_constraint_2_weight" in rcpo_metric
+    assert "validation_allocation_constraint_1_violation_cost" in rcpo_metric
+    assert "validation_allocation_constraint_2_violation_cost" in rcpo_metric
     assert rcpo_metric["reward_noise_enabled"] == 0
     assert rcpo_metric["validation_evaluated"] == 1
     assert rcpo_metric["validation_interval_updates"] == config.evaluation.validation_interval_updates
@@ -240,6 +262,32 @@ def test_short_noisy_reward_training_runs(tmp_path: Path) -> None:
     assert "batch_drawdown_constraint_cost_mean" in rcpo_metric
 
 
+def test_short_autoregressive_gaussian_policy_training_runs_for_ppo_and_rcpo(
+    tmp_path: Path,
+) -> None:
+    config = tiny_config(tmp_path)
+    config.reward_correction.mode = "none"
+    config.network.policy_architecture = "simplex_autoregressive_gaussian"
+    config.experiment.run_name = "tiny_autoregressive_gaussian_ppo"
+    ppo_run = run_experiment(config, algo="ppo_unconstrained")[0]
+
+    config.experiment.run_name = "tiny_autoregressive_gaussian_rcpo"
+    rcpo_run = run_experiment(config, algo="rcpo")[0]
+
+    with (ppo_run / "metrics.jsonl").open("r", encoding="utf-8") as handle:
+        ppo_metric = json.loads(handle.readline())
+    assert ppo_metric["policy_architecture"] == "simplex_autoregressive_gaussian"
+    assert ppo_metric["simplex_action_format"] == "branch_logits"
+    assert np.isfinite(ppo_metric["approx_kl"])
+
+    with (rcpo_run / "metrics.jsonl").open("r", encoding="utf-8") as handle:
+        rcpo_metric = json.loads(handle.readline())
+    assert rcpo_metric["policy_architecture"] == "simplex_autoregressive_gaussian"
+    assert rcpo_metric["simplex_action_format"] == "branch_logits"
+    assert "validation_allocation_constraint_1_weight" in rcpo_metric
+    assert (rcpo_run / "evaluation_best" / "summary_test.json").exists()
+
+
 def test_resume_rejects_legacy_rcpo_constraint_mode(tmp_path: Path) -> None:
     config = tiny_config(tmp_path)
     config.reward_correction.mode = "none"
@@ -257,6 +305,32 @@ def test_resume_rejects_legacy_rcpo_constraint_mode(tmp_path: Path) -> None:
             algo="rcpo",
             run_dir=run_dir,
             checkpoint_name="checkpoint_legacy.pt",
+        )
+
+    benchmark_mismatch_path = run_dir / "checkpoint_benchmark_mismatch.pt"
+    payload = torch.load(run_dir / "checkpoint_last.pt", map_location="cpu")
+    payload["drawdown_benchmark_mode"] = "true_equal_weight"
+    torch.save(payload, benchmark_mismatch_path)
+
+    with pytest.raises(ValueError, match="drawdown_benchmark_mode"):
+        resume_experiment(
+            config,
+            algo="rcpo",
+            run_dir=run_dir,
+            checkpoint_name="checkpoint_benchmark_mismatch.pt",
+        )
+
+    mismatch_path = run_dir / "checkpoint_policy_mismatch.pt"
+    payload = torch.load(run_dir / "checkpoint_last.pt", map_location="cpu")
+    payload["policy_architecture"] = "flat_gaussian"
+    torch.save(payload, mismatch_path)
+
+    with pytest.raises(ValueError, match="policy_architecture"):
+        resume_experiment(
+            config,
+            algo="rcpo",
+            run_dir=run_dir,
+            checkpoint_name="checkpoint_policy_mismatch.pt",
         )
 
 

@@ -8,6 +8,7 @@ import torch
 from .config import RewardNoiseConfig
 from .env import PortfolioEnv
 from .models import ActorCritic
+from .profiling import TrainingProfiler, profile_section
 from .reward_correction import RewardCorrector
 
 
@@ -71,6 +72,7 @@ def collect_rollout(
     drawdown_cost_scale: float | None = None,
     reward_noise_config: RewardNoiseConfig | None = None,
     reward_noise_rng: np.random.Generator | None = None,
+    profiler: TrainingProfiler | None = None,
 ) -> RolloutBatch:
     device = device or next(model.parameters()).device
     observations: list[np.ndarray] = []
@@ -87,15 +89,20 @@ def collect_rollout(
     max_drawdowns: list[float] = []
     benchmark_current_drawdowns: list[float] = []
     benchmark_max_drawdowns: list[float] = []
+    drawdown_benchmark_mode = ""
     effective_drawdown_budgets: list[float] = []
     alpha_targets: list[float] = []
     drawdown_gaps: list[float] = []
     drawdown_violations: list[float] = []
     drawdown_constraint_costs: list[float] = []
-    group_a_min_violation_costs: list[float] = []
-    group_b_max_violation_costs: list[float] = []
-    group_a_weights: list[float] = []
-    group_b_weights: list[float] = []
+    allocation_constraint_1_violation_costs: list[float] = []
+    allocation_constraint_2_violation_costs: list[float] = []
+    allocation_constraint_1_weights: list[float] = []
+    allocation_constraint_2_weights: list[float] = []
+    simplex_z1_values: list[float] = []
+    simplex_z2_values: list[float] = []
+    simplex_z3_values: list[float] = []
+    simplex_z4_values: list[float] = []
     concentrations: list[float] = []
     excess_concentration_costs: list[float] = []
     diversification_costs: list[float] = []
@@ -106,48 +113,64 @@ def collect_rollout(
     episode_turnover = 0.0
     episode_steps = 0
     for _ in range(optimization.rollout_steps):
-        obs_tensor = torch.as_tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
-        with torch.no_grad():
-            action_tensor, log_prob_tensor, _, reward_value_tensor, cost_value_tensor = (
-                model.get_action_and_value(obs_tensor)
-            )
+        with profile_section(profiler, "policy_action_forward"):
+            obs_tensor = torch.as_tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
+            with torch.no_grad():
+                action_tensor, log_prob_tensor, _, reward_value_tensor, cost_value_tensor = (
+                    model.get_action_and_value(obs_tensor)
+                )
         action = action_tensor.squeeze(0).cpu().numpy()
-        next_obs, reward, terminated, truncated, info = env.step(action)
+        with profile_section(profiler, "env_step"):
+            next_obs, reward, terminated, truncated, info = env.step(action)
         done = terminated or truncated
 
-        observations.append(obs.astype(np.float32))
-        actions.append(action.astype(np.float32))
-        next_observations.append(next_obs.astype(np.float32))
-        log_probs.append(float(log_prob_tensor.item()))
-        true_rewards.append(float(reward))
-        costs.append(float(info["constraint_cost"]))
-        dones.append(float(done))
-        reward_values.append(float(reward_value_tensor.item()))
-        cost_values.append(float(cost_value_tensor.item()))
-        current_drawdowns.append(float(info["current_drawdown"]))
-        max_drawdowns.append(float(info["max_drawdown"]))
-        benchmark_current_drawdowns.append(float(info["benchmark_current_drawdown"]))
-        benchmark_max_drawdowns.append(float(info["benchmark_max_drawdown"]))
-        effective_drawdown_budgets.append(float(info["effective_drawdown_budget"]))
-        if alpha_budget_ratio is not None:
-            if drawdown_cost_scale is None:
-                raise ValueError("drawdown_cost_scale is required with alpha_budget_ratio.")
-            alpha_targets.append(
-                float(
-                    (alpha_budget_ratio * float(info["effective_drawdown_budget"])) ** 2
-                    / max(drawdown_cost_scale, 1e-12)
+        with profile_section(profiler, "rollout_storage_append"):
+            observations.append(obs.astype(np.float32))
+            actions.append(action.astype(np.float32))
+            next_observations.append(next_obs.astype(np.float32))
+            log_probs.append(float(log_prob_tensor.item()))
+            true_rewards.append(float(reward))
+            costs.append(float(info["constraint_cost"]))
+            dones.append(float(done))
+            reward_values.append(float(reward_value_tensor.item()))
+            cost_values.append(float(cost_value_tensor.item()))
+            current_drawdowns.append(float(info["current_drawdown"]))
+            max_drawdowns.append(float(info["max_drawdown"]))
+            benchmark_current_drawdowns.append(float(info["benchmark_current_drawdown"]))
+            benchmark_max_drawdowns.append(float(info["benchmark_max_drawdown"]))
+            drawdown_benchmark_mode = str(info["drawdown_benchmark_mode"])
+            effective_drawdown_budgets.append(float(info["effective_drawdown_budget"]))
+            if alpha_budget_ratio is not None:
+                if drawdown_cost_scale is None:
+                    raise ValueError("drawdown_cost_scale is required with alpha_budget_ratio.")
+                alpha_targets.append(
+                    float(
+                        (alpha_budget_ratio * float(info["effective_drawdown_budget"])) ** 2
+                        / max(drawdown_cost_scale, 1e-12)
+                    )
                 )
+            drawdown_gaps.append(float(info["drawdown_gap"]))
+            drawdown_violations.append(float(info["drawdown_violation"]))
+            drawdown_constraint_costs.append(float(info["drawdown_constraint_cost"]))
+            allocation_constraint_1_violation_costs.append(
+                float(info["allocation_constraint_1_violation_cost"])
             )
-        drawdown_gaps.append(float(info["drawdown_gap"]))
-        drawdown_violations.append(float(info["drawdown_violation"]))
-        drawdown_constraint_costs.append(float(info["drawdown_constraint_cost"]))
-        group_a_min_violation_costs.append(float(info["group_a_min_violation_cost"]))
-        group_b_max_violation_costs.append(float(info["group_b_max_violation_cost"]))
-        group_a_weights.append(float(info["group_a_weight"]))
-        group_b_weights.append(float(info["group_b_weight"]))
-        concentrations.append(float(info["concentration"]))
-        excess_concentration_costs.append(float(info["excess_concentration_cost"]))
-        diversification_costs.append(float(info["diversification_cost"]))
+            allocation_constraint_2_violation_costs.append(
+                float(info["allocation_constraint_2_violation_cost"])
+            )
+            allocation_constraint_1_weights.append(
+                float(info["allocation_constraint_1_weight"])
+            )
+            allocation_constraint_2_weights.append(
+                float(info["allocation_constraint_2_weight"])
+            )
+            simplex_z1_values.append(float(info["simplex_z1"]))
+            simplex_z2_values.append(float(info["simplex_z2"]))
+            simplex_z3_values.append(float(info["simplex_z3"]))
+            simplex_z4_values.append(float(info["simplex_z4"]))
+            concentrations.append(float(info["concentration"]))
+            excess_concentration_costs.append(float(info["excess_concentration_cost"]))
+            diversification_costs.append(float(info["diversification_cost"]))
 
         episode_reward += float(info["net_return"])
         episode_cost += float(info["constraint_cost"])
@@ -169,19 +192,21 @@ def collect_rollout(
             episode_turnover = 0.0
             episode_steps = 0
 
-    next_value_r, next_value_c = model.value(
-        torch.as_tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
-    )
-    observations_tensor = torch.as_tensor(
-        np.asarray(observations), dtype=torch.float32, device=device
-    )
-    actions_tensor = torch.as_tensor(
-        np.asarray(actions), dtype=torch.float32, device=device
-    )
-    next_observations_tensor = torch.as_tensor(
-        np.asarray(next_observations), dtype=torch.float32, device=device
-    )
-    true_rewards_tensor = torch.as_tensor(true_rewards, dtype=torch.float32, device=device)
+    with profile_section(profiler, "policy_action_forward"):
+        next_value_r, next_value_c = model.value(
+            torch.as_tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
+        )
+    with profile_section(profiler, "tensor_conversion"):
+        observations_tensor = torch.as_tensor(
+            np.asarray(observations), dtype=torch.float32, device=device
+        )
+        actions_tensor = torch.as_tensor(
+            np.asarray(actions), dtype=torch.float32, device=device
+        )
+        next_observations_tensor = torch.as_tensor(
+            np.asarray(next_observations), dtype=torch.float32, device=device
+        )
+        true_rewards_tensor = torch.as_tensor(true_rewards, dtype=torch.float32, device=device)
     reward_noise_enabled = bool(
         reward_noise_config is not None and reward_noise_config.enabled
     )
@@ -190,49 +215,54 @@ def collect_rollout(
         if reward_noise_config is not None
         else 0.0
     )
-    if reward_noise_enabled and reward_noise_std > 0.0:
-        if reward_noise_rng is None:
-            raise ValueError("reward_noise_rng is required when reward noise is enabled.")
-        reward_noise = reward_noise_rng.normal(
-            loc=0.0,
-            scale=reward_noise_std,
-            size=len(true_rewards),
-        ).astype(np.float32)
-    else:
-        reward_noise = np.zeros(len(true_rewards), dtype=np.float32)
-    reward_noise_tensor = torch.as_tensor(reward_noise, dtype=torch.float32, device=device)
-    observed_rewards_tensor = true_rewards_tensor + reward_noise_tensor
-    correction = reward_corrector.update_and_correct(
-        observations_tensor,
-        actions_tensor,
-        next_observations_tensor,
-        observed_rewards_tensor,
-    )
-    rewards_tensor = correction.corrected_rewards.to(dtype=torch.float32)
-    costs_tensor = torch.as_tensor(costs, dtype=torch.float32, device=device)
-    dones_tensor = torch.as_tensor(dones, dtype=torch.float32, device=device)
-    reward_values_tensor = torch.as_tensor(
-        reward_values, dtype=torch.float32, device=device
-    )
-    cost_values_tensor = torch.as_tensor(
-        cost_values, dtype=torch.float32, device=device
-    )
-    reward_advantages, reward_returns = compute_gae(
-        rewards_tensor,
-        reward_values_tensor,
-        dones_tensor,
-        next_value_r.squeeze(0).detach(),
-        optimization.gamma,
-        optimization.gae_lambda,
-    )
-    cost_advantages, cost_returns = compute_gae(
-        costs_tensor,
-        cost_values_tensor,
-        dones_tensor,
-        next_value_c.squeeze(0).detach(),
-        optimization.gamma,
-        optimization.gae_lambda,
-    )
+    with profile_section(profiler, "reward_noise"):
+        if reward_noise_enabled and reward_noise_std > 0.0:
+            if reward_noise_rng is None:
+                raise ValueError("reward_noise_rng is required when reward noise is enabled.")
+            reward_noise = reward_noise_rng.normal(
+                loc=0.0,
+                scale=reward_noise_std,
+                size=len(true_rewards),
+            ).astype(np.float32)
+        else:
+            reward_noise = np.zeros(len(true_rewards), dtype=np.float32)
+        reward_noise_tensor = torch.as_tensor(reward_noise, dtype=torch.float32, device=device)
+        observed_rewards_tensor = true_rewards_tensor + reward_noise_tensor
+    with profile_section(profiler, "reward_correction"):
+        correction = reward_corrector.update_and_correct(
+            observations_tensor,
+            actions_tensor,
+            next_observations_tensor,
+            observed_rewards_tensor,
+        )
+        rewards_tensor = correction.corrected_rewards.to(dtype=torch.float32)
+    with profile_section(profiler, "tensor_conversion"):
+        costs_tensor = torch.as_tensor(costs, dtype=torch.float32, device=device)
+        dones_tensor = torch.as_tensor(dones, dtype=torch.float32, device=device)
+        reward_values_tensor = torch.as_tensor(
+            reward_values, dtype=torch.float32, device=device
+        )
+        cost_values_tensor = torch.as_tensor(
+            cost_values, dtype=torch.float32, device=device
+        )
+    with profile_section(profiler, "reward_gae"):
+        reward_advantages, reward_returns = compute_gae(
+            rewards_tensor,
+            reward_values_tensor,
+            dones_tensor,
+            next_value_r.squeeze(0).detach(),
+            optimization.gamma,
+            optimization.gae_lambda,
+        )
+    with profile_section(profiler, "cost_gae"):
+        cost_advantages, cost_returns = compute_gae(
+            costs_tensor,
+            cost_values_tensor,
+            dones_tensor,
+            next_value_c.squeeze(0).detach(),
+            optimization.gamma,
+            optimization.gae_lambda,
+        )
 
     info_summary: dict[str, float | int | str] = {
         "batch_reward_mean": float(rewards_tensor.mean().item()),
@@ -249,6 +279,7 @@ def collect_rollout(
             np.mean(benchmark_current_drawdowns)
         ),
         "batch_benchmark_max_drawdown_mean": float(np.mean(benchmark_max_drawdowns)),
+        "drawdown_benchmark_mode": drawdown_benchmark_mode,
         "batch_effective_drawdown_budget_mean": float(
             np.mean(effective_drawdown_budgets)
         ),
@@ -256,10 +287,22 @@ def collect_rollout(
         "batch_drawdown_gap_mean": float(np.mean(drawdown_gaps)),
         "batch_drawdown_violation_mean": float(np.mean(drawdown_violations)),
         "batch_drawdown_constraint_cost_mean": float(np.mean(drawdown_constraint_costs)),
-        "batch_group_a_min_violation_cost_mean": float(np.mean(group_a_min_violation_costs)),
-        "batch_group_b_max_violation_cost_mean": float(np.mean(group_b_max_violation_costs)),
-        "batch_group_a_weight_mean": float(np.mean(group_a_weights)),
-        "batch_group_b_weight_mean": float(np.mean(group_b_weights)),
+        "batch_allocation_constraint_1_violation_cost_mean": float(
+            np.mean(allocation_constraint_1_violation_costs)
+        ),
+        "batch_allocation_constraint_2_violation_cost_mean": float(
+            np.mean(allocation_constraint_2_violation_costs)
+        ),
+        "batch_allocation_constraint_1_weight_mean": float(
+            np.mean(allocation_constraint_1_weights)
+        ),
+        "batch_allocation_constraint_2_weight_mean": float(
+            np.mean(allocation_constraint_2_weights)
+        ),
+        "batch_simplex_z1_mean": float(np.mean(simplex_z1_values)),
+        "batch_simplex_z2_mean": float(np.mean(simplex_z2_values)),
+        "batch_simplex_z3_mean": float(np.mean(simplex_z3_values)),
+        "batch_simplex_z4_mean": float(np.mean(simplex_z4_values)),
         "batch_concentration_mean": float(np.mean(concentrations)),
         "batch_excess_concentration_cost_mean": float(np.mean(excess_concentration_costs)),
         "batch_diversification_cost_mean": float(np.mean(diversification_costs)),

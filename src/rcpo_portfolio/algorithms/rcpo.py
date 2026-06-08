@@ -3,6 +3,7 @@ from __future__ import annotations
 import torch
 
 from ..models import ActorCritic
+from ..profiling import TrainingProfiler, profile_section
 from ..rollouts import RolloutBatch
 from .ppo import _update_actor_critic_with_advantages
 
@@ -43,6 +44,7 @@ def update_rcpo_actor_critic(
     lambda_lr: float,
     lambda_lr_up: float | None = None,
     lambda_lr_down: float | None = None,
+    profiler: TrainingProfiler | None = None,
 ) -> tuple[dict[str, float], float, list[float]]:
     combined_advantages = combine_advantages(
         batch.reward_advantages,
@@ -57,19 +59,21 @@ def update_rcpo_actor_critic(
         selected_advantages=combined_advantages,
         train_cost_value=True,
         use_target_kl=True,
+        profiler=profiler,
     )
     metrics["combined_advantage_mean"] = float(combined_advantages.mean().item())
 
     lambda_updates: list[float] = []
     if alpha is not None:
-        for _ in range(optimization.epochs):
-            lambda_value = update_lagrange_multiplier(
-                lambda_value,
-                float(batch.info_summary["batch_constraint_cost_mean"]),
-                alpha,
-                learning_rate=lambda_lr,
-                learning_rate_up=lambda_lr_up,
-                learning_rate_down=lambda_lr_down,
-            )
-            lambda_updates.append(float(lambda_value))
+        with profile_section(profiler, "lambda_update"):
+            for _ in range(optimization.epochs):
+                lambda_value = update_lagrange_multiplier(
+                    lambda_value,
+                    float(batch.info_summary["batch_constraint_cost_mean"]),
+                    alpha,
+                    learning_rate=lambda_lr,
+                    learning_rate_up=lambda_lr_up,
+                    learning_rate_down=lambda_lr_down,
+                )
+                lambda_updates.append(float(lambda_value))
     return metrics, float(lambda_value), lambda_updates

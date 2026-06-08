@@ -11,8 +11,15 @@ build/
 dist/
 *.egg-info/
 
+HousenZhu_MEng_Project_Syllabus/
+
+profile_outputs/
 
 runs_*/
 
 .DS_Store
 Thumbs.db
+
+runs/**/metrics.jsonl
+
+runs/**/metrics.jsonl

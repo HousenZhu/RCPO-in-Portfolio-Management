@@ -35,7 +35,7 @@ def parse_args() -> argparse.Namespace:
         "--constraint-preset",
         choices=["c1", "c2", "c3"],
         default=None,
-        help="Optional override for the active long-only group-constraint preset.",
+        help="Optional override for the active allocation-constraint preset.",
     )
     parser.add_argument(
         "--constraint-drawdown",

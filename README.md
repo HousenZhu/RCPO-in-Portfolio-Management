@@ -5,9 +5,11 @@ This project builds a synthetic portfolio management problem and trains policy-g
 ## Features
 
 - Synthetic multi-market generator with 5 risky assets plus cash
-- Long-only portfolio weights via softmax-transformed policy logits
+- Long-only portfolio weights via softmax logits or CAOSD-style simplex decomposition
 - PPO baseline and RCPO with a reward critic, cost critic, and Lagrange multiplier
 - Benchmark-relative maximum drawdown constraint for RCPO
+- Two hard allocation constraints under `environment.action_mode: simplex_decomposition`
+- Configurable CAOSD policies: flat Gaussian, parallel branch Gaussian, or autoregressive Gaussian logits
 - Optional DRC/GDRC reward correction for PPO or RCPO
 - Config-driven training, resume, evaluation, checkpoints, metrics, and plots
 
@@ -45,7 +47,7 @@ py -3.11 train.py --algo rcpo --constraint-drawdown --use-drc --config configs/d
 py -3.11 train.py --algo rcpo --constraint-drawdown --use-gdrc --config configs/default.yaml
 ```
 
-Train with Gaussian reward noise when `reward_noise.enabled: true` in `configs/default.yaml`:
+Train with Gaussian reward noise after setting `reward_noise.enabled: true` in the YAML:
 
 ```powershell
 py -3.11 train.py --algo ppo_unconstrained --config configs/default.yaml
@@ -63,7 +65,7 @@ py -3.11 train.py --algo equal_weight --config configs/default.yaml
 Resume RCPO from the last checkpoint:
 
 ```powershell
-py -3.11 train.py --algo rcpo --constraint-drawdown --resume-run-dir "runs\new_rcpo_none_20260427_184555\seed_0"
+py -3.11 train.py --algo rcpo --constraint-drawdown --resume-run-dir "runs\simplex_v1_rcpo_none_20260606_150515\seed_0"
 ```
 
 Resume RCPO with GDRC:
@@ -75,7 +77,7 @@ py -3.11 train.py --algo rcpo --constraint-drawdown --use-gdrc --resume-run-dir 
 Resume PPO:
 
 ```powershell
-py -3.11 train.py --algo ppo_unconstrained  --resume-run-dir "runs\new_ppo_unconstrained_none_20260424_170155\seed_0"
+py -3.11 train.py --algo ppo_unconstrained  --resume-run-dir "runs\simplex_v1_ppo_unconstrained_none_20260526_125507\seed_0"
 ```
 
 To resume from a specific checkpoint file inside the run directory:
@@ -83,7 +85,6 @@ To resume from a specific checkpoint file inside the run directory:
 ```powershell
 py -3.11 train.py --algo rcpo --constraint-drawdown --resume-run-dir "runs\new_rcpo_none_YYYYMMDD_HHMMSS\seed_0" --resume-checkpoint checkpoint_best.pt
 ```
-noise_v1_ppo_unconstrained_gdrc_20260429_153756
 
 ## Evaluation Commands
 
@@ -105,6 +106,41 @@ Evaluate one future market that uses the same numeric seed as the train split:
 py -3.11 evaluate.py --run-dir "runs\latest_rcpo_none_YYYYMMDD_HHMMSS\seed_0" --checkpoint checkpoint_last.pt --include-train-seed-future --train-seed-future-steps 252
 ```
 
+## Action Constraints
+
+By default, `configs/default.yaml` uses `environment.action_mode: simplex_decomposition`.
+The policy emits either branch logits or branch simplex weights, then the environment maps them through four simplex-decomposition branches before trading. This makes the final portfolio weights long-only, sum to one, and satisfy two hard allocation constraints:
+
+```yaml
+environment:
+  action_mode: simplex_decomposition
+  simplex_action_format: branch_logits
+  allocation_constraint_1_indices: [1, 2, 4]
+  allocation_constraint_2_indices: [0, 4, 5]
+  active_constraint_preset: c2
+
+network:
+  policy_architecture: simplex_branch_gaussian
+```
+
+The preset `c2` requires at least `0.40` portfolio weight in each custom allocation set. Preset `c1` is looser for training/debugging, and `c3` is stricter for overlap-stress verification. In `simplex_decomposition` mode, the zero surrogate action is the constrained-neutral baseline, so it is feasible but not necessarily the same as unconstrained equal weight.
+
+Available policy architectures:
+
+- `flat_gaussian`: old one-head actor. With simplex decomposition, the env splits its flat logits into CAOSD branches.
+- `simplex_branch_gaussian`: shared encoder plus four parallel Gaussian branch heads. This is the default v2 mode.
+- `simplex_autoregressive_gaussian`: shared encoder plus four autoregressive Gaussian-logit branch heads. Later heads condition on previous branch softmax allocations.
+- `simplex_autoregressive_dirichlet`: legacy alias for `simplex_autoregressive_gaussian`; this mode no longer uses Dirichlet sampling.
+
+For v3, set:
+
+```yaml
+network:
+  policy_architecture: simplex_autoregressive_gaussian
+```
+
+The config loader resolves `environment.simplex_action_format` to `branch_logits` for all current simplex policy architectures. The environment applies softmax within each CAOSD branch.
+
 ## Constraint Definition
 
 Reward is net portfolio log return after transaction costs:
@@ -113,13 +149,13 @@ Reward is net portfolio log return after transaction costs:
 reward_t = log(1 + net_simple_return_t)
 ```
 
-RCPO uses a benchmark-relative maximum drawdown constraint. During each episode, the environment tracks the agent portfolio path and an online equal-weight benchmark path under the same transaction-cost model:
+RCPO uses a benchmark-relative maximum drawdown constraint. During each episode, the environment tracks the agent portfolio path and an online benchmark path under the same transaction-cost model. In simplex mode, `configs/default.yaml` uses the constrained-neutral CAOSD baseline as this benchmark; set `drawdown_benchmark_mode: true_equal_weight` to use the old true equal-weight benchmark instead.
 
 ```text
 agent_current_drawdown_t = (agent_running_peak_t - agent_portfolio_value_t) / agent_running_peak_t
 agent_max_drawdown_t = max(previous_agent_max_drawdown, agent_current_drawdown_t)
-equal_weight_max_drawdown_t = max(previous_equal_weight_max_drawdown, equal_weight_current_drawdown_t)
-budget_t = max(drawdown_budget_floor, benchmark_drawdown_margin * equal_weight_max_drawdown_t)
+benchmark_max_drawdown_t = max(previous_benchmark_max_drawdown, benchmark_current_drawdown_t)
+budget_t = max(drawdown_budget_floor, benchmark_drawdown_margin * benchmark_max_drawdown_t)
 drawdown_violation_t = max(0, agent_max_drawdown_t - budget_t)
 constraint_cost = drawdown_violation^2 / drawdown_cost_scale
 ```
@@ -128,8 +164,9 @@ Default settings:
 
 ```yaml
 environment:
-  drawdown_budget_floor: 0.02
-  benchmark_drawdown_margin: 0.90
+  drawdown_budget_floor: 0.05
+  drawdown_benchmark_mode: constrained_neutral
+  benchmark_drawdown_margin: 0.96
   drawdown_cost_scale: 0.01
 
 rcpo:
@@ -137,7 +174,7 @@ rcpo:
   alpha_budget_ratio: 0.05
 ```
 
-This means the policy can seek return, but RCPO penalizes episode paths whose running maximum drawdown exceeds a budget defined online from equal weight. The `0.90` margin asks the policy to stay about 10% safer than equal weight on drawdown, subject to the `0.02` minimum floor. With `alpha_budget_ratio: 0.05`, the Lagrange multiplier tolerates about 5% of the current effective drawdown budget as average violation before it increases.
+This means the policy can seek return, but RCPO penalizes episode paths whose running maximum drawdown exceeds a budget defined online from the selected benchmark. The `0.96` margin asks the policy to stay modestly safer than the benchmark on drawdown, subject to the `0.05` minimum floor. With `alpha_budget_ratio: 0.05`, the Lagrange multiplier tolerates about 5% of the current effective drawdown budget as average violation before it increases.
 
 ## DRC / GDRC Reward Correction
 
@@ -164,11 +201,11 @@ reward_correction:
 
 ## Reward Noise
 
-`configs/default.yaml` includes an optional Gaussian training reward-noise channel. The current experiment config is set to `enabled: true`; set it to `false` for clean-reward training.
+`configs/default.yaml` includes an optional Gaussian training reward-noise channel. It is disabled by default for the simplex-decomposition phase.
 
 ```yaml
 reward_noise:
-  enabled: true
+  enabled: false
   mode: gaussian
   std: 0.003
   seed_offset: 30000

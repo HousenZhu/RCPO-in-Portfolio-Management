@@ -19,6 +19,7 @@ from .config import (
 )
 from .devices import resolve_device
 from .env import PortfolioEnv
+from .io_utils import safe_savefig
 from .market import generate_market_splits
 from .models import ActorCritic
 
@@ -59,8 +60,8 @@ def select_start_indices(env: PortfolioEnv, episodes: int) -> np.ndarray:
     return starts[indices]
 
 
-def _equal_weight_logits(env: PortfolioEnv) -> np.ndarray:
-    return np.zeros(env.action_space.shape[0], dtype=np.float32)
+def _neutral_action(env: PortfolioEnv) -> np.ndarray:
+    return env.neutral_action()
 
 
 def _rollout_returns(
@@ -94,6 +95,7 @@ def evaluate_policy(
     first_episode: dict[str, np.ndarray] | None = None
     first_start_index: int | None = None
     violation_count = 0
+    drawdown_benchmark_mode = env.config.drawdown_benchmark_mode
     start_indices = select_start_indices(env, episodes)
     for start_index in start_indices:
         obs, _ = env.reset(options={"start_index": int(start_index)})
@@ -108,10 +110,14 @@ def evaluate_policy(
         drawdown_gaps: list[float] = []
         drawdown_violations: list[float] = []
         drawdown_constraint_costs: list[float] = []
-        group_a_min_violation_costs: list[float] = []
-        group_b_max_violation_costs: list[float] = []
-        group_a_weights: list[float] = []
-        group_b_weights: list[float] = []
+        allocation_constraint_1_violation_costs: list[float] = []
+        allocation_constraint_2_violation_costs: list[float] = []
+        allocation_constraint_1_weights: list[float] = []
+        allocation_constraint_2_weights: list[float] = []
+        simplex_z1_values: list[float] = []
+        simplex_z2_values: list[float] = []
+        simplex_z3_values: list[float] = []
+        simplex_z4_values: list[float] = []
         concentrations: list[float] = []
         excess_concentration_costs: list[float] = []
         diversification_costs: list[float] = []
@@ -127,6 +133,7 @@ def evaluate_policy(
             max_drawdowns.append(float(info["max_drawdown"]))
             benchmark_current_drawdowns.append(float(info["benchmark_current_drawdown"]))
             benchmark_max_drawdowns.append(float(info["benchmark_max_drawdown"]))
+            drawdown_benchmark_mode = str(info["drawdown_benchmark_mode"])
             effective_drawdown_budgets.append(float(info["effective_drawdown_budget"]))
             if alpha_budget_ratio is not None:
                 alpha_targets.append(
@@ -138,10 +145,22 @@ def evaluate_policy(
             drawdown_gaps.append(float(info["drawdown_gap"]))
             drawdown_violations.append(float(info["drawdown_violation"]))
             drawdown_constraint_costs.append(float(info["drawdown_constraint_cost"]))
-            group_a_min_violation_costs.append(float(info["group_a_min_violation_cost"]))
-            group_b_max_violation_costs.append(float(info["group_b_max_violation_cost"]))
-            group_a_weights.append(float(info["group_a_weight"]))
-            group_b_weights.append(float(info["group_b_weight"]))
+            allocation_constraint_1_violation_costs.append(
+                float(info["allocation_constraint_1_violation_cost"])
+            )
+            allocation_constraint_2_violation_costs.append(
+                float(info["allocation_constraint_2_violation_cost"])
+            )
+            allocation_constraint_1_weights.append(
+                float(info["allocation_constraint_1_weight"])
+            )
+            allocation_constraint_2_weights.append(
+                float(info["allocation_constraint_2_weight"])
+            )
+            simplex_z1_values.append(float(info["simplex_z1"]))
+            simplex_z2_values.append(float(info["simplex_z2"]))
+            simplex_z3_values.append(float(info["simplex_z3"]))
+            simplex_z4_values.append(float(info["simplex_z4"]))
             concentrations.append(float(info["concentration"]))
             excess_concentration_costs.append(float(info["excess_concentration_cost"]))
             diversification_costs.append(float(info["diversification_cost"]))
@@ -201,10 +220,22 @@ def evaluate_policy(
         episode_summary["average_drawdown_constraint_cost"] = float(
             np.mean(episode_drawdown_constraint_cost)
         )
-        episode_summary["average_group_a_min_violation_cost"] = float(np.mean(group_a_min_violation_costs))
-        episode_summary["average_group_b_max_violation_cost"] = float(np.mean(group_b_max_violation_costs))
-        episode_summary["average_group_a_weight"] = float(np.mean(group_a_weights))
-        episode_summary["average_group_b_weight"] = float(np.mean(group_b_weights))
+        episode_summary["average_allocation_constraint_1_violation_cost"] = float(
+            np.mean(allocation_constraint_1_violation_costs)
+        )
+        episode_summary["average_allocation_constraint_2_violation_cost"] = float(
+            np.mean(allocation_constraint_2_violation_costs)
+        )
+        episode_summary["average_allocation_constraint_1_weight"] = float(
+            np.mean(allocation_constraint_1_weights)
+        )
+        episode_summary["average_allocation_constraint_2_weight"] = float(
+            np.mean(allocation_constraint_2_weights)
+        )
+        episode_summary["average_simplex_z1"] = float(np.mean(simplex_z1_values))
+        episode_summary["average_simplex_z2"] = float(np.mean(simplex_z2_values))
+        episode_summary["average_simplex_z3"] = float(np.mean(simplex_z3_values))
+        episode_summary["average_simplex_z4"] = float(np.mean(simplex_z4_values))
         episode_summary["average_concentration"] = float(np.mean(concentrations))
         episode_summary["average_excess_concentration_cost"] = float(
             np.mean(excess_concentration_costs)
@@ -215,7 +246,7 @@ def evaluate_policy(
         episode_summaries.append(episode_summary)
         episode_return_paths.append(episode_returns)
         equal_weight_return_paths.append(
-            _rollout_returns(env, lambda _obs: _equal_weight_logits(env), int(start_index))
+            _rollout_returns(env, lambda _obs: _neutral_action(env), int(start_index))
         )
         episode_alpha_threshold = (
             episode_summary["average_alpha_target"]
@@ -242,8 +273,18 @@ def evaluate_policy(
                 "drawdown_violations": episode_drawdown_violation,
                 "drawdown_constraint_costs": episode_drawdown_constraint_cost,
                 "turnover": episode_turnover,
-                "group_a_weights": np.asarray(group_a_weights, dtype=np.float32),
-                "group_b_weights": np.asarray(group_b_weights, dtype=np.float32),
+                "allocation_constraint_1_weights": np.asarray(
+                    allocation_constraint_1_weights,
+                    dtype=np.float32,
+                ),
+                "allocation_constraint_2_weights": np.asarray(
+                    allocation_constraint_2_weights,
+                    dtype=np.float32,
+                ),
+                "simplex_z1": np.asarray(simplex_z1_values, dtype=np.float32),
+                "simplex_z2": np.asarray(simplex_z2_values, dtype=np.float32),
+                "simplex_z3": np.asarray(simplex_z3_values, dtype=np.float32),
+                "simplex_z4": np.asarray(simplex_z4_values, dtype=np.float32),
                 "concentrations": np.asarray(concentrations, dtype=np.float32),
                 "excess_concentration_costs": np.asarray(
                     excess_concentration_costs,
@@ -261,6 +302,7 @@ def evaluate_policy(
         for metric in episode_summaries[0]
     }
     aggregate["episodes"] = len(episode_summaries)
+    aggregate["drawdown_benchmark_mode"] = drawdown_benchmark_mode
     aggregate["constraint_violation_rate"] = (
         float(violation_count / len(episode_summaries))
         if (alpha is not None or alpha_budget_ratio is not None)
@@ -272,7 +314,7 @@ def evaluate_policy(
         first_episode=first_episode,
         episode_returns=episode_return_paths,
         equal_weight_first_episode_returns=_rollout_returns(
-            env, lambda _obs: _equal_weight_logits(env), first_start_index
+            env, lambda _obs: _neutral_action(env), first_start_index
         ),
         equal_weight_episode_returns=equal_weight_return_paths,
     )
@@ -284,6 +326,7 @@ def save_evaluation_artifacts(
     split_name: str,
     rolling_window: int,
     lambda_history: list[float] | None = None,
+    lambda_update_steps: list[int] | None = None,
     mean_episode_returns: list[np.ndarray] | None = None,
     equal_weight_mean_episode_returns: list[np.ndarray] | None = None,
 ) -> None:
@@ -308,7 +351,7 @@ def save_evaluation_artifacts(
     plt.title(f"Cumulative Return ({split_name})")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(output_path / f"cumulative_return_{split_name}.png")
+    safe_savefig(plt.gcf(), output_path / f"cumulative_return_{split_name}.png")
     plt.close()
 
     plots = [
@@ -325,7 +368,7 @@ def save_evaluation_artifacts(
         plt.plot(series)
         plt.title(f"{title} ({split_name})")
         plt.tight_layout()
-        plt.savefig(output_path / f"{file_stem}_{split_name}.png")
+        safe_savefig(plt.gcf(), output_path / f"{file_stem}_{split_name}.png")
         plt.close()
 
     model_mean_paths = mean_episode_returns or result.episode_returns
@@ -365,17 +408,23 @@ def save_evaluation_artifacts(
         plt.title(f"Mean Cumulative Return ({split_name})")
         plt.legend()
         plt.tight_layout()
-        plt.savefig(output_path / f"mean_cumulative_return_{split_name}.png")
+        safe_savefig(plt.gcf(), output_path / f"mean_cumulative_return_{split_name}.png")
         plt.close()
 
     save_group_weights_artifact(result, output_path, split_name)
 
     if lambda_history is not None:
         plt.figure(figsize=(8, 4))
-        plt.plot(lambda_history)
+        if lambda_update_steps is not None and len(lambda_update_steps) == len(lambda_history):
+            x_values = lambda_update_steps
+        else:
+            x_values = np.arange(1, len(lambda_history) + 1)
+        plt.plot(x_values, lambda_history)
         plt.title("Lambda Trajectory")
+        plt.xlabel("Training Update")
+        plt.ylabel("Lambda")
         plt.tight_layout()
-        plt.savefig(output_path / "lambda_trajectory.png")
+        safe_savefig(plt.gcf(), output_path / "lambda_trajectory.png")
         plt.close()
 
 
@@ -391,12 +440,30 @@ def save_group_weights_artifact(
     asset_labels = ["Cash", *[f"Asset {index}" for index in range(1, weights.shape[1])]]
     for asset_index, label in enumerate(asset_labels):
         plt.plot(weights[:, asset_index], label=label, linewidth=1.2, alpha=0.85)
-    plt.title(f"Portfolio Weights ({split_name})")
+    constraint_1 = result.first_episode.get("allocation_constraint_1_weights")
+    constraint_2 = result.first_episode.get("allocation_constraint_2_weights")
+    if constraint_1 is not None:
+        plt.plot(
+            constraint_1,
+            label="Allocation Constraint 1",
+            color="#111111",
+            linestyle="--",
+            linewidth=1.8,
+        )
+    if constraint_2 is not None:
+        plt.plot(
+            constraint_2,
+            label="Allocation Constraint 2",
+            color="#d94801",
+            linestyle="--",
+            linewidth=1.8,
+        )
+    plt.title(f"Portfolio And Allocation Constraint Weights ({split_name})")
     plt.xlabel("Step")
     plt.ylabel("Weight")
     plt.legend(loc="center left", bbox_to_anchor=(1.0, 0.5))
     plt.tight_layout()
-    plt.savefig(output_path / f"group_weights_{split_name}.png")
+    safe_savefig(plt.gcf(), output_path / f"group_weights_{split_name}.png")
     plt.close()
 
 
@@ -481,7 +548,7 @@ def save_training_progress_artifacts(
     axis.set_ylabel("Return")
     axis.legend()
     fig.tight_layout()
-    fig.savefig(output_path / "training_return.png")
+    safe_savefig(fig, output_path / "training_return.png")
     plt.close(fig)
 
     rollout_turnover = np.asarray(
@@ -519,7 +586,7 @@ def save_training_progress_artifacts(
     axis.set_ylabel("Average Turnover")
     axis.legend()
     fig.tight_layout()
-    fig.savefig(output_path / "training_turnover.png")
+    safe_savefig(fig, output_path / "training_turnover.png")
     plt.close(fig)
 
     reward_modes = {str(row.get("reward_correction_mode", "none")) for row in metrics_rows}
@@ -551,7 +618,7 @@ def save_training_progress_artifacts(
         axis.set_ylabel("Reward")
         axis.legend()
         fig.tight_layout()
-        fig.savefig(output_path / "training_reward_correction.png")
+        safe_savefig(fig, output_path / "training_reward_correction.png")
         plt.close(fig)
 
     selected_bins = np.asarray(
@@ -565,7 +632,7 @@ def save_training_progress_artifacts(
         axis.set_xlabel("Update")
         axis.set_ylabel("Selected Bins")
         fig.tight_layout()
-        fig.savefig(output_path / "gdrc_selected_bins.png")
+        safe_savefig(fig, output_path / "gdrc_selected_bins.png")
         plt.close(fig)
 
 
@@ -580,6 +647,24 @@ def load_checkpoint_for_evaluation(
     sync_rcpo_constraint_settings(config)
     device = resolve_device(config.runtime.device)
     checkpoint = torch.load(run_path / checkpoint_name, map_location=device)
+    checkpoint_action_mode = checkpoint.get("action_mode", "softmax")
+    if checkpoint_action_mode != config.environment.action_mode:
+        raise ValueError(
+            f"Checkpoint action_mode {checkpoint_action_mode!r} does not match "
+            f"config_snapshot {config.environment.action_mode!r}."
+        )
+    checkpoint_simplex_action_format = checkpoint.get("simplex_action_format", "branch_logits")
+    if checkpoint_simplex_action_format != config.environment.simplex_action_format:
+        raise ValueError(
+            f"Checkpoint simplex_action_format {checkpoint_simplex_action_format!r} "
+            f"does not match config_snapshot {config.environment.simplex_action_format!r}."
+        )
+    checkpoint_policy_architecture = checkpoint.get("policy_architecture", "flat_gaussian")
+    if checkpoint_policy_architecture != config.network.policy_architecture:
+        raise ValueError(
+            f"Checkpoint policy_architecture {checkpoint_policy_architecture!r} "
+            f"does not match config_snapshot {config.network.policy_architecture!r}."
+        )
     if checkpoint.get("algo") == "rcpo":
         checkpoint_constraint_mode = checkpoint.get("constraint_mode")
         if checkpoint_constraint_mode != config.rcpo.constraint_mode:
@@ -598,6 +683,14 @@ def load_checkpoint_for_evaluation(
             float(config.environment.drawdown_budget_floor),
         ):
             raise ValueError("Checkpoint drawdown_budget_floor does not match config_snapshot.")
+        checkpoint_benchmark_mode = checkpoint.get(
+            "drawdown_benchmark_mode",
+            "true_equal_weight",
+        )
+        if checkpoint_benchmark_mode != config.environment.drawdown_benchmark_mode:
+            raise ValueError(
+                "Checkpoint drawdown_benchmark_mode does not match config_snapshot."
+            )
         if not np.isclose(
             float(checkpoint.get("benchmark_drawdown_margin", np.nan)),
             float(config.environment.benchmark_drawdown_margin),
@@ -619,7 +712,21 @@ def load_checkpoint_for_evaluation(
         obs_dim=environments["train"].observation_space.shape[0],
         action_dim=environments["train"].action_space.shape[0],
         config=config.network,
+        branch_sizes=environments["train"].simplex_branch_sizes(),
     ).to(device)
+    checkpoint_action_dim = checkpoint.get("action_dim")
+    if checkpoint_action_dim is not None and int(checkpoint_action_dim) != int(
+        environments["train"].action_space.shape[0]
+    ):
+        raise ValueError(
+            f"Checkpoint action_dim {checkpoint_action_dim!r} does not match "
+            f"environment action dimension {environments['train'].action_space.shape[0]}."
+        )
+    checkpoint_branch_sizes = checkpoint.get("simplex_branch_sizes")
+    if checkpoint_branch_sizes is not None and list(checkpoint_branch_sizes) != environments[
+        "train"
+    ].simplex_branch_sizes():
+        raise ValueError("Checkpoint simplex_branch_sizes do not match config_snapshot.")
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
     metadata = {

@@ -33,21 +33,86 @@ def build_env(**overrides) -> PortfolioEnv:
         "episode_length": 3,
         "transaction_cost_bps": 10.0,
         "turnover_cap": 2.0,
+        "action_mode": "softmax",
         "constraint_mode": "max_drawdown",
         "drawdown_budget_floor": 0.02,
         "benchmark_drawdown_margin": 0.90,
         "drawdown_cost_scale": 0.01,
         "diversification_beta": 0.0,
-        "group_a_indices": [0],
-        "group_b_indices": [1],
+        "allocation_constraint_1_indices": [0],
+        "allocation_constraint_2_indices": [1],
         "active_constraint_preset": "c2",
         "constraint_presets": {
-            "c1": {"group_a_min_weight": 0.20, "group_b_max_weight": 0.70},
-            "c2": {"group_a_min_weight": 0.25, "group_b_max_weight": 0.60},
-            "c3": {"group_a_min_weight": 0.30, "group_b_max_weight": 0.50},
+            "c1": {
+                "allocation_constraint_1_min_weight": 0.20,
+                "allocation_constraint_2_min_weight": 0.70,
+            },
+            "c2": {
+                "allocation_constraint_1_min_weight": 0.25,
+                "allocation_constraint_2_min_weight": 0.60,
+            },
+            "c3": {
+                "allocation_constraint_1_min_weight": 0.30,
+                "allocation_constraint_2_min_weight": 0.50,
+            },
         },
-        "group_a_min_cost_weight": 0.35,
-        "group_b_max_cost_weight": 0.35,
+    }
+    env_kwargs.update(overrides)
+    env_config = EnvironmentConfig(**env_kwargs)
+    return PortfolioEnv(env_config, market, market_config, seed=7)
+
+
+def build_project_simplex_env(**overrides) -> PortfolioEnv:
+    returns = np.array(
+        [
+            [0.01, -0.02, 0.00, 0.01, -0.01],
+            [0.02, 0.01, -0.01, 0.00, 0.02],
+            [-0.01, 0.03, 0.01, -0.02, -0.01],
+            [0.01, 0.01, 0.00, 0.02, 0.00],
+            [-0.02, -0.01, 0.01, -0.01, -0.02],
+            [0.00, 0.02, -0.01, 0.01, 0.01],
+            [0.01, 0.01, 0.00, 0.00, 0.02],
+        ],
+        dtype=np.float32,
+    )
+    regimes = np.zeros(len(returns), dtype=np.int64)
+    market = MarketSlice(risky_returns=returns, regimes=regimes)
+    market_config = MarketConfig(
+        num_risky_assets=5,
+        lookback=2,
+        train_steps=5,
+        validation_steps=5,
+        test_steps=5,
+    )
+    env_kwargs = {
+        "episode_length": 3,
+        "transaction_cost_bps": 10.0,
+        "turnover_cap": 2.0,
+        "action_mode": "simplex_decomposition",
+        "simplex_action_format": "branch_logits",
+        "constraint_mode": "max_drawdown",
+        "drawdown_budget_floor": 0.02,
+        "drawdown_benchmark_mode": "constrained_neutral",
+        "benchmark_drawdown_margin": 0.90,
+        "drawdown_cost_scale": 0.01,
+        "diversification_beta": 0.0,
+        "allocation_constraint_1_indices": [1, 2, 4],
+        "allocation_constraint_2_indices": [0, 4, 5],
+        "active_constraint_preset": "c3",
+        "constraint_presets": {
+            "c1": {
+                "allocation_constraint_1_min_weight": 0.35,
+                "allocation_constraint_2_min_weight": 0.35,
+            },
+            "c2": {
+                "allocation_constraint_1_min_weight": 0.40,
+                "allocation_constraint_2_min_weight": 0.40,
+            },
+            "c3": {
+                "allocation_constraint_1_min_weight": 0.55,
+                "allocation_constraint_2_min_weight": 0.55,
+            },
+        },
     }
     env_kwargs.update(overrides)
     env_config = EnvironmentConfig(**env_kwargs)
@@ -156,6 +221,7 @@ def test_first_benchmark_step_applies_initial_rebalance_cost() -> None:
     expected_max_drawdown = -expected_net_return
     expected_budget = max(0.001, 0.90 * expected_max_drawdown)
 
+    assert info["drawdown_benchmark_mode"] == "true_equal_weight"
     assert np.isclose(info["benchmark_raw_return"], expected_raw_return)
     assert np.isclose(info["benchmark_turnover"], expected_turnover)
     assert np.isclose(info["benchmark_transaction_cost"], expected_transaction_cost)
@@ -163,6 +229,49 @@ def test_first_benchmark_step_applies_initial_rebalance_cost() -> None:
     assert np.isclose(info["benchmark_current_drawdown"], expected_max_drawdown)
     assert np.isclose(info["benchmark_max_drawdown"], expected_max_drawdown)
     assert np.isclose(info["effective_drawdown_budget"], expected_budget)
+
+
+def test_constrained_neutral_benchmark_uses_neutral_action_weights() -> None:
+    env = build_env(
+        action_mode="simplex_decomposition",
+        drawdown_benchmark_mode="constrained_neutral",
+        drawdown_budget_floor=0.001,
+    )
+    neutral_weights = env._weights_from_action(env.neutral_action())
+    env.reset(options={"start_index": 4})
+
+    _, _, _, _, info = env.step(np.zeros(env.action_space.shape[0], dtype=np.float32))
+
+    expected_raw_return = float(
+        np.dot(neutral_weights[1:], np.array([-0.02, -0.01], dtype=np.float32))
+    )
+    expected_turnover = float(
+        np.sum(np.abs(neutral_weights - np.array([1.0, 0.0, 0.0], dtype=np.float32)))
+    )
+
+    assert info["drawdown_benchmark_mode"] == "constrained_neutral"
+    np.testing.assert_allclose(info["benchmark_weights"], neutral_weights)
+    assert np.isclose(info["benchmark_raw_return"], expected_raw_return)
+    assert np.isclose(info["benchmark_turnover"], expected_turnover)
+    assert info["allocation_constraint_1_weight"] >= info["allocation_constraint_1_min_weight"]
+    assert info["allocation_constraint_2_weight"] >= info["allocation_constraint_2_min_weight"]
+
+
+def test_c3_constrained_neutral_benchmark_matches_project_simplex_weights() -> None:
+    env = build_project_simplex_env()
+
+    expected_weights = np.array(
+        [0.125, 0.175, 0.175, 0.025, 0.375, 0.125],
+        dtype=np.float32,
+    )
+
+    np.testing.assert_allclose(env.benchmark_weights(), expected_weights, atol=1e-7)
+    assert not np.allclose(
+        env.benchmark_weights(),
+        np.full(6, 1.0 / 6.0, dtype=np.float32),
+    )
+    assert np.isclose(np.sum(env.benchmark_weights()[[1, 2, 4]]), 0.725)
+    assert np.isclose(np.sum(env.benchmark_weights()[[0, 4, 5]]), 0.625)
 
 
 def test_later_benchmark_steps_have_zero_turnover() -> None:
@@ -259,8 +368,76 @@ def test_constraint_preset_resolution_changes_bounds() -> None:
     env = build_env(active_constraint_preset="c3")
     resolved = env.resolved_constraint_preset()
     assert resolved["preset_name"] == "c3"
-    assert np.isclose(resolved["group_a_min_weight"], 0.30)
-    assert np.isclose(resolved["group_b_max_weight"], 0.50)
+    assert np.isclose(resolved["allocation_constraint_1_min_weight"], 0.30)
+    assert np.isclose(resolved["allocation_constraint_2_min_weight"], 0.50)
+
+
+def test_simplex_decomposition_action_mode_uses_compact_action_shape() -> None:
+    env = build_env(action_mode="simplex_decomposition")
+
+    assert env.action_space.shape == (5,)
+
+
+def test_simplex_decomposition_rejects_wrong_action_shape() -> None:
+    env = build_env(action_mode="simplex_decomposition")
+    env.reset(options={"start_index": 2})
+
+    try:
+        env.step(np.zeros(3, dtype=np.float32))
+    except ValueError as error:
+        assert "simplex-decomposition action shape" in str(error)
+    else:
+        raise AssertionError("Expected simplex decomposition to reject wrong action shape.")
+
+
+def test_simplex_decomposition_zero_action_satisfies_allocation_constraints() -> None:
+    env = build_env(action_mode="simplex_decomposition")
+    env.reset(options={"start_index": 2})
+
+    _, _, _, _, info = env.step(np.zeros(env.action_space.shape[0], dtype=np.float32))
+
+    assert np.isclose(info["weights"].sum(), 1.0)
+    assert info["allocation_constraint_1_weight"] >= info["allocation_constraint_1_min_weight"]
+    assert info["allocation_constraint_2_weight"] >= info["allocation_constraint_2_min_weight"]
+    assert np.isclose(info["allocation_constraint_1_violation_cost"], 0.0)
+    assert np.isclose(info["allocation_constraint_2_violation_cost"], 0.0)
+    assert "simplex_z1" in info
+    assert "simplex_z2" in info
+    assert "simplex_z3" in info
+    assert "simplex_z4" in info
+
+
+def test_simplex_decomposition_branch_weights_action_format() -> None:
+    env = build_env(
+        action_mode="simplex_decomposition",
+        simplex_action_format="branch_weights",
+    )
+    env.reset(options={"start_index": 2})
+    action = env.neutral_action()
+
+    _, _, _, _, info = env.step(action)
+
+    assert action.shape == env.action_space.shape
+    assert np.isclose(info["weights"].sum(), 1.0)
+    assert info["allocation_constraint_1_weight"] >= info["allocation_constraint_1_min_weight"]
+    assert info["allocation_constraint_2_weight"] >= info["allocation_constraint_2_min_weight"]
+
+
+def test_simplex_decomposition_branch_weights_reject_negative_values() -> None:
+    env = build_env(
+        action_mode="simplex_decomposition",
+        simplex_action_format="branch_weights",
+    )
+    env.reset(options={"start_index": 2})
+    action = env.neutral_action()
+    action[1] = -0.1
+
+    try:
+        env.step(action)
+    except ValueError as error:
+        assert "nonnegative" in str(error)
+    else:
+        raise AssertionError("Expected negative branch weights to be rejected.")
 
 
 def test_reset_is_deterministic_when_start_index_is_fixed() -> None:

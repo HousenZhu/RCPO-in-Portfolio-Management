@@ -53,37 +53,50 @@ class MarketConfig:
 
 @dataclass
 class EnvironmentConfig:
+    action_mode: str = "softmax"
+    simplex_action_format: str = "branch_logits"
     episode_length: int = 252
     transaction_cost_bps: float = 1.0
     turnover_cap: float = 0.40
     constraint_mode: str = "max_drawdown"
     drawdown_budget_floor: float = 0.02
+    drawdown_benchmark_mode: str = "true_equal_weight"
     benchmark_drawdown_margin: float = 0.90
     drawdown_cost_scale: float = 0.01
     diversification_beta: float = 0.03
-    group_a_indices: list[int] = field(default_factory=lambda: [0, 1])
-    group_b_indices: list[int] = field(default_factory=lambda: [2, 3, 4])
+    allocation_constraint_1_indices: list[int] = field(default_factory=lambda: [1, 2, 4])
+    allocation_constraint_2_indices: list[int] = field(default_factory=lambda: [0, 4, 5])
     active_constraint_preset: str = "c2"
     constraint_presets: dict[str, dict[str, float]] = field(
         default_factory=lambda: {
-            "c1": {"group_a_min_weight": 0.20, "group_b_max_weight": 0.70},
-            "c2": {"group_a_min_weight": 0.25, "group_b_max_weight": 0.60},
-            "c3": {"group_a_min_weight": 0.30, "group_b_max_weight": 0.50},
+            "c1": {
+                "allocation_constraint_1_min_weight": 0.35,
+                "allocation_constraint_2_min_weight": 0.35,
+            },
+            "c2": {
+                "allocation_constraint_1_min_weight": 0.40,
+                "allocation_constraint_2_min_weight": 0.40,
+            },
+            "c3": {
+                "allocation_constraint_1_min_weight": 0.55,
+                "allocation_constraint_2_min_weight": 0.55,
+            },
         }
     )
-    resolved_group_a_min_weight: float | None = None
-    resolved_group_b_max_weight: float | None = None
-    group_a_min_cost_weight: float = 0.35
-    group_b_max_cost_weight: float = 0.35
+    resolved_allocation_constraint_1_min_weight: float | None = None
+    resolved_allocation_constraint_2_min_weight: float | None = None
 
 
 @dataclass
 class NetworkConfig:
+    policy_architecture: str = "flat_gaussian"
     hidden_sizes: list[int] = field(default_factory=lambda: [128, 128])
     activation: str = "tanh"
     init_log_std: float = -1.5
     min_log_std: float = -2.5
     equal_weight_policy_init: bool = True
+    dirichlet_min_concentration: float = 0.05
+    dirichlet_init_concentration: float = 1.0
 
 
 @dataclass
@@ -193,11 +206,45 @@ class ProjectConfig:
 
 
 def sync_rcpo_constraint_settings(config: ProjectConfig) -> None:
+    if config.network.policy_architecture == "simplex_autoregressive_dirichlet":
+        config.network.policy_architecture = "simplex_autoregressive_gaussian"
+    valid_policy_architectures = {
+        "flat_gaussian",
+        "simplex_branch_gaussian",
+        "simplex_autoregressive_gaussian",
+        "simplex_autoregressive_dirichlet",
+    }
+    if config.network.policy_architecture not in valid_policy_architectures:
+        raise ValueError(
+            "network.policy_architecture must be one of: "
+            f"{sorted(valid_policy_architectures)}."
+        )
+    if config.environment.action_mode not in {"softmax", "simplex_decomposition"}:
+        raise ValueError(
+            "environment.action_mode must be either 'softmax' or 'simplex_decomposition'."
+        )
+    if (
+        config.environment.action_mode != "simplex_decomposition"
+        and config.network.policy_architecture != "flat_gaussian"
+    ):
+        raise ValueError(
+            "Simplex branch policy architectures require "
+            "environment.action_mode='simplex_decomposition'."
+        )
+    config.environment.simplex_action_format = "branch_logits"
     if config.rcpo.constraint_mode != "max_drawdown":
         raise ValueError("rcpo.constraint_mode must be 'max_drawdown'.")
     config.environment.constraint_mode = config.rcpo.constraint_mode
     if config.environment.drawdown_budget_floor < 0.0:
         raise ValueError("environment.drawdown_budget_floor cannot be negative.")
+    if config.environment.drawdown_benchmark_mode not in {
+        "true_equal_weight",
+        "constrained_neutral",
+    }:
+        raise ValueError(
+            "environment.drawdown_benchmark_mode must be either "
+            "'true_equal_weight' or 'constrained_neutral'."
+        )
     if config.environment.benchmark_drawdown_margin <= 0.0:
         raise ValueError("environment.benchmark_drawdown_margin must be positive.")
     if config.environment.drawdown_cost_scale <= 0.0:
