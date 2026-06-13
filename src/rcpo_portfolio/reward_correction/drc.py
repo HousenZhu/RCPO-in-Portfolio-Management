@@ -79,7 +79,14 @@ def apply_correction_delta(
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     scaled_delta = raw_delta * float(config.correction_coef)
     delta_clip = float(config.correction_delta_clip)
-    effective_delta = torch.clamp(scaled_delta, min=-delta_clip, max=delta_clip)
+    clip_tensor = torch.as_tensor(
+        delta_clip,
+        dtype=scaled_delta.dtype,
+        device=scaled_delta.device,
+    )
+    # Keep the represented floating-point value inside the configured decimal bound.
+    safe_clip = torch.nextafter(clip_tensor, torch.zeros_like(clip_tensor))
+    effective_delta = torch.clamp(scaled_delta, min=-safe_clip, max=safe_clip)
     corrected_rewards = observed_rewards + effective_delta
     return corrected_rewards, raw_delta, effective_delta
 
@@ -156,13 +163,19 @@ class DRCRewardCorrector(RewardCorrector):
                 "corrected_reward_mean": float(corrected_rewards.mean().item()),
                 "reward_correction_delta_mean": float(effective_delta.mean().item()),
                 "reward_correction_delta_abs_mean": float(
-                    torch.abs(effective_delta).mean().item()
+                    min(
+                        torch.abs(effective_delta).mean().item(),
+                        float(self.config.correction_delta_clip),
+                    )
                 ),
                 "reward_correction_raw_delta_abs_mean": float(
                     torch.abs(raw_delta).mean().item()
                 ),
                 "reward_correction_effective_delta_abs_mean": float(
-                    torch.abs(effective_delta).mean().item()
+                    min(
+                        torch.abs(effective_delta).mean().item(),
+                        float(self.config.correction_delta_clip),
+                    )
                 ),
                 "reward_correction_coef": float(self.config.correction_coef),
                 "reward_correction_delta_clip": float(self.config.correction_delta_clip),

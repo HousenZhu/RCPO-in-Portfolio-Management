@@ -665,6 +665,33 @@ def load_checkpoint_for_evaluation(
             f"Checkpoint policy_architecture {checkpoint_policy_architecture!r} "
             f"does not match config_snapshot {config.network.policy_architecture!r}."
         )
+    checkpoint_branch_credit_mode = checkpoint.get("branch_credit_mode", "global")
+    if checkpoint_branch_credit_mode != config.network.branch_credit_mode:
+        raise ValueError(
+            f"Checkpoint branch_credit_mode {checkpoint_branch_credit_mode!r} "
+            f"does not match config_snapshot {config.network.branch_credit_mode!r}."
+        )
+    checkpoint_initial_portfolio_mode = checkpoint.get("initial_portfolio_mode", "all_cash")
+    if checkpoint_initial_portfolio_mode != config.environment.initial_portfolio_mode:
+        raise ValueError(
+            f"Checkpoint initial_portfolio_mode {checkpoint_initial_portfolio_mode!r} "
+            f"does not match config_snapshot {config.environment.initial_portfolio_mode!r}."
+        )
+    if config.network.policy_architecture == "simplex_autoregressive_dirichlet":
+        for field_name in (
+            "dirichlet_min_concentration",
+            "dirichlet_init_concentration",
+            "dirichlet_max_concentration",
+        ):
+            checkpoint_value = checkpoint.get(field_name)
+            configured_value = float(getattr(config.network, field_name))
+            if checkpoint_value is None or not np.isclose(
+                float(checkpoint_value),
+                configured_value,
+            ):
+                raise ValueError(
+                    f"Checkpoint {field_name} does not match config_snapshot."
+                )
     if checkpoint.get("algo") == "rcpo":
         checkpoint_constraint_mode = checkpoint.get("constraint_mode")
         if checkpoint_constraint_mode != config.rcpo.constraint_mode:
@@ -741,6 +768,11 @@ def load_checkpoint_for_evaluation(
             "constraint_semantics",
             BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION,
         ),
+        "policy_architecture": config.network.policy_architecture,
+        "branch_credit_mode": config.network.branch_credit_mode,
+        "simplex_action_format": config.environment.simplex_action_format,
+        "initial_portfolio_mode": config.environment.initial_portfolio_mode,
+        "simplex_branch_sizes": environments["train"].simplex_branch_sizes(),
         "lambda_value": float(checkpoint["lambda_value"]),
         "device": str(device),
     }

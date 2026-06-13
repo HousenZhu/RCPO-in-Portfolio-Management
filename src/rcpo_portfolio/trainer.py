@@ -151,6 +151,8 @@ class RCPOTrainer:
             f"action_mode={self.config.environment.action_mode} "
             f"simplex_action_format={self.config.environment.simplex_action_format} "
             f"policy_architecture={self.config.network.policy_architecture} "
+            f"branch_credit_mode={self.config.network.branch_credit_mode} "
+            f"initial_portfolio_mode={self.config.environment.initial_portfolio_mode} "
             f"branch_sizes={self.train_env.simplex_branch_sizes()} "
             f"drawdown_budget_floor={self.config.environment.drawdown_budget_floor} "
             f"drawdown_benchmark_mode={self.config.environment.drawdown_benchmark_mode} "
@@ -205,6 +207,12 @@ class RCPOTrainer:
                 f"lambda={metric_row['lambda_value']:.6f} "
                 f"alpha={metric_row['alpha']:.6f} "
                 f"kl={metric_row['approx_kl']:.6f} "
+                f"optimizer_steps={metric_row['optimizer_steps_completed']} "
+                f"trigger_kl={metric_row['trigger_minibatch_kl']} "
+                f"branch_kl=({metric_row['approx_kl_branch_1']:.5f},"
+                f"{metric_row['approx_kl_branch_2']:.5f},"
+                f"{metric_row['approx_kl_branch_3']:.5f},"
+                f"{metric_row['approx_kl_branch_4']:.5f}) "
                 f"clip_frac={metric_row['clip_fraction']:.4f} "
                 f"lr={metric_row['learning_rate']:.8f} "
                 f"val_eval={metric_row['validation_evaluated']} "
@@ -330,6 +338,17 @@ class RCPOTrainer:
                 "action_dim": int(self.train_env.action_space.shape[0]),
                 "simplex_branch_sizes": self.train_env.simplex_branch_sizes(),
                 "policy_architecture": self.config.network.policy_architecture,
+                "branch_credit_mode": self.config.network.branch_credit_mode,
+                "initial_portfolio_mode": self.config.environment.initial_portfolio_mode,
+                "dirichlet_min_concentration": float(
+                    self.config.network.dirichlet_min_concentration
+                ),
+                "dirichlet_init_concentration": float(
+                    self.config.network.dirichlet_init_concentration
+                ),
+                "dirichlet_max_concentration": float(
+                    self.config.network.dirichlet_max_concentration
+                ),
                 "allocation_constraint_1_indices": list(
                     self.config.environment.allocation_constraint_1_indices
                 ),
@@ -396,6 +415,38 @@ class RCPOTrainer:
                 f"Checkpoint policy_architecture {checkpoint_policy_architecture!r} "
                 f"does not match requested {self.config.network.policy_architecture!r}."
             )
+        checkpoint_branch_credit_mode = checkpoint.get("branch_credit_mode", "global")
+        if checkpoint_branch_credit_mode != self.config.network.branch_credit_mode:
+            raise ValueError(
+                f"Checkpoint branch_credit_mode {checkpoint_branch_credit_mode!r} "
+                f"does not match requested {self.config.network.branch_credit_mode!r}."
+            )
+        checkpoint_initial_portfolio_mode = checkpoint.get(
+            "initial_portfolio_mode",
+            "all_cash",
+        )
+        if checkpoint_initial_portfolio_mode != self.config.environment.initial_portfolio_mode:
+            raise ValueError(
+                f"Checkpoint initial_portfolio_mode {checkpoint_initial_portfolio_mode!r} "
+                f"does not match requested {self.config.environment.initial_portfolio_mode!r}."
+            )
+        if self.config.network.policy_architecture == "simplex_autoregressive_dirichlet":
+            for field_name in (
+                "dirichlet_min_concentration",
+                "dirichlet_init_concentration",
+                "dirichlet_max_concentration",
+            ):
+                checkpoint_value = checkpoint.get(field_name)
+                configured_value = float(getattr(self.config.network, field_name))
+                if checkpoint_value is None or not math.isclose(
+                    float(checkpoint_value),
+                    configured_value,
+                    rel_tol=0.0,
+                    abs_tol=1e-12,
+                ):
+                    raise ValueError(
+                        f"Checkpoint {field_name} does not match the current config."
+                    )
         checkpoint_action_dim = checkpoint.get("action_dim")
         if checkpoint_action_dim is not None and int(checkpoint_action_dim) != int(
             self.train_env.action_space.shape[0]
@@ -929,6 +980,8 @@ class RCPOTrainer:
                 "action_mode": self.config.environment.action_mode,
                 "simplex_action_format": self.config.environment.simplex_action_format,
                 "policy_architecture": self.config.network.policy_architecture,
+                "branch_credit_mode": self.config.network.branch_credit_mode,
+                "initial_portfolio_mode": self.config.environment.initial_portfolio_mode,
                 "reward_correction_mode": self.config.reward_correction.mode,
                 "lambda_value": self.lambda_value,
                 "learning_rate": current_learning_rate,
@@ -1025,6 +1078,8 @@ class RCPOTrainer:
             "action_mode": self.config.environment.action_mode,
             "simplex_action_format": self.config.environment.simplex_action_format,
             "policy_architecture": self.config.network.policy_architecture,
+            "branch_credit_mode": self.config.network.branch_credit_mode,
+            "initial_portfolio_mode": self.config.environment.initial_portfolio_mode,
             "reward_correction_mode": self.config.reward_correction.mode,
             "device": str(self.device),
             "constraint_preset": self._resolved_preset["preset_name"],
@@ -1083,6 +1138,8 @@ class RCPOTrainer:
             "action_mode": self.config.environment.action_mode,
             "simplex_action_format": self.config.environment.simplex_action_format,
             "policy_architecture": self.config.network.policy_architecture,
+            "branch_credit_mode": self.config.network.branch_credit_mode,
+            "initial_portfolio_mode": self.config.environment.initial_portfolio_mode,
             "reward_correction_mode": self.config.reward_correction.mode,
             "device": str(self.device),
             "constraint_preset": self._resolved_preset["preset_name"],

@@ -161,13 +161,19 @@ class GDRCRewardCorrector(RewardCorrector):
                 "corrected_reward_mean": float(corrected_rewards.mean().item()),
                 "reward_correction_delta_mean": float(effective_delta.mean().item()),
                 "reward_correction_delta_abs_mean": float(
-                    torch.abs(effective_delta).mean().item()
+                    min(
+                        torch.abs(effective_delta).mean().item(),
+                        float(self.config.correction_delta_clip),
+                    )
                 ),
                 "reward_correction_raw_delta_abs_mean": float(
                     torch.abs(raw_delta).mean().item()
                 ),
                 "reward_correction_effective_delta_abs_mean": float(
-                    torch.abs(effective_delta).mean().item()
+                    min(
+                        torch.abs(effective_delta).mean().item(),
+                        float(self.config.correction_delta_clip),
+                    )
                 ),
                 "reward_correction_coef": float(self.config.correction_coef),
                 "reward_correction_delta_clip": float(self.config.correction_delta_clip),

@@ -51,12 +51,22 @@ def update_rcpo_actor_critic(
         batch.cost_advantages,
         lambda_value,
     )
+    branch_combined_advantages = (
+        combine_advantages(
+            batch.branch_reward_advantages,
+            batch.branch_cost_advantages,
+            lambda_value,
+        )
+        if model.branch_credit_mode == "standalone"
+        else None
+    )
     metrics = _update_actor_critic_with_advantages(
         model=model,
         optimizer=optimizer,
         batch=batch,
         optimization=optimization,
         selected_advantages=combined_advantages,
+        branch_selected_advantages=branch_combined_advantages,
         train_cost_value=True,
         use_target_kl=True,
         profiler=profiler,

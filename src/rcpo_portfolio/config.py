@@ -55,6 +55,7 @@ class MarketConfig:
 class EnvironmentConfig:
     action_mode: str = "softmax"
     simplex_action_format: str = "branch_logits"
+    initial_portfolio_mode: str = "all_cash"
     episode_length: int = 252
     transaction_cost_bps: float = 1.0
     turnover_cap: float = 0.40
@@ -90,13 +91,15 @@ class EnvironmentConfig:
 @dataclass
 class NetworkConfig:
     policy_architecture: str = "flat_gaussian"
+    branch_credit_mode: str = "global"
     hidden_sizes: list[int] = field(default_factory=lambda: [128, 128])
     activation: str = "tanh"
     init_log_std: float = -1.5
     min_log_std: float = -2.5
     equal_weight_policy_init: bool = True
-    dirichlet_min_concentration: float = 0.05
-    dirichlet_init_concentration: float = 1.0
+    dirichlet_min_concentration: float = 0.5
+    dirichlet_init_concentration: float = 12.0
+    dirichlet_max_concentration: float = 80.0
 
 
 @dataclass
@@ -206,8 +209,6 @@ class ProjectConfig:
 
 
 def sync_rcpo_constraint_settings(config: ProjectConfig) -> None:
-    if config.network.policy_architecture == "simplex_autoregressive_dirichlet":
-        config.network.policy_architecture = "simplex_autoregressive_gaussian"
     valid_policy_architectures = {
         "flat_gaussian",
         "simplex_branch_gaussian",
@@ -231,7 +232,36 @@ def sync_rcpo_constraint_settings(config: ProjectConfig) -> None:
             "Simplex branch policy architectures require "
             "environment.action_mode='simplex_decomposition'."
         )
-    config.environment.simplex_action_format = "branch_logits"
+    if config.network.branch_credit_mode not in {"global", "standalone"}:
+        raise ValueError("network.branch_credit_mode must be 'global' or 'standalone'.")
+    if (
+        config.network.branch_credit_mode == "standalone"
+        and config.environment.action_mode != "simplex_decomposition"
+    ):
+        raise ValueError("Standalone branch credit requires simplex_decomposition action mode.")
+    config.environment.simplex_action_format = (
+        "branch_weights"
+        if config.network.policy_architecture == "simplex_autoregressive_dirichlet"
+        else "branch_logits"
+    )
+    if config.environment.initial_portfolio_mode not in {"all_cash", "constrained_neutral"}:
+        raise ValueError(
+            "environment.initial_portfolio_mode must be 'all_cash' or 'constrained_neutral'."
+        )
+    if config.network.dirichlet_min_concentration <= 0.0:
+        raise ValueError("network.dirichlet_min_concentration must be positive.")
+    if config.network.dirichlet_max_concentration <= config.network.dirichlet_min_concentration:
+        raise ValueError(
+            "network.dirichlet_max_concentration must exceed dirichlet_min_concentration."
+        )
+    if not (
+        config.network.dirichlet_min_concentration
+        <= config.network.dirichlet_init_concentration
+        <= config.network.dirichlet_max_concentration
+    ):
+        raise ValueError(
+            "network.dirichlet_init_concentration must lie within the configured bounds."
+        )
     if config.rcpo.constraint_mode != "max_drawdown":
         raise ValueError("rcpo.constraint_mode must be 'max_drawdown'.")
     config.environment.constraint_mode = config.rcpo.constraint_mode
@@ -292,6 +322,10 @@ def validate_reward_correction_settings(config: ProjectConfig) -> None:
         raise ValueError("reward_correction.correction_coef cannot be negative.")
     if reward_config.correction_delta_clip < 0.0:
         raise ValueError("reward_correction.correction_delta_clip cannot be negative.")
+    if config.network.branch_credit_mode == "standalone" and reward_config.mode != "none":
+        raise ValueError(
+            "Standalone branch credit currently requires reward_correction.mode='none'."
+        )
 
 
 def validate_reward_noise_settings(config: ProjectConfig) -> None:
@@ -300,6 +334,8 @@ def validate_reward_noise_settings(config: ProjectConfig) -> None:
         raise ValueError("reward_noise.mode must be 'gaussian'.")
     if noise_config.std < 0.0:
         raise ValueError("reward_noise.std cannot be negative.")
+    if config.network.branch_credit_mode == "standalone" and noise_config.enabled:
+        raise ValueError("Standalone branch credit currently requires clean rewards.")
 
 
 def _merge_dicts(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:

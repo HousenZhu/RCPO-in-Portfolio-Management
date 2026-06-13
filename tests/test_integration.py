@@ -288,6 +288,61 @@ def test_short_autoregressive_gaussian_policy_training_runs_for_ppo_and_rcpo(
     assert (rcpo_run / "evaluation_best" / "summary_test.json").exists()
 
 
+@pytest.mark.parametrize(
+    "policy_architecture,expected_action_format",
+    [
+        ("simplex_autoregressive_gaussian", "branch_logits"),
+        ("simplex_autoregressive_dirichlet", "branch_weights"),
+    ],
+)
+@pytest.mark.parametrize("algo", ["ppo_unconstrained", "rcpo"])
+def test_short_standalone_branch_credit_training_runs(
+    tmp_path: Path,
+    policy_architecture: str,
+    expected_action_format: str,
+    algo: str,
+) -> None:
+    config = tiny_config(tmp_path)
+    config.network.policy_architecture = policy_architecture
+    config.network.branch_credit_mode = "standalone"
+    config.environment.initial_portfolio_mode = "constrained_neutral"
+    config.reward_correction.mode = "none"
+    config.reward_noise.enabled = False
+    config.optimization.rollout_steps = 32
+    config.optimization.minibatch_size = 16
+    config.ppo.rollout_steps = 32
+    config.ppo.minibatch_size = 16
+    architecture_tag = "dirichlet" if policy_architecture.endswith("dirichlet") else "gaussian"
+    algo_tag = "ppo" if algo == "ppo_unconstrained" else "rcpo"
+    config.experiment.run_name = f"tiny_standalone_{architecture_tag}_{algo_tag}"
+
+    run_dir = run_experiment(config, algo=algo)[0]
+
+    with (run_dir / "metrics.jsonl").open("r", encoding="utf-8") as handle:
+        metric = json.loads(handle.readline())
+    assert metric["policy_architecture"] == policy_architecture
+    assert metric["simplex_action_format"] == expected_action_format
+    assert metric["branch_credit_mode"] == "standalone"
+    assert metric["initial_portfolio_mode"] == "constrained_neutral"
+    assert metric["optimizer_steps_completed"] > 0
+    assert "trigger_minibatch_kl" in metric
+    for branch_number in range(1, 5):
+        assert f"approx_kl_branch_{branch_number}" in metric
+        assert f"entropy_branch_{branch_number}" in metric
+        assert f"batch_branch_{branch_number}_reward_mean" in metric
+        assert f"batch_branch_{branch_number}_transaction_cost_mean" in metric
+        assert f"batch_branch_{branch_number}_drawdown_cost_mean" in metric
+        assert f"batch_branch_{branch_number}_reward_advantage_std" in metric
+        assert f"batch_branch_{branch_number}_cost_advantage_std" in metric
+        assert f"batch_branch_{branch_number}_z_mean" in metric
+
+    checkpoint = torch.load(run_dir / "checkpoint_last.pt", map_location="cpu")
+    assert checkpoint["branch_credit_mode"] == "standalone"
+    assert checkpoint["initial_portfolio_mode"] == "constrained_neutral"
+    assert checkpoint["policy_architecture"] == policy_architecture
+    assert checkpoint["simplex_action_format"] == expected_action_format
+
+
 def test_resume_rejects_legacy_rcpo_constraint_mode(tmp_path: Path) -> None:
     config = tiny_config(tmp_path)
     config.reward_correction.mode = "none"
@@ -331,6 +386,32 @@ def test_resume_rejects_legacy_rcpo_constraint_mode(tmp_path: Path) -> None:
             algo="rcpo",
             run_dir=run_dir,
             checkpoint_name="checkpoint_policy_mismatch.pt",
+        )
+
+    branch_credit_mismatch_path = run_dir / "checkpoint_branch_credit_mismatch.pt"
+    payload = torch.load(run_dir / "checkpoint_last.pt", map_location="cpu")
+    payload["branch_credit_mode"] = "standalone"
+    torch.save(payload, branch_credit_mismatch_path)
+
+    with pytest.raises(ValueError, match="branch_credit_mode"):
+        resume_experiment(
+            config,
+            algo="rcpo",
+            run_dir=run_dir,
+            checkpoint_name="checkpoint_branch_credit_mismatch.pt",
+        )
+
+    initial_mode_mismatch_path = run_dir / "checkpoint_initial_mode_mismatch.pt"
+    payload = torch.load(run_dir / "checkpoint_last.pt", map_location="cpu")
+    payload["initial_portfolio_mode"] = "constrained_neutral"
+    torch.save(payload, initial_mode_mismatch_path)
+
+    with pytest.raises(ValueError, match="initial_portfolio_mode"):
+        resume_experiment(
+            config,
+            algo="rcpo",
+            run_dir=run_dir,
+            checkpoint_name="checkpoint_initial_mode_mismatch.pt",
         )
 
 

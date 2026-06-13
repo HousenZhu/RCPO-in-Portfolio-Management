@@ -29,6 +29,17 @@ class RolloutBatch:
     cost_returns: torch.Tensor
     reward_advantages: torch.Tensor
     cost_advantages: torch.Tensor
+    branch_log_probs: torch.Tensor
+    branch_entropies: torch.Tensor
+    branch_rewards: torch.Tensor
+    branch_costs: torch.Tensor
+    branch_z_values: torch.Tensor
+    branch_reward_values: torch.Tensor
+    branch_cost_values: torch.Tensor
+    branch_reward_returns: torch.Tensor
+    branch_cost_returns: torch.Tensor
+    branch_reward_advantages: torch.Tensor
+    branch_cost_advantages: torch.Tensor
     info_summary: dict[str, float | int | str]
 
 
@@ -41,7 +52,7 @@ def compute_gae(
     gae_lambda: float,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     advantages = torch.zeros_like(rewards)
-    last_advantage = torch.zeros((), dtype=rewards.dtype, device=rewards.device)
+    last_advantage = torch.zeros_like(rewards[0])
     for index in reversed(range(len(rewards))):
         if index == len(rewards) - 1:
             next_non_terminal = 1.0 - dones[index]
@@ -84,6 +95,16 @@ def collect_rollout(
     dones: list[float] = []
     reward_values: list[float] = []
     cost_values: list[float] = []
+    branch_log_probs: list[np.ndarray] = []
+    branch_entropies: list[np.ndarray] = []
+    branch_rewards: list[np.ndarray] = []
+    branch_costs: list[np.ndarray] = []
+    branch_z_values: list[np.ndarray] = []
+    branch_reward_values: list[np.ndarray] = []
+    branch_cost_values: list[np.ndarray] = []
+    branch_turnovers: list[np.ndarray] = []
+    branch_transaction_costs: list[np.ndarray] = []
+    branch_max_drawdowns: list[np.ndarray] = []
     episode_metrics: list[dict[str, float]] = []
     current_drawdowns: list[float] = []
     max_drawdowns: list[float] = []
@@ -116,9 +137,11 @@ def collect_rollout(
         with profile_section(profiler, "policy_action_forward"):
             obs_tensor = torch.as_tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
             with torch.no_grad():
-                action_tensor, log_prob_tensor, _, reward_value_tensor, cost_value_tensor = (
-                    model.get_action_and_value(obs_tensor)
-                )
+                policy_output = model.get_policy_output(obs_tensor)
+                action_tensor = policy_output.action
+                log_prob_tensor = policy_output.log_prob
+                reward_value_tensor = policy_output.reward_value
+                cost_value_tensor = policy_output.cost_value
         action = action_tensor.squeeze(0).cpu().numpy()
         with profile_section(profiler, "env_step"):
             next_obs, reward, terminated, truncated, info = env.step(action)
@@ -134,6 +157,28 @@ def collect_rollout(
             dones.append(float(done))
             reward_values.append(float(reward_value_tensor.item()))
             cost_values.append(float(cost_value_tensor.item()))
+            branch_log_probs.append(
+                policy_output.branch_log_probs.squeeze(0).cpu().numpy().astype(np.float32)
+            )
+            branch_entropies.append(
+                policy_output.branch_entropies.squeeze(0).cpu().numpy().astype(np.float32)
+            )
+            branch_reward_values.append(
+                policy_output.branch_reward_values.squeeze(0).cpu().numpy().astype(np.float32)
+            )
+            branch_cost_values.append(
+                policy_output.branch_cost_values.squeeze(0).cpu().numpy().astype(np.float32)
+            )
+            branch_rewards.append(np.asarray(info["branch_rewards"], dtype=np.float32))
+            branch_costs.append(np.asarray(info["branch_costs"], dtype=np.float32))
+            branch_z_values.append(np.asarray(info["branch_z_values"], dtype=np.float32))
+            branch_turnovers.append(np.asarray(info["branch_turnovers"], dtype=np.float32))
+            branch_transaction_costs.append(
+                np.asarray(info["branch_transaction_costs"], dtype=np.float32)
+            )
+            branch_max_drawdowns.append(
+                np.asarray(info["branch_max_drawdowns"], dtype=np.float32)
+            )
             current_drawdowns.append(float(info["current_drawdown"]))
             max_drawdowns.append(float(info["max_drawdown"]))
             benchmark_current_drawdowns.append(float(info["benchmark_current_drawdown"]))
@@ -193,7 +238,7 @@ def collect_rollout(
             episode_steps = 0
 
     with profile_section(profiler, "policy_action_forward"):
-        next_value_r, next_value_c = model.value(
+        next_value_r, next_value_c, next_branch_value_r, next_branch_value_c = model.value_with_branches(
             torch.as_tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
         )
     with profile_section(profiler, "tensor_conversion"):
@@ -245,6 +290,27 @@ def collect_rollout(
         cost_values_tensor = torch.as_tensor(
             cost_values, dtype=torch.float32, device=device
         )
+        branch_log_probs_tensor = torch.as_tensor(
+            np.asarray(branch_log_probs), dtype=torch.float32, device=device
+        )
+        branch_entropies_tensor = torch.as_tensor(
+            np.asarray(branch_entropies), dtype=torch.float32, device=device
+        )
+        branch_rewards_tensor = torch.as_tensor(
+            np.asarray(branch_rewards), dtype=torch.float32, device=device
+        )
+        branch_costs_tensor = torch.as_tensor(
+            np.asarray(branch_costs), dtype=torch.float32, device=device
+        )
+        branch_z_values_tensor = torch.as_tensor(
+            np.asarray(branch_z_values), dtype=torch.float32, device=device
+        )
+        branch_reward_values_tensor = torch.as_tensor(
+            np.asarray(branch_reward_values), dtype=torch.float32, device=device
+        )
+        branch_cost_values_tensor = torch.as_tensor(
+            np.asarray(branch_cost_values), dtype=torch.float32, device=device
+        )
     with profile_section(profiler, "reward_gae"):
         reward_advantages, reward_returns = compute_gae(
             rewards_tensor,
@@ -263,6 +329,30 @@ def collect_rollout(
             optimization.gamma,
             optimization.gae_lambda,
         )
+    if model.branch_credit_mode == "standalone":
+        with profile_section(profiler, "reward_gae"):
+            branch_reward_advantages, branch_reward_returns = compute_gae(
+                branch_rewards_tensor,
+                branch_reward_values_tensor,
+                dones_tensor,
+                next_branch_value_r.squeeze(0).detach(),
+                optimization.gamma,
+                optimization.gae_lambda,
+            )
+        with profile_section(profiler, "cost_gae"):
+            branch_cost_advantages, branch_cost_returns = compute_gae(
+                branch_costs_tensor,
+                branch_cost_values_tensor,
+                dones_tensor,
+                next_branch_value_c.squeeze(0).detach(),
+                optimization.gamma,
+                optimization.gae_lambda,
+            )
+    else:
+        branch_reward_advantages = torch.zeros_like(branch_rewards_tensor)
+        branch_cost_advantages = torch.zeros_like(branch_costs_tensor)
+        branch_reward_returns = torch.zeros_like(branch_rewards_tensor)
+        branch_cost_returns = torch.zeros_like(branch_costs_tensor)
 
     info_summary: dict[str, float | int | str] = {
         "batch_reward_mean": float(rewards_tensor.mean().item()),
@@ -311,6 +401,29 @@ def collect_rollout(
         "episode_cost_mean": _flatten_metrics(episode_metrics, "episode_cost"),
         **correction.metrics,
     }
+    for branch_index in range(branch_rewards_tensor.shape[1]):
+        number = branch_index + 1
+        info_summary[f"batch_branch_{number}_reward_mean"] = float(
+            branch_rewards_tensor[:, branch_index].mean().item()
+        )
+        info_summary[f"batch_branch_{number}_transaction_cost_mean"] = float(
+            np.mean(np.asarray(branch_transaction_costs)[:, branch_index])
+        )
+        info_summary[f"batch_branch_{number}_drawdown_cost_mean"] = float(
+            branch_costs_tensor[:, branch_index].mean().item()
+        )
+        info_summary[f"batch_branch_{number}_max_drawdown_mean"] = float(
+            np.mean(np.asarray(branch_max_drawdowns)[:, branch_index])
+        )
+        info_summary[f"batch_branch_{number}_z_mean"] = float(
+            branch_z_values_tensor[:, branch_index].mean().item()
+        )
+        info_summary[f"batch_branch_{number}_reward_advantage_std"] = float(
+            branch_reward_advantages[:, branch_index].std(unbiased=False).item()
+        )
+        info_summary[f"batch_branch_{number}_cost_advantage_std"] = float(
+            branch_cost_advantages[:, branch_index].std(unbiased=False).item()
+        )
     return RolloutBatch(
         observations=observations_tensor,
         actions=actions_tensor,
@@ -327,5 +440,16 @@ def collect_rollout(
         cost_returns=cost_returns.detach(),
         reward_advantages=reward_advantages.detach(),
         cost_advantages=cost_advantages.detach(),
+        branch_log_probs=branch_log_probs_tensor,
+        branch_entropies=branch_entropies_tensor,
+        branch_rewards=branch_rewards_tensor,
+        branch_costs=branch_costs_tensor,
+        branch_z_values=branch_z_values_tensor,
+        branch_reward_values=branch_reward_values_tensor,
+        branch_cost_values=branch_cost_values_tensor,
+        branch_reward_returns=branch_reward_returns.detach(),
+        branch_cost_returns=branch_cost_returns.detach(),
+        branch_reward_advantages=branch_reward_advantages.detach(),
+        branch_cost_advantages=branch_cost_advantages.detach(),
         info_summary=info_summary,
     )

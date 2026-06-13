@@ -8,6 +8,7 @@ import numpy as np
 @dataclass(frozen=True)
 class SimplexDecompositionResult:
     weights: np.ndarray
+    branch_weights: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
     diagnostics: dict[str, float]
 
 
@@ -71,6 +72,17 @@ class SimplexDecomposition:
             return np.zeros(0, dtype=np.float32)
         return np.concatenate(branches).astype(np.float32)
 
+    def neutral_padded_branches(
+        self,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        branches = []
+        for indices in self.branch_indices:
+            padded = np.zeros(self.num_assets, dtype=np.float32)
+            if indices:
+                padded[np.asarray(indices, dtype=np.int64)] = 1.0 / float(len(indices))
+            branches.append(padded)
+        return tuple(branches)  # type: ignore[return-value]
+
     def _split_action(self, action: np.ndarray) -> list[np.ndarray]:
         branches: list[np.ndarray] = []
         offset = 0
@@ -109,6 +121,9 @@ class SimplexDecomposition:
 
         return SimplexDecompositionResult(
             weights=weights,
+            branch_weights=tuple(
+                branch.astype(np.float32, copy=True) for branch in padded_branches
+            ),
             diagnostics={
                 "simplex_z1": float(z1),
                 "simplex_z2": float(z2),

@@ -6,6 +6,7 @@ import pytest
 import torch
 
 import train
+from rcpo_portfolio.algorithms.ppo import standalone_branch_policy_loss
 from rcpo_portfolio.trainer import combine_advantages, update_lagrange_multiplier
 
 
@@ -53,6 +54,23 @@ def test_combined_advantage_shapes_stay_consistent() -> None:
     cost_advantages = torch.randn(8)
     combined = combine_advantages(reward_advantages, cost_advantages, lambda_value=0.3)
     assert combined.shape == reward_advantages.shape == cost_advantages.shape
+
+
+def test_standalone_branch_policy_loss_is_weighted_by_actual_caosd_mass() -> None:
+    ratios = torch.tensor([[1.10, 0.90, 1.20, 0.80]], requires_grad=True)
+    clipped = torch.tensor([[1.10, 0.90, 1.15, 0.85]])
+    advantages = torch.tensor([[1.0, -2.0, 0.5, -1.0]])
+    z_values = torch.tensor([[0.10, 0.20, 0.0, 0.70]])
+
+    loss = standalone_branch_policy_loss(ratios, clipped, advantages, z_values)
+    expected_surrogate = torch.minimum(ratios.detach() * advantages, clipped * advantages)
+    expected = -torch.sum(z_values * expected_surrogate)
+    assert loss.item() == pytest.approx(expected.item())
+
+    loss.backward()
+    assert ratios.grad is not None
+    assert ratios.grad[0, 0].abs() > 0.0
+    assert ratios.grad[0, 2] == 0.0
 
 
 def test_rcpo_constraint_flags_are_required(monkeypatch: pytest.MonkeyPatch) -> None:

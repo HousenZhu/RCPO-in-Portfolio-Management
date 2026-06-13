@@ -53,12 +53,22 @@ def test_noisy_reward_config_loads_and_validates() -> None:
     assert default_config.reward_noise.mode == "gaussian"
     assert default_config.reward_noise.std == pytest.approx(0.003)
 
+    default_config.network.branch_credit_mode = "global"
     default_config.reward_noise.enabled = True
     validate_reward_noise_settings(default_config)
 
     default_config.reward_noise.std = -0.001
     with pytest.raises(ValueError, match="reward_noise.std"):
         validate_reward_noise_settings(default_config)
+
+
+def test_standalone_branch_credit_rejects_reward_noise() -> None:
+    config = ProjectConfig()
+    config.network.branch_credit_mode = "standalone"
+    config.reward_noise.enabled = True
+
+    with pytest.raises(ValueError, match="requires clean rewards"):
+        validate_reward_noise_settings(config)
 
 
 def test_clean_reward_noise_mode_keeps_observed_rewards_clean() -> None:

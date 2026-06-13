@@ -74,6 +74,15 @@ def test_reward_correction_config_rejects_invalid_stabilization_settings(
         validate_reward_correction_settings(config)
 
 
+def test_standalone_branch_credit_rejects_reward_correction() -> None:
+    config = ProjectConfig()
+    config.network.branch_credit_mode = "standalone"
+    config.reward_correction.mode = "gdrc"
+
+    with pytest.raises(ValueError, match="requires reward_correction.mode='none'"):
+        validate_reward_correction_settings(config)
+
+
 def test_drc_corrected_rewards_are_scaled_and_clipped() -> None:
     config = RewardCorrectionConfig(
         mode="drc",

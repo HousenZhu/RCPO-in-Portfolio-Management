@@ -9,7 +9,8 @@ This project builds a synthetic portfolio management problem and trains policy-g
 - PPO baseline and RCPO with a reward critic, cost critic, and Lagrange multiplier
 - Benchmark-relative maximum drawdown constraint for RCPO
 - Two hard allocation constraints under `environment.action_mode: simplex_decomposition`
-- Configurable CAOSD policies: flat Gaussian, parallel branch Gaussian, or autoregressive Gaussian logits
+- Configurable CAOSD policies: flat Gaussian, parallel/autoregressive Gaussian logits, or autoregressive Dirichlet weights
+- Global or standalone branch credit assignment for simplex policies
 - Optional DRC/GDRC reward correction for PPO or RCPO
 - Config-driven training, resume, evaluation, checkpoints, metrics, and plots
 
@@ -33,6 +34,8 @@ Train PPO with reward correction:
 py -3.11 train.py --algo ppo_unconstrained --use-drc --config configs/default.yaml
 py -3.11 train.py --algo ppo_unconstrained --use-gdrc --config configs/default.yaml
 ```
+
+Set `network.branch_credit_mode: global` before using DRC/GDRC or reward noise. Standalone branch credit currently requires clean rewards.
 
 Train RCPO with the maximum drawdown constraint:
 
@@ -115,31 +118,39 @@ The policy emits either branch logits or branch simplex weights, then the enviro
 environment:
   action_mode: simplex_decomposition
   simplex_action_format: branch_logits
-  allocation_constraint_1_indices: [1, 2, 4]
-  allocation_constraint_2_indices: [0, 4, 5]
-  active_constraint_preset: c2
+  initial_portfolio_mode: constrained_neutral
+  allocation_constraint_1_indices: [1, 3, 5]
+  allocation_constraint_2_indices: [4, 5]
+  active_constraint_preset: c3
 
 network:
-  policy_architecture: simplex_branch_gaussian
+  policy_architecture: simplex_autoregressive_gaussian
+  branch_credit_mode: standalone
 ```
 
-The preset `c2` requires at least `0.40` portfolio weight in each custom allocation set. Preset `c1` is looser for training/debugging, and `c3` is stricter for overlap-stress verification. In `simplex_decomposition` mode, the zero surrogate action is the constrained-neutral baseline, so it is feasible but not necessarily the same as unconstrained equal weight.
+The active preset `c3` requires at least `0.55` portfolio weight in each custom allocation set. Presets `c1` and `c2` provide looser alternatives. New episodes begin at the constrained-neutral CAOSD allocation, so the first action pays turnover only for moving away from that feasible baseline, not for an artificial all-cash rebalance.
 
 Available policy architectures:
 
 - `flat_gaussian`: old one-head actor. With simplex decomposition, the env splits its flat logits into CAOSD branches.
-- `simplex_branch_gaussian`: shared encoder plus four parallel Gaussian branch heads. This is the default v2 mode.
+- `simplex_branch_gaussian`: shared encoder plus four parallel Gaussian branch heads.
 - `simplex_autoregressive_gaussian`: shared encoder plus four autoregressive Gaussian-logit branch heads. Later heads condition on previous branch softmax allocations.
-- `simplex_autoregressive_dirichlet`: legacy alias for `simplex_autoregressive_gaussian`; this mode no longer uses Dirichlet sampling.
+- `simplex_autoregressive_dirichlet`: shared encoder plus four autoregressive Dirichlet heads. Each head samples a valid within-branch simplex allocation directly.
 
 For v3, set:
 
 ```yaml
 network:
-  policy_architecture: simplex_autoregressive_gaussian
+  policy_architecture: simplex_autoregressive_dirichlet
+  branch_credit_mode: standalone
+  dirichlet_init_concentration: 12.0
+  dirichlet_min_concentration: 0.5
+  dirichlet_max_concentration: 80.0
 ```
 
-The config loader resolves `environment.simplex_action_format` to `branch_logits` for all current simplex policy architectures. The environment applies softmax within each CAOSD branch.
+The config loader resolves Gaussian architectures to `branch_logits` and applies softmax within each branch. Dirichlet resolves to `branch_weights`, because its sampled action already lies on each branch simplex.
+
+With `branch_credit_mode: standalone`, each branch receives its own shadow-portfolio return and drawdown advantage, and its PPO loss is scaled by its realized CAOSD coefficient `z_i`. RCPO still uses one global Lagrange multiplier, updated only from the final combined portfolio drawdown cost. Set `branch_credit_mode: global` to preserve the original joint log-probability and shared final-portfolio advantage.
 
 ## Constraint Definition
 
@@ -185,6 +196,7 @@ Optional reward-correction modes are available for PPO and RCPO:
 - `--use-gdrc`: train a fine-bin GDRC ensemble and select between 48-bin and 64-bin reward critics.
 
 DRC/GDRC only change the reward stream used for training. Evaluation summaries and plots still report actual portfolio returns from the environment.
+They currently require `network.branch_credit_mode: global`; branch-aware reward correction is intentionally deferred.
 
 The current GDRC stabilization settings are:
 

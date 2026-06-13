@@ -145,6 +145,51 @@ def test_reset_initializes_drawdown_tracking() -> None:
     assert env.state.benchmark_has_rebalanced is False
 
 
+def test_constrained_neutral_reset_starts_without_initial_rebalance_cost() -> None:
+    env = build_project_simplex_env(initial_portfolio_mode="constrained_neutral")
+    neutral_action = env.neutral_action()
+    expected_weights = env._weights_from_action(neutral_action)
+
+    env.reset(options={"start_index": 2})
+    assert env.state is not None
+    np.testing.assert_allclose(env.state.weights, expected_weights)
+    assert env.state.benchmark_has_rebalanced is True
+
+    _, _, _, _, info = env.step(neutral_action)
+    assert np.isclose(info["turnover"], 0.0)
+    assert np.isclose(info["transaction_cost"], 0.0)
+    assert np.isclose(info["benchmark_turnover"], 0.0)
+    np.testing.assert_allclose(info["branch_turnovers"], np.zeros(4), atol=1e-8)
+
+
+def test_standalone_branch_reward_and_cost_use_same_market_step() -> None:
+    env = build_project_simplex_env(
+        initial_portfolio_mode="constrained_neutral",
+        drawdown_budget_floor=0.001,
+    )
+    action = env.neutral_action()
+    env.reset(options={"start_index": 4})
+    assert env.state is not None
+    initial_branches = tuple(weights.copy() for weights in env.state.branch_weights)
+    current_returns = env.market.risky_returns[4]
+
+    _, _, _, _, info = env.step(action)
+
+    for branch_index, branch_weights in enumerate(initial_branches):
+        expected_raw = float(np.dot(branch_weights[1:], current_returns))
+        expected_reward = float(np.log1p(expected_raw))
+        expected_max_drawdown = max(0.0, -expected_raw)
+        expected_violation = max(
+            0.0,
+            expected_max_drawdown - float(info["effective_drawdown_budget"]),
+        )
+        expected_cost = expected_violation**2 / env.config.drawdown_cost_scale
+        assert np.isclose(info["branch_rewards"][branch_index], expected_reward)
+        assert np.isclose(info["branch_transaction_costs"][branch_index], 0.0)
+        assert np.isclose(info["branch_max_drawdowns"][branch_index], expected_max_drawdown)
+        assert np.isclose(info["branch_costs"][branch_index], expected_cost)
+
+
 def test_positive_return_updates_peak_and_keeps_drawdown_zero() -> None:
     env = build_env()
     env.reset(options={"start_index": 2})

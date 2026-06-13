@@ -29,6 +29,11 @@ class EpisodeState:
     benchmark_current_drawdown: float
     benchmark_max_drawdown: float
     benchmark_has_rebalanced: bool
+    branch_weights: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+    branch_portfolio_values: np.ndarray
+    branch_running_peak_values: np.ndarray
+    branch_current_drawdowns: np.ndarray
+    branch_max_drawdowns: np.ndarray
 
 
 class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
@@ -99,6 +104,8 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             shape=(action_dim,),
             dtype=np.float32,
         )
+        self._initial_portfolio_weights = self._resolve_initial_portfolio_weights()
+        self._initial_branch_weights = self._resolve_initial_branch_weights()
         self._benchmark_mode = self.config.drawdown_benchmark_mode
         self._benchmark_weights = self._resolve_benchmark_weights()
         self._benchmark_risky_weights = self._benchmark_weights[1:]
@@ -106,7 +113,7 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             self.market.risky_returns @ self._benchmark_risky_weights
         ).astype(np.float32)
         self._benchmark_initial_turnover = float(
-            np.sum(np.abs(self._benchmark_weights - self._initial_cash_weights))
+            np.sum(np.abs(self._benchmark_weights - self._initial_portfolio_weights))
         )
 
     def _compute_start_indices(self) -> np.ndarray:
@@ -125,6 +132,11 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             raise ValueError(
                 "Environment simplex_action_format must be either 'branch_logits' "
                 "or 'branch_weights'."
+            )
+        if self.config.initial_portfolio_mode not in {"all_cash", "constrained_neutral"}:
+            raise ValueError(
+                "initial_portfolio_mode must be either 'all_cash' or "
+                "'constrained_neutral'."
             )
         if self.config.constraint_mode != "max_drawdown":
             raise ValueError(
@@ -185,6 +197,26 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
     def benchmark_weights(self) -> np.ndarray:
         return self._benchmark_weights.copy()
 
+    def initial_portfolio_weights(self) -> np.ndarray:
+        return self._initial_portfolio_weights.copy()
+
+    def _resolve_initial_portfolio_weights(self) -> np.ndarray:
+        if self.config.initial_portfolio_mode == "all_cash":
+            return self._initial_cash_weights.copy()
+        if self.config.initial_portfolio_mode == "constrained_neutral":
+            return self._weights_from_action(self.neutral_action()).astype(np.float32)
+        raise ValueError(
+            f"Unsupported initial_portfolio_mode: {self.config.initial_portfolio_mode}"
+        )
+
+    def _resolve_initial_branch_weights(
+        self,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        if self._simplex_decomposition is None:
+            empty = np.zeros(self.num_assets, dtype=np.float32)
+            return (empty.copy(), empty.copy(), empty.copy(), empty.copy())
+        return self._simplex_decomposition.neutral_padded_branches()
+
     def _resolve_benchmark_weights(self) -> np.ndarray:
         if self.config.drawdown_benchmark_mode == "true_equal_weight":
             return np.full(
@@ -203,7 +235,7 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
     def _weights_and_action_components(
         self,
         action: np.ndarray,
-    ) -> tuple[np.ndarray, dict[str, float]]:
+    ) -> tuple[np.ndarray, dict[str, Any]]:
         if self.config.action_mode == "simplex_decomposition":
             if self._simplex_decomposition is None:
                 raise RuntimeError("Simplex decomposition has not been initialized.")
@@ -211,7 +243,12 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
                 result = self._simplex_decomposition.map_branch_weights(action)
             else:
                 result = self._simplex_decomposition.map_logits(action)
-            return result.weights, result.diagnostics
+            return result.weights, {
+                **result.diagnostics,
+                "simplex_branch_weights": tuple(
+                    branch.copy() for branch in result.branch_weights
+                ),
+            }
 
         logits = np.asarray(action, dtype=np.float32)
         if logits.shape != (self.num_assets,):
@@ -227,6 +264,9 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             "simplex_z3": 0.0,
             "simplex_z4": 0.0,
             "simplex_z2_intersection": 0.0,
+            "simplex_branch_weights": tuple(
+                np.zeros(self.num_assets, dtype=np.float32) for _ in range(4)
+            ),
         }
 
     def _allocation_constraint_weights(self, weights: np.ndarray) -> dict[str, float]:
@@ -441,8 +481,10 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             start_index = int(self.rng.choice(self._valid_start_indices))
         if start_index not in set(self._valid_start_indices.tolist()):
             raise ValueError(f"Invalid start index {start_index}.")
-        initial_weights = np.zeros(self.num_assets, dtype=np.float32)
-        initial_weights[0] = 1.0
+        initial_weights = self._initial_portfolio_weights.copy()
+        initial_branch_weights = tuple(
+            weights.copy() for weights in self._initial_branch_weights
+        )
         self.state = EpisodeState(
             start_index=start_index,
             current_index=start_index,
@@ -458,9 +500,82 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             benchmark_running_peak_value=1.0,
             benchmark_current_drawdown=0.0,
             benchmark_max_drawdown=0.0,
-            benchmark_has_rebalanced=False,
+            benchmark_has_rebalanced=bool(
+                np.allclose(
+                    self._benchmark_weights,
+                    self._initial_portfolio_weights,
+                    atol=1e-8,
+                )
+            ),
+            branch_weights=initial_branch_weights,
+            branch_portfolio_values=np.ones(4, dtype=np.float64),
+            branch_running_peak_values=np.ones(4, dtype=np.float64),
+            branch_current_drawdowns=np.zeros(4, dtype=np.float64),
+            branch_max_drawdowns=np.zeros(4, dtype=np.float64),
         )
         return self._get_observation(), {"start_index": start_index}
+
+    def _standalone_branch_components(
+        self,
+        branch_weights: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+        current_returns: np.ndarray,
+        effective_drawdown_budget: float,
+        z_values: np.ndarray,
+    ) -> dict[str, np.ndarray]:
+        if self.state is None:
+            raise RuntimeError("Environment has not been reset.")
+        rewards = np.zeros(4, dtype=np.float32)
+        costs = np.zeros(4, dtype=np.float32)
+        turnovers = np.zeros(4, dtype=np.float32)
+        net_returns = np.zeros(4, dtype=np.float32)
+        max_drawdowns = np.zeros(4, dtype=np.float32)
+        for branch_index, weights in enumerate(branch_weights):
+            previous_weights = self.state.branch_weights[branch_index]
+            turnover = float(np.sum(np.abs(weights - previous_weights)))
+            raw_return = float(np.dot(weights[1:], current_returns.astype(np.float32)))
+            net_return = raw_return - self.transaction_cost_rate * turnover
+            drawdown_state = self._updated_drawdown_state(
+                portfolio_value=float(self.state.branch_portfolio_values[branch_index]),
+                running_peak_value=float(
+                    self.state.branch_running_peak_values[branch_index]
+                ),
+                max_drawdown=float(self.state.branch_max_drawdowns[branch_index]),
+                net_simple_return=net_return,
+            )
+            violation = max(
+                0.0,
+                float(drawdown_state["max_drawdown"]) - effective_drawdown_budget,
+            )
+            cost = violation**2 / max(float(self.config.drawdown_cost_scale), 1e-12)
+            rewards[branch_index] = float(
+                np.log1p(np.clip(net_return, -0.999999, None))
+            )
+            costs[branch_index] = float(cost)
+            turnovers[branch_index] = float(turnover)
+            net_returns[branch_index] = float(net_return)
+            max_drawdowns[branch_index] = float(drawdown_state["max_drawdown"])
+            self.state.branch_portfolio_values[branch_index] = float(
+                drawdown_state["portfolio_value"]
+            )
+            self.state.branch_running_peak_values[branch_index] = float(
+                drawdown_state["running_peak_value"]
+            )
+            self.state.branch_current_drawdowns[branch_index] = float(
+                drawdown_state["current_drawdown"]
+            )
+            self.state.branch_max_drawdowns[branch_index] = float(
+                drawdown_state["max_drawdown"]
+            )
+        self.state.branch_weights = tuple(weights.copy() for weights in branch_weights)
+        return {
+            "branch_rewards": rewards,
+            "branch_costs": costs,
+            "branch_turnovers": turnovers,
+            "branch_transaction_costs": turnovers * self.transaction_cost_rate,
+            "branch_net_returns": net_returns,
+            "branch_max_drawdowns": max_drawdowns,
+            "branch_z_values": z_values.astype(np.float32),
+        }
 
     def step(self, action: np.ndarray) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
         if self.state is None:
@@ -480,6 +595,22 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             benchmark_components["effective_drawdown_budget"],
         )
         constraint_cost = float(drawdown_components["drawdown_constraint_cost"])
+        branch_weights = action_components["simplex_branch_weights"]
+        z_values = np.asarray(
+            [
+                action_components["simplex_z1"],
+                action_components["simplex_z2"],
+                action_components["simplex_z3"],
+                action_components["simplex_z4"],
+            ],
+            dtype=np.float32,
+        )
+        branch_components = self._standalone_branch_components(
+            branch_weights,
+            current_returns,
+            float(benchmark_components["effective_drawdown_budget"]),
+            z_values,
+        )
 
         self.state.weights = weights
         self.state.previous_turnover = turnover
@@ -521,6 +652,7 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             **drawdown_components,
             **benchmark_components,
             **action_components,
+            **branch_components,
             "weights": weights.copy(),
             "regime": int(self.market.regimes[self.state.current_index - 1]),
             **constraint_components,
