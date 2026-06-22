@@ -19,7 +19,7 @@ from .config import (
 )
 from .devices import resolve_device
 from .env import PortfolioEnv
-from .io_utils import safe_savefig
+from .io_utils import live_savefig, safe_savefig
 from .market import generate_market_splits
 from .models import ActorCritic
 
@@ -31,6 +31,7 @@ class EvaluationResult:
     episode_returns: list[np.ndarray]
     equal_weight_first_episode_returns: np.ndarray
     equal_weight_episode_returns: list[np.ndarray]
+    branch_first_episodes: list[dict[str, np.ndarray]] | None = None
 
 
 def compute_drawdown(returns: np.ndarray) -> np.ndarray:
@@ -317,6 +318,7 @@ def evaluate_policy(
             env, lambda _obs: _neutral_action(env), first_start_index
         ),
         equal_weight_episode_returns=equal_weight_return_paths,
+        branch_first_episodes=[first_episode],
     )
 
 
@@ -432,16 +434,39 @@ def save_group_weights_artifact(
     result: EvaluationResult,
     output_dir: str | Path,
     split_name: str,
+    update_number: int | None = None,
 ) -> None:
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-    weights = result.first_episode["weights"]
+    branch_episodes = result.branch_first_episodes or [result.first_episode]
+    weights = np.mean(
+        np.stack([episode["weights"] for episode in branch_episodes], axis=0),
+        axis=0,
+    )
     plt.figure(figsize=(10, 5))
     asset_labels = ["Cash", *[f"Asset {index}" for index in range(1, weights.shape[1])]]
     for asset_index, label in enumerate(asset_labels):
         plt.plot(weights[:, asset_index], label=label, linewidth=1.2, alpha=0.85)
-    constraint_1 = result.first_episode.get("allocation_constraint_1_weights")
-    constraint_2 = result.first_episode.get("allocation_constraint_2_weights")
+    constraint_1_paths = [
+        episode["allocation_constraint_1_weights"]
+        for episode in branch_episodes
+        if "allocation_constraint_1_weights" in episode
+    ]
+    constraint_2_paths = [
+        episode["allocation_constraint_2_weights"]
+        for episode in branch_episodes
+        if "allocation_constraint_2_weights" in episode
+    ]
+    constraint_1 = (
+        np.mean(np.stack(constraint_1_paths, axis=0), axis=0)
+        if constraint_1_paths
+        else None
+    )
+    constraint_2 = (
+        np.mean(np.stack(constraint_2_paths, axis=0), axis=0)
+        if constraint_2_paths
+        else None
+    )
     if constraint_1 is not None:
         plt.plot(
             constraint_1,
@@ -458,12 +483,18 @@ def save_group_weights_artifact(
             linestyle="--",
             linewidth=1.8,
         )
-    plt.title(f"Portfolio And Allocation Constraint Weights ({split_name})")
+    branch_count = len(branch_episodes)
+    branch_suffix = f", mean of {branch_count} branches" if branch_count > 1 else ""
+    update_suffix = f", update {update_number}" if update_number is not None else ""
+    plt.title(
+        f"Portfolio And Allocation Constraint Weights "
+        f"({split_name}{branch_suffix}{update_suffix})"
+    )
     plt.xlabel("Step")
     plt.ylabel("Weight")
     plt.legend(loc="center left", bbox_to_anchor=(1.0, 0.5))
     plt.tight_layout()
-    safe_savefig(plt.gcf(), output_path / f"group_weights_{split_name}.png")
+    live_savefig(plt.gcf(), output_path / f"group_weights_{split_name}.png")
     plt.close()
 
 

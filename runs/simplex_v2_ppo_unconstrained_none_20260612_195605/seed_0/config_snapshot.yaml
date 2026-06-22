@@ -105,7 +105,7 @@ optimization:
   early_stop_patience: null
   early_stop_min_delta: 0.001
 ppo:
-  total_updates: 8000
+  total_updates: 6000
   rollout_steps: 2048
   epochs: 4
   minibatch_size: 512

@@ -1,6 +1,6 @@
 experiment:
   output_root: runs
-  run_name: simplex_v2
+  run_name: simplex_v2.2
   seeds: [0]
 
 runtime:
@@ -60,29 +60,29 @@ environment:
 
 network:
   # policy_architecture: simplex_branch_gaussian
-  policy_architecture: simplex_autoregressive_gaussian
-  # policy_architecture: simplex_autoregressive_dirichlet
+  # policy_architecture: simplex_autoregressive_gaussian
+  policy_architecture: simplex_autoregressive_dirichlet
   branch_credit_mode: standalone
   hidden_sizes: [128, 128]
   activation: tanh
   init_log_std: -1.5
   min_log_std: -2.5
   equal_weight_policy_init: true
-  dirichlet_min_concentration: 0.5
-  dirichlet_init_concentration: 12.0
-  dirichlet_max_concentration: 80.0
+  dirichlet_min_concentration: 0.3
+  dirichlet_init_concentration: 2.0
+  dirichlet_max_concentration: 12.0
 
 optimization:
   total_updates: 8000
   rollout_steps: 2048
   epochs: 4
   minibatch_size: 512
-  learning_rate: 0.00023
-  learning_rate_final: 0.00023
+  learning_rate: 0.0002
+  learning_rate_final: 0.0002
   gamma: 0.99
   gae_lambda: 0.95
   clip_epsilon: 0.15
-  entropy_coef: 0.0005
+  entropy_coef: 0.001
   reward_value_coef: 0.5
   cost_value_coef: 0.5
   max_grad_norm: 0.5
@@ -95,12 +95,12 @@ ppo:
   rollout_steps: 2048
   epochs: 4
   minibatch_size: 512
-  learning_rate: 0.00023
-  learning_rate_final: 0.00023
+  learning_rate: 0.0002
+  learning_rate_final: 0.0002
   gamma: 0.99
   gae_lambda: 0.95
   clip_epsilon: 0.15
-  entropy_coef: 0.0002
+  entropy_coef: 0.001
   reward_value_coef: 0.5
   cost_value_coef: 0.0
   max_grad_norm: 0.5
@@ -110,9 +110,9 @@ ppo:
 
 rcpo:
   initial_lambda: 0.0
-  lambda_lr: 0.05
-  lambda_lr_up: 0.01
-  lambda_lr_down: 0.05
+  lambda_lr: 0.03
+  lambda_lr_up: 0.0015
+  lambda_lr_down: 0.03
   alpha:
   alpha_budget_ratio: 0.05
   constraint_mode: max_drawdown

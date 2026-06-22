@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import shutil
 import time
 from datetime import datetime
 from pathlib import Path
@@ -34,6 +35,7 @@ from .evaluation import (
     save_group_weights_artifact,
     save_training_progress_artifacts,
 )
+from .io_utils import exclusive_run_lock
 from .io_utils import safe_torch_save
 from .market import generate_continuation_splits, generate_train_markets
 from .models import ActorCritic
@@ -608,6 +610,31 @@ class RCPOTrainer:
             for line in handle:
                 if line.strip():
                     rows.append(json.loads(line))
+        if self.resume_checkpoint is not None and rows:
+            by_update: dict[int, dict[str, Any]] = {}
+            for row in rows:
+                update = int(row.get("update", -1))
+                if 0 <= update < self.resume_completed_updates:
+                    by_update[update] = row
+            normalized_rows = [by_update[update] for update in sorted(by_update)]
+            original_updates = [int(row.get("update", -1)) for row in rows]
+            normalized_updates = [int(row["update"]) for row in normalized_rows]
+            if original_updates != normalized_updates:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                backup_path = self.metrics_path.with_name(
+                    f"metrics_before_resume_repair_{timestamp}.jsonl"
+                )
+                shutil.copy2(self.metrics_path, backup_path)
+                with self.metrics_path.open("w", encoding="utf-8") as handle:
+                    for row in normalized_rows:
+                        handle.write(json.dumps(row) + "\n")
+                print(
+                    f"[train] repaired_metrics duplicates_or_ordering=true "
+                    f"rows_before={len(rows)} rows_after={len(normalized_rows)} "
+                    f"backup={backup_path}",
+                    flush=True,
+                )
+                rows = normalized_rows
         return rows
 
     def _best_from_metric_rows(
@@ -778,6 +805,7 @@ class RCPOTrainer:
             episode_returns=model_returns,
             equal_weight_first_episode_returns=first_result.equal_weight_first_episode_returns,
             equal_weight_episode_returns=equal_weight_returns,
+            branch_first_episodes=[result.first_episode for result in branch_results],
         )
         return aggregate_result, model_returns, equal_weight_returns
 
@@ -944,6 +972,7 @@ class RCPOTrainer:
                             validation_result,
                             self.run_dir / "evaluation",
                             "validation",
+                            update_number=update_index + 1,
                         )
                 last_validation_summary = validation_result.summary
             if last_validation_summary is None:
@@ -961,6 +990,7 @@ class RCPOTrainer:
                                 validation_result,
                                 self.run_dir / "evaluation",
                                 "validation",
+                                update_number=update_index + 1,
                             )
                     last_validation_summary = validation_result.summary
                     validation_evaluated = True
@@ -1178,7 +1208,8 @@ def run_experiment(
             disable_artifacts=disable_artifacts,
             skip_validation=skip_validation,
         )
-        trainer.train()
+        with exclusive_run_lock(run_dir):
+            trainer.train()
         run_directories.append(run_dir)
     return run_directories
 
@@ -1206,5 +1237,6 @@ def resume_experiment(
         disable_artifacts=disable_artifacts,
         skip_validation=skip_validation,
     )
-    trainer.train()
+    with exclusive_run_lock(run_path):
+        trainer.train()
     return run_path

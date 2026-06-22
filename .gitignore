@@ -21,3 +21,6 @@ runs_*/
 Thumbs.db
 
 runs/**/metrics.jsonl
+
+slides/
+scripts/

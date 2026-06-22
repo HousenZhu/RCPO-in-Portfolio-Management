@@ -1,0 +1,75 @@
+{
+  "future_market_count": 20,
+  "future_seed_offset": 20000,
+  "anchor_run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\simplex_v2.1_ppo_unconstrained_none_20260620_144053\\seed_0",
+  "anchor_seed": 0,
+  "baseline": "constrained_neutral",
+  "policies": {
+    "PPO Dirichlet": {
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\simplex_v2.1_ppo_unconstrained_none_20260620_144053\\seed_0",
+      "checkpoint": "checkpoint_best.pt",
+      "policy_architecture": "simplex_autoregressive_dirichlet",
+      "branch_credit_mode": "standalone",
+      "mean_final_cumulative_return": 0.18485430479049683,
+      "mean_excess_cumulative_return": 0.0316490113735199,
+      "win_rate_vs_constrained_neutral": 0.8,
+      "mean_annualized_return": 0.18485413122495262,
+      "mean_annualized_volatility": 0.1676559237330954,
+      "mean_max_drawdown": 0.14485397674143313,
+      "mean_average_turnover": 0.007130890968255699,
+      "mean_constraint_cost": 0.001169087642483646
+    },
+    "PPO Gaussian": {
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\simplex_v2_ppo_unconstrained_none_20260612_195706\\seed_0",
+      "checkpoint": "checkpoint_best.pt",
+      "policy_architecture": "simplex_autoregressive_gaussian",
+      "branch_credit_mode": "standalone",
+      "mean_final_cumulative_return": 0.16852535009384156,
+      "mean_excess_cumulative_return": 0.015320056676864624,
+      "win_rate_vs_constrained_neutral": 0.7,
+      "mean_annualized_return": 0.16852511028333308,
+      "mean_annualized_volatility": 0.1600652646829695,
+      "mean_max_drawdown": 0.1396534588187933,
+      "mean_average_turnover": 0.14365619160234927,
+      "mean_constraint_cost": 0.0012626321101578241
+    },
+    "RCPO Dirichlet": {
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\simplex_v2.1_rcpo_none_20260620_144057\\seed_0",
+      "checkpoint": "checkpoint_best.pt",
+      "policy_architecture": "simplex_autoregressive_dirichlet",
+      "branch_credit_mode": "standalone",
+      "mean_final_cumulative_return": 0.1929131418466568,
+      "mean_excess_cumulative_return": 0.03970784842967987,
+      "win_rate_vs_constrained_neutral": 0.8,
+      "mean_annualized_return": 0.19291341586512098,
+      "mean_annualized_volatility": 0.16852547712807878,
+      "mean_max_drawdown": 0.1456978466361761,
+      "mean_average_turnover": 0.003730830631684512,
+      "mean_constraint_cost": 0.0019544877120097224
+    },
+    "RCPO Gaussian": {
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\simplex_v2.1_rcpo_none_20260620_144107\\seed_0",
+      "checkpoint": "checkpoint_best.pt",
+      "policy_architecture": "simplex_autoregressive_gaussian",
+      "branch_credit_mode": "standalone",
+      "mean_final_cumulative_return": 0.19671957492828368,
+      "mean_excess_cumulative_return": 0.04351428151130676,
+      "win_rate_vs_constrained_neutral": 0.75,
+      "mean_annualized_return": 0.19671942481831078,
+      "mean_annualized_volatility": 0.1709555309225462,
+      "mean_max_drawdown": 0.14816395714879035,
+      "mean_average_turnover": 0.013420002162456512,
+      "mean_constraint_cost": 0.0031718143424996014
+    },
+    "Constrained-neutral baseline": {
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\simplex_v2.1_ppo_unconstrained_none_20260620_144053\\seed_0",
+      "checkpoint": "neutral_action",
+      "mean_final_cumulative_return": 0.15320529341697692,
+      "mean_annualized_return": 0.15320518494696356,
+      "mean_annualized_volatility": 0.15843883116596444,
+      "mean_max_drawdown": 0.13883839622139932,
+      "mean_average_turnover": 0.0,
+      "mean_constraint_cost": 0.0002594072859210428
+    }
+  }
+}
