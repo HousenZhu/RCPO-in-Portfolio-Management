@@ -21,6 +21,7 @@ runs_*/
 Thumbs.db
 
 runs/**/metrics.jsonl
+runs/**/metrics_before_resume_repair_*.jsonl
 
 slides/
 scripts/
