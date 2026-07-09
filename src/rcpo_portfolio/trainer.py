@@ -18,6 +18,7 @@ from .algorithms import (
     update_rcpo_actor_critic,
 )
 from .config import (
+    ALLOCATION_CONSTRAINT_VERSION,
     BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION,
     ProjectConfig,
     save_config,
@@ -189,6 +190,8 @@ class RCPOTrainer:
                 f"reward_oce={metric_row['reward_correction_oce']:.6f} "
                 f"gdrc_bins={metric_row['gdrc_selected_bins']} "
                 f"batch_constraint={metric_row['batch_constraint_cost_mean']:.6f} "
+                f"alloc_cost={metric_row['batch_allocation_constraint_cost_mean']:.6f} "
+                f"alloc_raw={metric_row['batch_allocation_constraint_raw_cost_mean']:.6f} "
                 f"batch_max_drawdown={metric_row['batch_max_drawdown_mean']:.6f} "
                 f"batch_benchmark_max_drawdown={metric_row['batch_benchmark_max_drawdown_mean']:.6f} "
                 f"batch_budget={metric_row['batch_effective_drawdown_budget_mean']:.6f} "
@@ -207,6 +210,8 @@ class RCPOTrainer:
                 f"value_loss_r={metric_row['reward_value_loss']:.6f} "
                 f"value_loss_c={metric_row['cost_value_loss']:.6f} "
                 f"lambda={metric_row['lambda_value']:.6f} "
+                f"lambda_adv_ratio={metric_row['batch_lambda_cost_advantage_ratio']:.3f} "
+                f"lambda_cost_reward={metric_row['lambda_cost_to_reward_ratio']:.3f} "
                 f"alpha={metric_row['alpha']:.6f} "
                 f"kl={metric_row['approx_kl']:.6f} "
                 f"optimizer_steps={metric_row['optimizer_steps_completed']} "
@@ -328,13 +333,20 @@ class RCPOTrainer:
                 "alpha": self.alpha,
                 "alpha_budget_ratio": float(self.config.rcpo.alpha_budget_ratio),
                 "constraint_mode": self.config.rcpo.constraint_mode,
-                "constraint_semantics": BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION,
+                "constraint_semantics": (
+                    ALLOCATION_CONSTRAINT_VERSION
+                    if self.config.rcpo.constraint_mode == "allocation"
+                    else BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION
+                ),
                 "drawdown_budget_floor": float(self.config.environment.drawdown_budget_floor),
                 "drawdown_benchmark_mode": self.config.environment.drawdown_benchmark_mode,
                 "benchmark_drawdown_margin": float(
                     self.config.environment.benchmark_drawdown_margin
                 ),
                 "drawdown_cost_scale": float(self.config.environment.drawdown_cost_scale),
+                "allocation_constraint_cost_scale": float(
+                    self.config.environment.allocation_constraint_cost_scale
+                ),
                 "action_mode": self.config.environment.action_mode,
                 "simplex_action_format": self.config.environment.simplex_action_format,
                 "action_dim": int(self.train_env.action_space.shape[0]),
@@ -457,9 +469,16 @@ class RCPOTrainer:
                 f"Checkpoint action_dim {checkpoint_action_dim!r} does not match current "
                 f"action dimension {self.train_env.action_space.shape[0]}."
             )
-        if self.config.environment.action_mode == "simplex_decomposition":
+        if (
+            self.config.environment.action_mode == "simplex_decomposition"
+            or self.config.rcpo.constraint_mode == "allocation"
+        ):
             checkpoint_branch_sizes = checkpoint.get("simplex_branch_sizes")
-            if checkpoint_branch_sizes is not None and list(checkpoint_branch_sizes) != self.train_env.simplex_branch_sizes():
+            if (
+                self.config.environment.action_mode == "simplex_decomposition"
+                and checkpoint_branch_sizes is not None
+                and list(checkpoint_branch_sizes) != self.train_env.simplex_branch_sizes()
+            ):
                 raise ValueError(
                     "Checkpoint simplex_branch_sizes do not match current config."
                 )
@@ -499,7 +518,7 @@ class RCPOTrainer:
         if self.algo == "rcpo":
             if checkpoint_constraint_mode is None:
                 raise ValueError(
-                    "RCPO resume requires checkpoints saved with constraint_mode='max_drawdown'. "
+                    "RCPO resume requires checkpoints saved with a supported constraint_mode. "
                     "Legacy downside/sortino checkpoints are not supported."
                 )
             if checkpoint_constraint_mode != self.config.rcpo.constraint_mode:
@@ -508,48 +527,65 @@ class RCPOTrainer:
                     f"requested {self.config.rcpo.constraint_mode!r}. Legacy downside/sortino "
                     "checkpoints are not supported."
                 )
-            checkpoint_semantics = checkpoint.get("constraint_semantics")
-            if checkpoint_semantics != BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION:
-                raise ValueError(
-                    "RCPO resume requires checkpoints saved with the benchmark-relative "
-                    "drawdown constraint semantics. Legacy fixed-budget drawdown checkpoints "
-                    "are not supported."
+            if self.config.rcpo.constraint_mode == "max_drawdown":
+                checkpoint_semantics = checkpoint.get("constraint_semantics")
+                if checkpoint_semantics != BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION:
+                    raise ValueError(
+                        "RCPO resume requires checkpoints saved with the benchmark-relative "
+                        "drawdown constraint semantics. Legacy fixed-budget drawdown checkpoints "
+                        "are not supported."
+                    )
+                if not math.isclose(
+                    float(checkpoint.get("drawdown_budget_floor", math.nan)),
+                    float(self.config.environment.drawdown_budget_floor),
+                    rel_tol=0.0,
+                    abs_tol=1e-12,
+                ):
+                    raise ValueError(
+                        "Checkpoint drawdown_budget_floor does not match the current config."
+                    )
+                checkpoint_benchmark_mode = checkpoint.get(
+                    "drawdown_benchmark_mode",
+                    "true_equal_weight",
                 )
-            if not math.isclose(
-                float(checkpoint.get("drawdown_budget_floor", math.nan)),
-                float(self.config.environment.drawdown_budget_floor),
-                rel_tol=0.0,
-                abs_tol=1e-12,
-            ):
-                raise ValueError(
-                    "Checkpoint drawdown_budget_floor does not match the current config."
-                )
-            checkpoint_benchmark_mode = checkpoint.get(
-                "drawdown_benchmark_mode",
-                "true_equal_weight",
-            )
-            if checkpoint_benchmark_mode != self.config.environment.drawdown_benchmark_mode:
-                raise ValueError(
-                    "Checkpoint drawdown_benchmark_mode does not match the current config."
-                )
-            if not math.isclose(
-                float(checkpoint.get("benchmark_drawdown_margin", math.nan)),
-                float(self.config.environment.benchmark_drawdown_margin),
-                rel_tol=0.0,
-                abs_tol=1e-12,
-            ):
-                raise ValueError(
-                    "Checkpoint benchmark_drawdown_margin does not match the current config."
-                )
-            if not math.isclose(
-                float(checkpoint.get("drawdown_cost_scale", math.nan)),
-                float(self.config.environment.drawdown_cost_scale),
-                rel_tol=0.0,
-                abs_tol=1e-12,
-            ):
-                raise ValueError(
-                    "Checkpoint drawdown_cost_scale does not match the current config."
-                )
+                if checkpoint_benchmark_mode != self.config.environment.drawdown_benchmark_mode:
+                    raise ValueError(
+                        "Checkpoint drawdown_benchmark_mode does not match the current config."
+                    )
+                if not math.isclose(
+                    float(checkpoint.get("benchmark_drawdown_margin", math.nan)),
+                    float(self.config.environment.benchmark_drawdown_margin),
+                    rel_tol=0.0,
+                    abs_tol=1e-12,
+                ):
+                    raise ValueError(
+                        "Checkpoint benchmark_drawdown_margin does not match the current config."
+                    )
+                if not math.isclose(
+                    float(checkpoint.get("drawdown_cost_scale", math.nan)),
+                    float(self.config.environment.drawdown_cost_scale),
+                    rel_tol=0.0,
+                    abs_tol=1e-12,
+                ):
+                    raise ValueError(
+                        "Checkpoint drawdown_cost_scale does not match the current config."
+                    )
+            if self.config.rcpo.constraint_mode == "allocation":
+                checkpoint_semantics = checkpoint.get("constraint_semantics")
+                if checkpoint_semantics != ALLOCATION_CONSTRAINT_VERSION:
+                    raise ValueError(
+                        "RCPO resume requires checkpoints saved with the soft allocation "
+                        "constraint semantics."
+                    )
+                if not math.isclose(
+                    float(checkpoint.get("allocation_constraint_cost_scale", math.nan)),
+                    float(self.config.environment.allocation_constraint_cost_scale),
+                    rel_tol=0.0,
+                    abs_tol=1e-12,
+                ):
+                    raise ValueError(
+                        "Checkpoint allocation_constraint_cost_scale does not match the current config."
+                    )
         checkpoint_reward_mode = checkpoint.get("reward_correction_mode", "none")
         if checkpoint_reward_mode != self.config.reward_correction.mode:
             raise ValueError(
@@ -716,6 +752,8 @@ class RCPOTrainer:
             "average_allocation_constraint_2_weight": 0.0,
             "average_allocation_constraint_1_violation_cost": 0.0,
             "average_allocation_constraint_2_violation_cost": 0.0,
+            "average_allocation_constraint_raw_cost": 0.0,
+            "average_allocation_constraint_cost": 0.0,
             "average_simplex_z1": 0.0,
             "average_simplex_z2": 0.0,
             "average_simplex_z3": 0.0,
@@ -847,6 +885,12 @@ class RCPOTrainer:
             ],
             "validation_allocation_constraint_2_violation_cost": summary[
                 "average_allocation_constraint_2_violation_cost"
+            ],
+            "validation_allocation_constraint_raw_cost": summary[
+                "average_allocation_constraint_raw_cost"
+            ],
+            "validation_allocation_constraint_cost": summary[
+                "average_allocation_constraint_cost"
             ],
             "validation_simplex_z1": summary["average_simplex_z1"],
             "validation_simplex_z2": summary["average_simplex_z2"],
@@ -1026,6 +1070,17 @@ class RCPOTrainer:
                 **losses,
                 **self._validation_metric_fields(last_validation_summary),
             }
+            reward_advantage_std = float(metric_row.get("batch_reward_advantage_std", 0.0))
+            cost_advantage_std = float(metric_row.get("batch_cost_advantage_std", 0.0))
+            batch_reward_mean = float(metric_row.get("batch_reward_mean", 0.0))
+            batch_constraint_mean = float(metric_row.get("batch_constraint_cost_mean", 0.0))
+            lambda_value = float(metric_row.get("lambda_value", 0.0))
+            metric_row["batch_lambda_cost_advantage_ratio"] = float(
+                abs(lambda_value) * cost_advantage_std / max(reward_advantage_std, 1e-12)
+            )
+            metric_row["lambda_cost_to_reward_ratio"] = float(
+                abs(lambda_value) * abs(batch_constraint_mean) / max(abs(batch_reward_mean), 1e-12)
+            )
             with profile_section(self.profiler, "metric_write"):
                 self._write_metric_row(metric_row)
             metrics_rows.append(metric_row)

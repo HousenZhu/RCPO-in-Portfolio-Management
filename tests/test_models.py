@@ -29,12 +29,13 @@ def test_flat_gaussian_policy_preserves_action_contract() -> None:
 def test_default_config_exposes_standalone_credit_and_dirichlet_settings() -> None:
     config = load_config("configs/default.yaml")
 
-    assert config.network.policy_architecture == "simplex_autoregressive_gaussian"
+    assert config.network.policy_architecture == "simplex_autoregressive_dirichlet"
     assert config.network.branch_credit_mode == "standalone"
     assert config.environment.initial_portfolio_mode == "constrained_neutral"
-    assert config.network.dirichlet_min_concentration == 0.5
-    assert config.network.dirichlet_init_concentration == 12.0
-    assert config.network.dirichlet_max_concentration == 80.0
+    assert config.environment.simplex_action_format == "branch_weights"
+    assert config.network.dirichlet_min_concentration == 0.3
+    assert config.network.dirichlet_init_concentration == 2.0
+    assert config.network.dirichlet_max_concentration == 12.0
 
 
 def test_parallel_branch_gaussian_uses_four_branch_heads() -> None:

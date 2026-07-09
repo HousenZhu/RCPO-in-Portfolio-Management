@@ -7,6 +7,7 @@ from typing import Any
 import yaml
 
 BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION = "benchmark_relative_equal_weight_drawdown_v1"
+ALLOCATION_CONSTRAINT_VERSION = "soft_allocation_penalty_v1"
 
 
 @dataclass
@@ -64,6 +65,7 @@ class EnvironmentConfig:
     drawdown_benchmark_mode: str = "true_equal_weight"
     benchmark_drawdown_margin: float = 0.90
     drawdown_cost_scale: float = 0.01
+    allocation_constraint_cost_scale: float = 20.0
     diversification_beta: float = 0.03
     allocation_constraint_1_indices: list[int] = field(default_factory=lambda: [1, 2, 4])
     allocation_constraint_2_indices: list[int] = field(default_factory=lambda: [0, 4, 5])
@@ -262,8 +264,8 @@ def sync_rcpo_constraint_settings(config: ProjectConfig) -> None:
         raise ValueError(
             "network.dirichlet_init_concentration must lie within the configured bounds."
         )
-    if config.rcpo.constraint_mode != "max_drawdown":
-        raise ValueError("rcpo.constraint_mode must be 'max_drawdown'.")
+    if config.rcpo.constraint_mode not in {"max_drawdown", "allocation"}:
+        raise ValueError("rcpo.constraint_mode must be either 'max_drawdown' or 'allocation'.")
     config.environment.constraint_mode = config.rcpo.constraint_mode
     if config.environment.drawdown_budget_floor < 0.0:
         raise ValueError("environment.drawdown_budget_floor cannot be negative.")
@@ -279,6 +281,10 @@ def sync_rcpo_constraint_settings(config: ProjectConfig) -> None:
         raise ValueError("environment.benchmark_drawdown_margin must be positive.")
     if config.environment.drawdown_cost_scale <= 0.0:
         raise ValueError("environment.drawdown_cost_scale must be positive.")
+    if config.environment.allocation_constraint_cost_scale <= 0.0:
+        raise ValueError("environment.allocation_constraint_cost_scale must be positive.")
+    if config.rcpo.constraint_mode == "allocation" and config.rcpo.alpha is None:
+        raise ValueError("rcpo.alpha must be set when rcpo.constraint_mode='allocation'.")
     if config.rcpo.alpha_budget_ratio < 0.0:
         raise ValueError("rcpo.alpha_budget_ratio cannot be negative.")
     if config.rcpo.lambda_lr_up <= 0.0:

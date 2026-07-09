@@ -319,6 +319,34 @@ def test_c3_constrained_neutral_benchmark_matches_project_simplex_weights() -> N
     assert np.isclose(np.sum(env.benchmark_weights()[[0, 4, 5]]), 0.625)
 
 
+def test_softmax_constrained_neutral_benchmark_uses_feasible_caosd_weights() -> None:
+    env = build_env(
+        drawdown_benchmark_mode="constrained_neutral",
+        initial_portfolio_mode="constrained_neutral",
+    )
+
+    expected_weights = np.array([0.30, 0.65, 0.05], dtype=np.float32)
+
+    np.testing.assert_allclose(env.benchmark_weights(), expected_weights, atol=1e-7)
+    np.testing.assert_allclose(
+        env.initial_portfolio_weights(),
+        expected_weights,
+        atol=1e-7,
+    )
+    assert not np.allclose(
+        env.benchmark_weights(),
+        np.full(3, 1.0 / 3.0, dtype=np.float32),
+    )
+    assert np.sum(env.benchmark_weights()[[0]]) >= 0.25
+    assert np.sum(env.benchmark_weights()[[1]]) >= 0.60
+
+    env.reset(options={"start_index": 2})
+    _, _, _, _, info = env.step(np.zeros(3, dtype=np.float32))
+
+    assert info["drawdown_benchmark_mode"] == "constrained_neutral"
+    assert np.isclose(info["benchmark_turnover"], 0.0)
+
+
 def test_later_benchmark_steps_have_zero_turnover() -> None:
     env = build_env(drawdown_budget_floor=0.001)
     env.reset(options={"start_index": 2})
@@ -409,6 +437,40 @@ def test_concentrated_weights_have_positive_diversification_diagnostics() -> Non
     assert np.isclose(info["constraint_cost"], info["drawdown_constraint_cost"])
 
 
+def test_allocation_constraint_mode_uses_scaled_allocation_violation_cost() -> None:
+    env = build_env(
+        constraint_mode="allocation",
+        allocation_constraint_cost_scale=20.0,
+    )
+    env.reset(options={"start_index": 2})
+    action = np.zeros(3, dtype=np.float32)
+
+    _, _, _, _, info = env.step(action)
+
+    expected_raw = (
+        info["allocation_constraint_1_violation_cost"]
+        + info["allocation_constraint_2_violation_cost"]
+    )
+    expected_scaled = expected_raw / 20.0
+    assert info["allocation_constraint_raw_cost"] > 0.0
+    assert np.isclose(info["allocation_constraint_raw_cost"], expected_raw)
+    assert np.isclose(info["allocation_constraint_cost"], expected_scaled)
+    assert np.isclose(info["constraint_cost"], expected_scaled)
+
+
+def test_drawdown_constraint_mode_keeps_allocation_cost_diagnostic_only() -> None:
+    env = build_env(
+        constraint_mode="max_drawdown",
+        allocation_constraint_cost_scale=20.0,
+    )
+    env.reset(options={"start_index": 2})
+
+    _, _, _, _, info = env.step(np.zeros(3, dtype=np.float32))
+
+    assert info["allocation_constraint_cost"] > 0.0
+    assert np.isclose(info["constraint_cost"], info["drawdown_constraint_cost"])
+
+
 def test_constraint_preset_resolution_changes_bounds() -> None:
     env = build_env(active_constraint_preset="c3")
     resolved = env.resolved_constraint_preset()
@@ -446,6 +508,7 @@ def test_simplex_decomposition_zero_action_satisfies_allocation_constraints() ->
     assert info["allocation_constraint_2_weight"] >= info["allocation_constraint_2_min_weight"]
     assert np.isclose(info["allocation_constraint_1_violation_cost"], 0.0)
     assert np.isclose(info["allocation_constraint_2_violation_cost"], 0.0)
+    assert np.isclose(info["allocation_constraint_cost"], 0.0)
     assert "simplex_z1" in info
     assert "simplex_z2" in info
     assert "simplex_z3" in info

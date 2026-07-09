@@ -193,6 +193,7 @@ def test_short_training_runs_for_rcpo_and_ppo(tmp_path: Path) -> None:
     assert "validation_allocation_constraint_2_weight" in rcpo_metric
     assert "validation_allocation_constraint_1_violation_cost" in rcpo_metric
     assert "validation_allocation_constraint_2_violation_cost" in rcpo_metric
+
     assert rcpo_metric["reward_noise_enabled"] == 0
     assert rcpo_metric["validation_evaluated"] == 1
     assert rcpo_metric["validation_interval_updates"] == config.evaluation.validation_interval_updates
@@ -222,6 +223,37 @@ def test_short_training_runs_for_rcpo_and_ppo(tmp_path: Path) -> None:
     resumed_run = resume_experiment(config, algo="ppo_unconstrained", run_dir=ppo_run)
     resumed_metric_count = sum(1 for _ in (resumed_run / "metrics.jsonl").open("r", encoding="utf-8"))
     assert resumed_metric_count == original_metric_count + 1
+
+
+def test_short_rcpo_allocation_penalty_run(tmp_path: Path) -> None:
+    config = tiny_config(tmp_path)
+    config.experiment.run_name = "tiny_rcpo_allocation"
+    config.environment.action_mode = "softmax"
+    config.environment.initial_portfolio_mode = "constrained_neutral"
+    config.environment.constraint_mode = "allocation"
+    config.environment.allocation_constraint_cost_scale = 20.0
+    config.network.policy_architecture = "flat_gaussian"
+    config.network.branch_credit_mode = "global"
+    config.rcpo.constraint_mode = "allocation"
+    config.rcpo.alpha = 0.0005
+    config.rcpo.lambda_lr_up = 0.0015
+    config.rcpo.lambda_lr_down = 0.03
+    config.reward_correction.mode = "none"
+
+    run_dir = run_experiment(config, algo="rcpo")[0]
+    metric = json.loads((run_dir / "metrics.jsonl").read_text().splitlines()[-1])
+    snapshot = (run_dir / "config_snapshot.yaml").read_text()
+
+    assert "constraint_mode: allocation" in snapshot
+    assert "allocation_constraint_cost_scale: 20.0" in snapshot
+    assert metric["constraint_mode"] == "allocation"
+    assert "batch_allocation_constraint_cost_mean" in metric
+    assert "batch_allocation_constraint_raw_cost_mean" in metric
+    assert "batch_lambda_cost_advantage_ratio" in metric
+    assert "lambda_cost_to_reward_ratio" in metric
+    assert metric["batch_constraint_cost_mean"] == pytest.approx(
+        metric["batch_allocation_constraint_cost_mean"]
+    )
 
 
 def test_short_noisy_reward_training_runs(tmp_path: Path) -> None:

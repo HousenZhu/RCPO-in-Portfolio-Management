@@ -1,6 +1,6 @@
 # RCPO Portfolio Management Prototype
 
-This project builds a synthetic portfolio management problem and trains policy-gradient agents with PyTorch and Gymnasium. The main methods are unconstrained PPO and an RCPO-style PPO variant that maximizes net portfolio log return while enforcing a benchmark-relative maximum drawdown constraint.
+This project builds a synthetic portfolio management problem and trains policy-gradient agents with PyTorch and Gymnasium. The main methods are unconstrained PPO, simplex-decomposition policies with hard allocation feasibility, and RCPO-style PPO variants that maximize net portfolio log return while controlling either drawdown or soft allocation-constraint violations.
 
 ## Features
 
@@ -8,6 +8,7 @@ This project builds a synthetic portfolio management problem and trains policy-g
 - Long-only portfolio weights via softmax logits or CAOSD-style simplex decomposition
 - PPO baseline and RCPO with a reward critic, cost critic, and Lagrange multiplier
 - Benchmark-relative maximum drawdown constraint for RCPO
+- Soft allocation-constraint RCPO baseline for comparison with hard simplex feasibility
 - Two hard allocation constraints under `environment.action_mode: simplex_decomposition`
 - Configurable CAOSD policies: flat Gaussian, parallel/autoregressive Gaussian logits, or autoregressive Dirichlet weights
 - Global or standalone branch credit assignment for simplex policies
@@ -41,6 +42,12 @@ Train RCPO with the maximum drawdown constraint:
 
 ```powershell
 py -3.11 train.py --algo rcpo --constraint-drawdown --config configs/default.yaml
+```
+
+Train the soft allocation-constraint RCPO baseline without simplex decomposition:
+
+```powershell
+py -3.11 train.py --algo rcpo --constraint-allocation --config configs/rcpo_allocation_penalty.yaml
 ```
 
 Train RCPO with reward correction:
@@ -89,6 +96,12 @@ To resume from a specific checkpoint file inside the run directory:
 py -3.11 train.py --algo rcpo --constraint-drawdown --resume-run-dir "runs\new_rcpo_none_YYYYMMDD_HHMMSS\seed_0" --resume-checkpoint checkpoint_best.pt
 ```
 
+Resume the soft allocation-constraint RCPO baseline:
+
+```powershell
+py -3.11 train.py --algo rcpo --constraint-allocation --resume-run-dir "runs\rcpo_allocation_penalty_none_YYYYMMDD_HHMMSS\seed_0"
+```
+
 ## Evaluation Commands
 
 Evaluate the best checkpoint:
@@ -117,14 +130,14 @@ The policy emits either branch logits or branch simplex weights, then the enviro
 ```yaml
 environment:
   action_mode: simplex_decomposition
-  simplex_action_format: branch_logits
+  simplex_action_format: branch_weights
   initial_portfolio_mode: constrained_neutral
   allocation_constraint_1_indices: [1, 3, 5]
   allocation_constraint_2_indices: [4, 5]
   active_constraint_preset: c3
 
 network:
-  policy_architecture: simplex_autoregressive_gaussian
+  policy_architecture: simplex_autoregressive_dirichlet
   branch_credit_mode: standalone
 ```
 
@@ -160,7 +173,14 @@ Reward is net portfolio log return after transaction costs:
 reward_t = log(1 + net_simple_return_t)
 ```
 
-RCPO uses a benchmark-relative maximum drawdown constraint. During each episode, the environment tracks the agent portfolio path and an online benchmark path under the same transaction-cost model. In simplex mode, `configs/default.yaml` uses the constrained-neutral CAOSD baseline as this benchmark; set `drawdown_benchmark_mode: true_equal_weight` to use the old true equal-weight benchmark instead.
+RCPO now supports two active constraint modes. Select exactly one at the command line:
+
+- `--constraint-drawdown`: benchmark-relative maximum drawdown control.
+- `--constraint-allocation`: soft allocation-constraint penalty for the non-simplex baseline.
+
+### Drawdown RCPO
+
+Drawdown RCPO tracks the agent portfolio path and an online benchmark path under the same transaction-cost model. In simplex mode, `configs/default.yaml` uses the constrained-neutral CAOSD baseline as this benchmark; set `drawdown_benchmark_mode: true_equal_weight` to use the old true equal-weight benchmark instead.
 
 ```text
 agent_current_drawdown_t = (agent_running_peak_t - agent_portfolio_value_t) / agent_running_peak_t
@@ -177,15 +197,49 @@ Default settings:
 environment:
   drawdown_budget_floor: 0.05
   drawdown_benchmark_mode: constrained_neutral
-  benchmark_drawdown_margin: 0.96
-  drawdown_cost_scale: 0.01
+  benchmark_drawdown_margin: 0.95
+  drawdown_cost_scale: 0.10
 
 rcpo:
   alpha: null
   alpha_budget_ratio: 0.05
 ```
 
-This means the policy can seek return, but RCPO penalizes episode paths whose running maximum drawdown exceeds a budget defined online from the selected benchmark. The `0.96` margin asks the policy to stay modestly safer than the benchmark on drawdown, subject to the `0.05` minimum floor. With `alpha_budget_ratio: 0.05`, the Lagrange multiplier tolerates about 5% of the current effective drawdown budget as average violation before it increases.
+This means the policy can seek return, but RCPO penalizes episode paths whose running maximum drawdown exceeds a budget defined online from the selected benchmark. The `0.95` margin asks the policy to stay modestly safer than the benchmark on drawdown, subject to the `0.05` minimum floor. With `alpha_budget_ratio: 0.05`, the Lagrange multiplier tolerates about 5% of the current effective drawdown budget as average violation before it increases.
+
+### Soft Allocation-Penalty RCPO Baseline
+
+`configs/rcpo_allocation_penalty.yaml` uses `environment.action_mode: softmax`, so the policy is not protected by simplex decomposition. Instead, RCPO uses the two allocation constraint violations as its active cost:
+
+```text
+raw_violation = allocation_constraint_1_violation_cost
+              + allocation_constraint_2_violation_cost
+constraint_cost = raw_violation / allocation_constraint_cost_scale
+```
+
+Default healthy settings for this baseline:
+
+```yaml
+environment:
+  action_mode: softmax
+  drawdown_benchmark_mode: constrained_neutral
+  constraint_mode: allocation
+  allocation_constraint_cost_scale: 20.0
+
+rcpo:
+  constraint_mode: allocation
+  alpha: 0.0005
+  lambda_lr_up: 0.0015
+  lambda_lr_down: 0.03
+```
+
+This baseline answers a clean research question: can a soft Lagrange penalty learn to reduce allocation violations without destroying return, and how does that compare with simplex decomposition, which guarantees allocation feasibility by construction? The policy remains plain softmax, but `constrained_neutral` uses the same CAOSD-neutral feasible allocation for the initial portfolio and drawdown benchmark diagnostics.
+
+To compare the soft baseline against simplex runs after training:
+
+```powershell
+py -3.11 scripts\compare_allocation_penalty_vs_simplex.py --allocation-run-dir "runs\rcpo_allocation_penalty_none_YYYYMMDD_HHMMSS\seed_0"
+```
 
 ## DRC / GDRC Reward Correction
 

@@ -42,6 +42,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Use maximum drawdown target-violation cost as the RCPO constraint cost.",
     )
+    parser.add_argument(
+        "--constraint-allocation",
+        action="store_true",
+        help="Use soft allocation-constraint violation cost as the RCPO constraint cost.",
+    )
     reward_group = parser.add_mutually_exclusive_group()
     reward_group.add_argument(
         "--use-drc",
@@ -64,10 +69,11 @@ def parse_args() -> argparse.Namespace:
         help="Checkpoint file inside --resume-run-dir to continue from.",
     )
     args = parser.parse_args()
-    if args.algo == "rcpo" and not args.constraint_drawdown:
-        parser.error("RCPO requires --constraint-drawdown.")
-    if args.algo != "rcpo" and args.constraint_drawdown:
-        parser.error("--constraint-drawdown is only valid with --algo rcpo.")
+    selected_constraint_count = int(args.constraint_drawdown) + int(args.constraint_allocation)
+    if args.algo == "rcpo" and selected_constraint_count != 1:
+        parser.error("RCPO requires exactly one of --constraint-drawdown or --constraint-allocation.")
+    if args.algo != "rcpo" and selected_constraint_count:
+        parser.error("--constraint-drawdown and --constraint-allocation are only valid with --algo rcpo.")
     if args.algo == "equal_weight" and (args.use_drc or args.use_gdrc):
         parser.error("--use-drc and --use-gdrc are not valid with --algo equal_weight.")
     return args
@@ -84,7 +90,9 @@ def main() -> None:
     config = load_config(config_path)
     if args.constraint_preset is not None:
         config.environment.active_constraint_preset = args.constraint_preset
-    if args.algo == "rcpo":
+    if args.constraint_allocation:
+        config.rcpo.constraint_mode = "allocation"
+    elif args.algo == "rcpo":
         config.rcpo.constraint_mode = "max_drawdown"
     if args.use_drc:
         config.reward_correction.mode = "drc"

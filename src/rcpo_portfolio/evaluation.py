@@ -13,6 +13,7 @@ import numpy as np
 import torch
 
 from .config import (
+    ALLOCATION_CONSTRAINT_VERSION,
     BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION,
     ProjectConfig,
     sync_rcpo_constraint_settings,
@@ -113,6 +114,8 @@ def evaluate_policy(
         drawdown_constraint_costs: list[float] = []
         allocation_constraint_1_violation_costs: list[float] = []
         allocation_constraint_2_violation_costs: list[float] = []
+        allocation_constraint_raw_costs: list[float] = []
+        allocation_constraint_costs: list[float] = []
         allocation_constraint_1_weights: list[float] = []
         allocation_constraint_2_weights: list[float] = []
         simplex_z1_values: list[float] = []
@@ -152,6 +155,10 @@ def evaluate_policy(
             allocation_constraint_2_violation_costs.append(
                 float(info["allocation_constraint_2_violation_cost"])
             )
+            allocation_constraint_raw_costs.append(
+                float(info["allocation_constraint_raw_cost"])
+            )
+            allocation_constraint_costs.append(float(info["allocation_constraint_cost"]))
             allocation_constraint_1_weights.append(
                 float(info["allocation_constraint_1_weight"])
             )
@@ -226,6 +233,12 @@ def evaluate_policy(
         )
         episode_summary["average_allocation_constraint_2_violation_cost"] = float(
             np.mean(allocation_constraint_2_violation_costs)
+        )
+        episode_summary["average_allocation_constraint_raw_cost"] = float(
+            np.mean(allocation_constraint_raw_costs)
+        )
+        episode_summary["average_allocation_constraint_cost"] = float(
+            np.mean(allocation_constraint_costs)
         )
         episode_summary["average_allocation_constraint_1_weight"] = float(
             np.mean(allocation_constraint_1_weights)
@@ -730,37 +743,49 @@ def load_checkpoint_for_evaluation(
                 f"Checkpoint constraint mode {checkpoint_constraint_mode!r} does not match "
                 f"config_snapshot {config.rcpo.constraint_mode!r}."
             )
-        checkpoint_semantics = checkpoint.get("constraint_semantics")
-        if checkpoint_semantics != BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION:
-            raise ValueError(
-                "RCPO checkpoint uses incompatible drawdown constraint semantics. "
-                "Legacy fixed-budget drawdown checkpoints are not supported."
+        if config.rcpo.constraint_mode == "max_drawdown":
+            checkpoint_semantics = checkpoint.get("constraint_semantics")
+            if checkpoint_semantics != BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION:
+                raise ValueError(
+                    "RCPO checkpoint uses incompatible drawdown constraint semantics. "
+                    "Legacy fixed-budget drawdown checkpoints are not supported."
+                )
+            if not np.isclose(
+                float(checkpoint.get("drawdown_budget_floor", np.nan)),
+                float(config.environment.drawdown_budget_floor),
+            ):
+                raise ValueError("Checkpoint drawdown_budget_floor does not match config_snapshot.")
+            checkpoint_benchmark_mode = checkpoint.get(
+                "drawdown_benchmark_mode",
+                "true_equal_weight",
             )
-        if not np.isclose(
-            float(checkpoint.get("drawdown_budget_floor", np.nan)),
-            float(config.environment.drawdown_budget_floor),
-        ):
-            raise ValueError("Checkpoint drawdown_budget_floor does not match config_snapshot.")
-        checkpoint_benchmark_mode = checkpoint.get(
-            "drawdown_benchmark_mode",
-            "true_equal_weight",
-        )
-        if checkpoint_benchmark_mode != config.environment.drawdown_benchmark_mode:
-            raise ValueError(
-                "Checkpoint drawdown_benchmark_mode does not match config_snapshot."
-            )
-        if not np.isclose(
-            float(checkpoint.get("benchmark_drawdown_margin", np.nan)),
-            float(config.environment.benchmark_drawdown_margin),
-        ):
-            raise ValueError(
-                "Checkpoint benchmark_drawdown_margin does not match config_snapshot."
-            )
-        if not np.isclose(
-            float(checkpoint.get("drawdown_cost_scale", np.nan)),
-            float(config.environment.drawdown_cost_scale),
-        ):
-            raise ValueError("Checkpoint drawdown_cost_scale does not match config_snapshot.")
+            if checkpoint_benchmark_mode != config.environment.drawdown_benchmark_mode:
+                raise ValueError(
+                    "Checkpoint drawdown_benchmark_mode does not match config_snapshot."
+                )
+            if not np.isclose(
+                float(checkpoint.get("benchmark_drawdown_margin", np.nan)),
+                float(config.environment.benchmark_drawdown_margin),
+            ):
+                raise ValueError(
+                    "Checkpoint benchmark_drawdown_margin does not match config_snapshot."
+                )
+            if not np.isclose(
+                float(checkpoint.get("drawdown_cost_scale", np.nan)),
+                float(config.environment.drawdown_cost_scale),
+            ):
+                raise ValueError("Checkpoint drawdown_cost_scale does not match config_snapshot.")
+        if config.rcpo.constraint_mode == "allocation":
+            checkpoint_semantics = checkpoint.get("constraint_semantics")
+            if checkpoint_semantics != ALLOCATION_CONSTRAINT_VERSION:
+                raise ValueError(
+                    "RCPO checkpoint uses incompatible allocation constraint semantics."
+                )
+            if not np.isclose(
+                float(checkpoint.get("allocation_constraint_cost_scale", np.nan)),
+                float(config.environment.allocation_constraint_cost_scale),
+            ):
+                raise ValueError("Checkpoint allocation_constraint_cost_scale does not match config_snapshot.")
     market_splits = generate_market_splits(config.market, int(checkpoint["seed"]))
     environments = {
         split_name: PortfolioEnv(config.environment, market, config.market, seed=int(checkpoint["seed"]))

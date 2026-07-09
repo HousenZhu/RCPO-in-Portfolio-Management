@@ -16,6 +16,8 @@ HousenZhu_MEng_Project_Syllabus/
 profile_outputs/
 
 runs_*/
+runs/
+*.training.lock
 
 .DS_Store
 Thumbs.db

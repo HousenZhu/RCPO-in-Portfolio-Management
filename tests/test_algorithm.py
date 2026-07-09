@@ -7,6 +7,7 @@ import torch
 
 import train
 from rcpo_portfolio.algorithms.ppo import standalone_branch_policy_loss
+from rcpo_portfolio.config import ProjectConfig, load_config, sync_rcpo_constraint_settings
 from rcpo_portfolio.trainer import combine_advantages, update_lagrange_multiplier
 
 
@@ -81,6 +82,20 @@ def test_rcpo_constraint_flags_are_required(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr(sys, "argv", ["train.py", "--algo", "rcpo", "--constraint-drawdown"])
     args = train.parse_args()
     assert args.constraint_drawdown
+    assert not args.constraint_allocation
+
+    monkeypatch.setattr(sys, "argv", ["train.py", "--algo", "rcpo", "--constraint-allocation"])
+    args = train.parse_args()
+    assert args.constraint_allocation
+    assert not args.constraint_drawdown
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["train.py", "--algo", "rcpo", "--constraint-drawdown", "--constraint-allocation"],
+    )
+    with pytest.raises(SystemExit):
+        train.parse_args()
 
 
 def test_constraint_flags_are_rejected_for_non_rcpo(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -88,6 +103,14 @@ def test_constraint_flags_are_rejected_for_non_rcpo(monkeypatch: pytest.MonkeyPa
         sys,
         "argv",
         ["train.py", "--algo", "ppo_unconstrained", "--constraint-drawdown"],
+    )
+    with pytest.raises(SystemExit):
+        train.parse_args()
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["train.py", "--algo", "ppo_unconstrained", "--constraint-allocation"],
     )
     with pytest.raises(SystemExit):
         train.parse_args()
@@ -109,6 +132,28 @@ def test_legacy_constraint_flags_are_rejected(monkeypatch: pytest.MonkeyPatch) -
     )
     with pytest.raises(SystemExit):
         train.parse_args()
+
+
+def test_allocation_constraint_mode_requires_fixed_alpha() -> None:
+    config = ProjectConfig()
+    config.rcpo.constraint_mode = "allocation"
+    config.rcpo.alpha = None
+    with pytest.raises(ValueError, match="rcpo.alpha"):
+        sync_rcpo_constraint_settings(config)
+
+
+def test_allocation_penalty_config_loads() -> None:
+    config = load_config("configs/rcpo_allocation_penalty.yaml")
+    sync_rcpo_constraint_settings(config)
+
+    assert config.environment.action_mode == "softmax"
+    assert config.network.policy_architecture == "flat_gaussian"
+    assert config.network.branch_credit_mode == "global"
+    assert config.rcpo.constraint_mode == "allocation"
+    assert config.environment.constraint_mode == "allocation"
+    assert config.environment.drawdown_benchmark_mode == "constrained_neutral"
+    assert config.rcpo.alpha == pytest.approx(0.0005)
+    assert config.environment.allocation_constraint_cost_scale == pytest.approx(20.0)
 
 
 def test_reward_correction_flags_are_mutually_exclusive(monkeypatch: pytest.MonkeyPatch) -> None:

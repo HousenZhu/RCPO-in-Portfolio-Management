@@ -138,9 +138,9 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
                 "initial_portfolio_mode must be either 'all_cash' or "
                 "'constrained_neutral'."
             )
-        if self.config.constraint_mode != "max_drawdown":
+        if self.config.constraint_mode not in {"max_drawdown", "allocation"}:
             raise ValueError(
-                "Environment constraint_mode must be 'max_drawdown'."
+                "Environment constraint_mode must be either 'max_drawdown' or 'allocation'."
             )
         if self.config.drawdown_budget_floor < 0.0:
             raise ValueError("drawdown_budget_floor cannot be negative.")
@@ -156,6 +156,8 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             raise ValueError("benchmark_drawdown_margin must be positive.")
         if self.config.drawdown_cost_scale <= 0.0:
             raise ValueError("drawdown_cost_scale must be positive.")
+        if self.config.allocation_constraint_cost_scale <= 0.0:
+            raise ValueError("allocation_constraint_cost_scale must be positive.")
         if self.config.diversification_beta < 0.0:
             raise ValueError("diversification_beta cannot be negative.")
 
@@ -204,7 +206,7 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
         if self.config.initial_portfolio_mode == "all_cash":
             return self._initial_cash_weights.copy()
         if self.config.initial_portfolio_mode == "constrained_neutral":
-            return self._weights_from_action(self.neutral_action()).astype(np.float32)
+            return self._constrained_neutral_weights()
         raise ValueError(
             f"Unsupported initial_portfolio_mode: {self.config.initial_portfolio_mode}"
         )
@@ -225,8 +227,32 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
                 dtype=np.float32,
             )
         if self.config.drawdown_benchmark_mode == "constrained_neutral":
-            return self._weights_from_action(self.neutral_action()).astype(np.float32)
+            return self._constrained_neutral_weights()
         raise ValueError(f"Unsupported drawdown_benchmark_mode: {self.config.drawdown_benchmark_mode}")
+
+    def _constrained_neutral_weights(self) -> np.ndarray:
+        if self._simplex_decomposition is not None:
+            action = self.neutral_action()
+            return self._weights_from_action(action).astype(np.float32)
+        decomposition = build_simplex_decomposition(
+            num_assets=self.num_assets,
+            constraint_1_indices=self.config.allocation_constraint_1_indices,
+            constraint_2_indices=self.config.allocation_constraint_2_indices,
+            constraint_1_min_weight=float(
+                self._resolved_constraint_preset[
+                    "allocation_constraint_1_min_weight"
+                ]
+            ),
+            constraint_2_min_weight=float(
+                self._resolved_constraint_preset[
+                    "allocation_constraint_2_min_weight"
+                ]
+            ),
+        )
+        neutral_branch_weights = decomposition.neutral_branch_weights()
+        return decomposition.map_branch_weights(neutral_branch_weights).weights.astype(
+            np.float32
+        )
 
     def _weights_from_action(self, action: np.ndarray) -> np.ndarray:
         weights, _ = self._weights_and_action_components(action)
@@ -322,10 +348,20 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             )
             ** 2
         )
+        allocation_raw_cost = float(constraint_1_violation + constraint_2_violation)
+        allocation_constraint_cost = float(
+            allocation_raw_cost
+            / max(float(self.config.allocation_constraint_cost_scale), 1e-12)
+        )
         return {
             **allocation_weights,
             "allocation_constraint_1_violation_cost": constraint_1_violation,
             "allocation_constraint_2_violation_cost": constraint_2_violation,
+            "allocation_constraint_raw_cost": allocation_raw_cost,
+            "allocation_constraint_cost": allocation_constraint_cost,
+            "allocation_constraint_cost_scale": float(
+                self.config.allocation_constraint_cost_scale
+            ),
             "allocation_constraint_1_min_weight": constraint_1_min_weight,
             "allocation_constraint_2_min_weight": constraint_2_min_weight,
             "concentration": concentration,
@@ -594,7 +630,11 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             net_simple_return,
             benchmark_components["effective_drawdown_budget"],
         )
-        constraint_cost = float(drawdown_components["drawdown_constraint_cost"])
+        constraint_cost = (
+            float(constraint_components["allocation_constraint_cost"])
+            if self.config.constraint_mode == "allocation"
+            else float(drawdown_components["drawdown_constraint_cost"])
+        )
         branch_weights = action_components["simplex_branch_weights"]
         z_values = np.asarray(
             [

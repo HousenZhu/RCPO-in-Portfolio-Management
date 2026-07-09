@@ -118,6 +118,8 @@ def collect_rollout(
     drawdown_constraint_costs: list[float] = []
     allocation_constraint_1_violation_costs: list[float] = []
     allocation_constraint_2_violation_costs: list[float] = []
+    allocation_constraint_raw_costs: list[float] = []
+    allocation_constraint_costs: list[float] = []
     allocation_constraint_1_weights: list[float] = []
     allocation_constraint_2_weights: list[float] = []
     simplex_z1_values: list[float] = []
@@ -203,6 +205,8 @@ def collect_rollout(
             allocation_constraint_2_violation_costs.append(
                 float(info["allocation_constraint_2_violation_cost"])
             )
+            allocation_constraint_raw_costs.append(float(info["allocation_constraint_raw_cost"]))
+            allocation_constraint_costs.append(float(info["allocation_constraint_cost"]))
             allocation_constraint_1_weights.append(
                 float(info["allocation_constraint_1_weight"])
             )
@@ -383,6 +387,12 @@ def collect_rollout(
         "batch_allocation_constraint_2_violation_cost_mean": float(
             np.mean(allocation_constraint_2_violation_costs)
         ),
+        "batch_allocation_constraint_raw_cost_mean": float(
+            np.mean(allocation_constraint_raw_costs)
+        ),
+        "batch_allocation_constraint_cost_mean": float(
+            np.mean(allocation_constraint_costs)
+        ),
         "batch_allocation_constraint_1_weight_mean": float(
             np.mean(allocation_constraint_1_weights)
         ),
@@ -401,6 +411,12 @@ def collect_rollout(
         "episode_cost_mean": _flatten_metrics(episode_metrics, "episode_cost"),
         **correction.metrics,
     }
+    info_summary["batch_reward_advantage_std"] = float(
+        reward_advantages.std(unbiased=False).item()
+    )
+    info_summary["batch_cost_advantage_std"] = float(
+        cost_advantages.std(unbiased=False).item()
+    )
     for branch_index in range(branch_rewards_tensor.shape[1]):
         number = branch_index + 1
         info_summary[f"batch_branch_{number}_reward_mean"] = float(

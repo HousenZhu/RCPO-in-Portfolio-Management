@@ -10,14 +10,18 @@
       "checkpoint": "checkpoint_best.pt",
       "policy_architecture": "simplex_autoregressive_dirichlet",
       "branch_credit_mode": "standalone",
-      "mean_final_cumulative_return": 0.18485430479049683,
-      "mean_excess_cumulative_return": 0.0316490113735199,
-      "win_rate_vs_constrained_neutral": 0.8,
-      "mean_annualized_return": 0.18485413122495262,
-      "mean_annualized_volatility": 0.1676559237330954,
-      "mean_max_drawdown": 0.14485397674143313,
-      "mean_average_turnover": 0.007130890968255699,
-      "mean_constraint_cost": 0.001169087642483646
+      "mean_final_cumulative_return": 0.18431463539600373,
+      "mean_excess_cumulative_return": 0.031109341979026796,
+      "win_rate_vs_constrained_neutral": 0.75,
+      "mean_annualized_return": 0.18431438154164184,
+      "mean_annualized_volatility": 0.164126367649011,
+      "mean_max_drawdown": 0.13865543119609355,
+      "mean_average_turnover": 0.1767095111310482,
+      "mean_constraint_cost": 0.0005126274931171792,
+      "mean_allocation_constraint_raw_cost": 0.0,
+      "mean_allocation_constraint_cost": 0.0,
+      "mean_allocation_constraint_1_violation_cost": 0.0,
+      "mean_allocation_constraint_2_violation_cost": 0.0
     },
     "PPO Gaussian": {
       "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\simplex_v2_ppo_unconstrained_none_20260612_195706\\seed_0",
@@ -31,21 +35,29 @@
       "mean_annualized_volatility": 0.1600652646829695,
       "mean_max_drawdown": 0.1396534588187933,
       "mean_average_turnover": 0.14365619160234927,
-      "mean_constraint_cost": 0.0012626321101578241
+      "mean_constraint_cost": 0.0012626321101578241,
+      "mean_allocation_constraint_raw_cost": 0.0,
+      "mean_allocation_constraint_cost": 0.0,
+      "mean_allocation_constraint_1_violation_cost": 0.0,
+      "mean_allocation_constraint_2_violation_cost": 0.0
     },
     "RCPO Dirichlet": {
       "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\simplex_v2.1_rcpo_none_20260620_144057\\seed_0",
       "checkpoint": "checkpoint_best.pt",
       "policy_architecture": "simplex_autoregressive_dirichlet",
       "branch_credit_mode": "standalone",
-      "mean_final_cumulative_return": 0.1929131418466568,
-      "mean_excess_cumulative_return": 0.03970784842967987,
-      "win_rate_vs_constrained_neutral": 0.8,
-      "mean_annualized_return": 0.19291341586512098,
-      "mean_annualized_volatility": 0.16852547712807878,
-      "mean_max_drawdown": 0.1456978466361761,
-      "mean_average_turnover": 0.003730830631684512,
-      "mean_constraint_cost": 0.0019544877120097224
+      "mean_final_cumulative_return": 0.17989631593227387,
+      "mean_excess_cumulative_return": 0.026691022515296935,
+      "win_rate_vs_constrained_neutral": 0.7,
+      "mean_annualized_return": 0.17989632420193455,
+      "mean_annualized_volatility": 0.1612401734919539,
+      "mean_max_drawdown": 0.13411158584058286,
+      "mean_average_turnover": 0.27462641932070253,
+      "mean_constraint_cost": 0.0007151631446938201,
+      "mean_allocation_constraint_raw_cost": 0.0,
+      "mean_allocation_constraint_cost": 0.0,
+      "mean_allocation_constraint_1_violation_cost": 0.0,
+      "mean_allocation_constraint_2_violation_cost": 0.0
     },
     "RCPO Gaussian": {
       "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\simplex_v2.1_rcpo_none_20260620_144107\\seed_0",
@@ -59,7 +71,29 @@
       "mean_annualized_volatility": 0.1709555309225462,
       "mean_max_drawdown": 0.14816395714879035,
       "mean_average_turnover": 0.013420002162456512,
-      "mean_constraint_cost": 0.0031718143424996014
+      "mean_constraint_cost": 0.0031718143424996014,
+      "mean_allocation_constraint_raw_cost": 0.0,
+      "mean_allocation_constraint_cost": 0.0,
+      "mean_allocation_constraint_1_violation_cost": 0.0,
+      "mean_allocation_constraint_2_violation_cost": 0.0
+    },
+    "RCPO Allocation Penalty": {
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\rcpo_allocation_penalty_rcpo_none_20260630_141127\\seed_0",
+      "checkpoint": "checkpoint_best.pt",
+      "policy_architecture": "flat_gaussian",
+      "branch_credit_mode": "global",
+      "mean_final_cumulative_return": 0.1712728202342987,
+      "mean_excess_cumulative_return": 0.018067526817321777,
+      "win_rate_vs_constrained_neutral": 0.6,
+      "mean_annualized_return": 0.17127269149829633,
+      "mean_annualized_volatility": 0.18820400104245585,
+      "mean_max_drawdown": 0.17529513016343118,
+      "mean_average_turnover": 0.670033472776413,
+      "mean_constraint_cost": 0.0017777883040253073,
+      "mean_allocation_constraint_raw_cost": 0.03555576493963599,
+      "mean_allocation_constraint_cost": 0.0017777883040253073,
+      "mean_allocation_constraint_1_violation_cost": 0.0261136120185256,
+      "mean_allocation_constraint_2_violation_cost": 0.009442153538111597
     },
     "Constrained-neutral baseline": {
       "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\simplex_v2.1_ppo_unconstrained_none_20260620_144053\\seed_0",
@@ -69,7 +103,9 @@
       "mean_annualized_volatility": 0.15843883116596444,
       "mean_max_drawdown": 0.13883839622139932,
       "mean_average_turnover": 0.0,
-      "mean_constraint_cost": 0.0002594072859210428
+      "mean_constraint_cost": 0.0002594072859210428,
+      "mean_allocation_constraint_raw_cost": 0.0,
+      "mean_allocation_constraint_cost": 0.0
     }
   }
 }
