@@ -16,7 +16,13 @@ HousenZhu_MEng_Project_Syllabus/
 profile_outputs/
 
 runs_*/
-runs/
+# Keep training artifacts out of Git. Only evaluation PNGs from completed runs
+# are included; current v2.4 runs remain local while training is active.
+runs/**
+!runs/**/
+!runs/**/evaluation/**/*.png
+!runs/**/evaluation_*/**/*.png
+runs/*v2.4*/
 *.training.lock
 
 .DS_Store
