@@ -1,0 +1,45 @@
+﻿extends: ../experiment2_8assets/base.yaml
+
+experiment:
+  run_name: simplex_v2.6_base
+  seeds: [0]
+
+environment:
+  observation_schema_version: 2
+  initial_portfolio_mode: constrained_neutral
+  drawdown_benchmark_mode: constrained_neutral
+  benchmark_drawdown_margin: 0.90
+  drawdown_budget_floor: 0.05
+  drawdown_cost_scale: 0.10
+
+network:
+  hidden_sizes: [192, 128]
+  branch_credit_mode: standalone_reward_global_cost
+  dirichlet_min_concentration: 0.5
+  dirichlet_init_concentration: 1.5
+  dirichlet_max_concentration: 8.0
+
+reward_correction:
+  mode: none
+
+reward_noise:
+  enabled: false
+
+evaluation:
+  validation_branch_count: 10
+  test_branch_count: 20
+  validation_interval_updates: 200
+  checkpoint_score: validation_mean_excess_cumulative_return
+
+logging:
+  metrics_schema_version: 2
+  print_interval_updates: 10
+  branch_diagnostic_interval_updates: 50
+
+rcpo:
+  initial_lambda: 0.0
+  lambda_lr_up: 0.00075
+  lambda_lr_down: 0.01
+  alpha:
+  alpha_budget_ratio: 0.05
+

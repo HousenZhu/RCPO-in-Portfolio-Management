@@ -48,5 +48,12 @@ class PortfolioEnvPool:
     def simplex_branch_sizes(self) -> list[int]:
         return self.envs[0].simplex_branch_sizes()
 
+    def simplex_branch_train_mask(self) -> list[bool]:
+        return self.envs[0].simplex_branch_train_mask()
+
+
     def neutral_action(self):
         return self.envs[0].neutral_action()
+
+    def constrained_neutral_action(self):
+        return self.envs[0].constrained_neutral_action()

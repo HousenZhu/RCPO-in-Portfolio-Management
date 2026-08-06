@@ -1,0 +1,29 @@
+﻿extends: base.yaml
+
+experiment:
+  run_name: simplex_v2.6_ppo_gaussian
+
+environment:
+  action_mode: simplex_decomposition
+  simplex_action_format: branch_logits
+  constraint_mode: relative_current_drawdown
+
+network:
+  policy_architecture: simplex_autoregressive_gaussian
+  branch_credit_mode: standalone_reward_global_cost
+
+ppo:
+  total_updates: 60000
+  rollout_steps: 2048
+  epochs: 4
+  minibatch_size: 512
+  learning_rate: 0.000085
+  learning_rate_final: 0.000040
+  clip_epsilon: 0.10
+  entropy_coef: 0.0015
+  target_kl: 0.02
+  early_stop_patience:
+
+rcpo:
+  constraint_mode: relative_current_drawdown
+

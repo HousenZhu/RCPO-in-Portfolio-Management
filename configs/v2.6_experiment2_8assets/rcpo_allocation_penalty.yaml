@@ -1,0 +1,34 @@
+﻿extends: base.yaml
+
+experiment:
+  run_name: simplex_v2.6_rcpo_allocation_penalty
+
+environment:
+  action_mode: softmax
+  simplex_action_format: branch_logits
+  constraint_mode: allocation
+
+network:
+  policy_architecture: flat_gaussian
+  branch_credit_mode: global
+
+optimization:
+  total_updates: 60000
+  rollout_steps: 2048
+  epochs: 3
+  minibatch_size: 512
+  learning_rate: 0.000085
+  learning_rate_final: 0.000030
+  clip_epsilon: 0.10
+  entropy_coef: 0.0010
+  target_kl: 0.02
+  early_stop_patience:
+
+rcpo:
+  initial_lambda: 0.0
+  lambda_lr_up: 0.00075
+  lambda_lr_down: 0.01
+  alpha: 0.0001
+  alpha_budget_ratio: 0.05
+  constraint_mode: allocation
+

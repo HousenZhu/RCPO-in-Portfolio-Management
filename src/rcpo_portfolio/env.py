@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
@@ -90,6 +90,7 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             + self.num_risky_assets
             + self.num_assets
             + 6
+            + (7 if self.config.observation_schema_version >= 2 else 0)
         )
         bound = np.finfo(np.float32).max
         self.observation_space = spaces.Box(
@@ -133,14 +134,24 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
                 "Environment simplex_action_format must be either 'branch_logits' "
                 "or 'branch_weights'."
             )
+        if self.config.observation_schema_version not in {1, 2}:
+            raise ValueError("observation_schema_version must be 1 or 2.")
         if self.config.initial_portfolio_mode not in {"all_cash", "constrained_neutral"}:
             raise ValueError(
                 "initial_portfolio_mode must be either 'all_cash' or "
                 "'constrained_neutral'."
             )
-        if self.config.constraint_mode not in {"max_drawdown", "allocation"}:
+        valid_constraint_modes = {
+            "max_drawdown",
+            "allocation",
+            "allocation_drawdown",
+            "relative_current_drawdown",
+            "allocation_relative_drawdown",
+        }
+        if self.config.constraint_mode not in valid_constraint_modes:
             raise ValueError(
-                "Environment constraint_mode must be either 'max_drawdown' or 'allocation'."
+                "Environment constraint_mode must be one of: "
+                f"{sorted(valid_constraint_modes)}."
             )
         if self.config.drawdown_budget_floor < 0.0:
             raise ValueError("drawdown_budget_floor cannot be negative.")
@@ -188,6 +199,12 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             return []
         return [len(indices) for indices in self._simplex_decomposition.branch_indices]
 
+    def simplex_branch_train_mask(self) -> list[bool]:
+        if self._simplex_decomposition is None:
+            return []
+        return list(self._simplex_decomposition.branch_training_mask())
+
+
     def neutral_action(self) -> np.ndarray:
         if self.config.action_mode == "simplex_decomposition":
             if self._simplex_decomposition is None:
@@ -195,6 +212,16 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             if self.config.simplex_action_format == "branch_weights":
                 return self._simplex_decomposition.neutral_branch_weights()
         return np.zeros(self.action_space.shape[0], dtype=np.float32)
+
+    def constrained_neutral_action(self) -> np.ndarray:
+        if self.config.action_mode == "simplex_decomposition":
+            return self.neutral_action()
+        weights = self._constrained_neutral_weights()
+        logits = np.log(np.clip(weights, 1e-12, None))
+        # Softmax is shift-invariant; centering keeps the diagnostic action compact.
+        logits -= float(np.mean(logits))
+        return logits.astype(np.float32)
+
 
     def benchmark_weights(self) -> np.ndarray:
         return self._benchmark_weights.copy()
@@ -412,7 +439,14 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             max(
                 float(self.config.drawdown_budget_floor),
                 float(self.config.benchmark_drawdown_margin)
-                * float(drawdown_state["max_drawdown"]),
+                * float(
+                    drawdown_state["current_drawdown"]
+                    if self.config.constraint_mode in {
+                        "relative_current_drawdown",
+                        "allocation_relative_drawdown",
+                    }
+                    else drawdown_state["max_drawdown"]
+                ),
             )
         )
         return {
@@ -442,7 +476,15 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             max_drawdown=self.state.max_drawdown,
             net_simple_return=net_simple_return,
         )
-        drawdown_gap = float(drawdown_state["max_drawdown"] - effective_drawdown_budget)
+        constrained_drawdown = (
+            float(drawdown_state["current_drawdown"])
+            if self.config.constraint_mode in {
+                "relative_current_drawdown",
+                "allocation_relative_drawdown",
+            }
+            else float(drawdown_state["max_drawdown"])
+        )
+        drawdown_gap = float(constrained_drawdown - effective_drawdown_budget)
         drawdown_violation = float(
             max(0.0, drawdown_gap)
         )
@@ -500,6 +542,36 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
                 np.asarray([turnover_cap_slack], dtype=np.float32),
             ]
         )
+        if self.config.observation_schema_version >= 2:
+            effective_budget = max(
+                float(self.config.drawdown_budget_floor),
+                float(self.config.benchmark_drawdown_margin)
+                * float(
+                    self.state.benchmark_current_drawdown
+                    if self.config.constraint_mode in {
+                        "relative_current_drawdown",
+                        "allocation_relative_drawdown",
+                    }
+                    else self.state.benchmark_max_drawdown
+                ),
+            )
+            drawdown_features = np.asarray(
+                [
+                    np.clip(self.state.current_drawdown, 0.0, 1.0),
+                    np.clip(self.state.max_drawdown, 0.0, 1.0),
+                    np.clip(self.state.benchmark_current_drawdown, 0.0, 1.0),
+                    np.clip(self.state.benchmark_max_drawdown, 0.0, 1.0),
+                    np.clip(effective_budget, 0.0, 1.0),
+                    np.clip(self.state.current_drawdown - effective_budget, -1.0, 1.0),
+                    np.clip(
+                        self.state.steps_elapsed / max(self.config.episode_length, 1),
+                        0.0,
+                        1.0,
+                    ),
+                ],
+                dtype=np.float32,
+            )
+            observation = np.concatenate([observation, drawdown_features])
         return observation.astype(np.float32)
 
     def reset(
@@ -565,7 +637,12 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
         turnovers = np.zeros(4, dtype=np.float32)
         net_returns = np.zeros(4, dtype=np.float32)
         max_drawdowns = np.zeros(4, dtype=np.float32)
+        branch_train_mask = self.simplex_branch_train_mask()
+        if not branch_train_mask:
+            branch_train_mask = [False, False, False, False]
         for branch_index, weights in enumerate(branch_weights):
+            if not branch_train_mask[branch_index]:
+                continue
             previous_weights = self.state.branch_weights[branch_index]
             turnover = float(np.sum(np.abs(weights - previous_weights)))
             raw_return = float(np.dot(weights[1:], current_returns.astype(np.float32)))
@@ -611,6 +688,9 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             "branch_net_returns": net_returns,
             "branch_max_drawdowns": max_drawdowns,
             "branch_z_values": z_values.astype(np.float32),
+            "branch_train_mask": np.asarray(
+                branch_train_mask, dtype=np.float32
+            ),
         }
 
     def step(self, action: np.ndarray) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
@@ -630,11 +710,20 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             net_simple_return,
             benchmark_components["effective_drawdown_budget"],
         )
-        constraint_cost = (
-            float(constraint_components["allocation_constraint_cost"])
-            if self.config.constraint_mode == "allocation"
-            else float(drawdown_components["drawdown_constraint_cost"])
+        allocation_drawdown_constraint_cost = float(
+            constraint_components["allocation_constraint_cost"]
+            + float(self.config.combined_drawdown_cost_weight)
+            * drawdown_components["drawdown_constraint_cost"]
         )
+        if self.config.constraint_mode == "allocation":
+            constraint_cost = float(constraint_components["allocation_constraint_cost"])
+        elif self.config.constraint_mode in {
+            "allocation_drawdown",
+            "allocation_relative_drawdown",
+        }:
+            constraint_cost = allocation_drawdown_constraint_cost
+        else:
+            constraint_cost = float(drawdown_components["drawdown_constraint_cost"])
         branch_weights = action_components["simplex_branch_weights"]
         z_values = np.asarray(
             [
@@ -689,6 +778,10 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             "turnover": turnover,
             "constraint_cost": constraint_cost,
             "constraint_mode": self.config.constraint_mode,
+            "allocation_drawdown_constraint_cost": allocation_drawdown_constraint_cost,
+            "combined_drawdown_cost_weight": float(
+                self.config.combined_drawdown_cost_weight
+            ),
             **drawdown_components,
             **benchmark_components,
             **action_components,

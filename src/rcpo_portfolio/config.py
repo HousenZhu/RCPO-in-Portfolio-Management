@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
@@ -7,7 +7,12 @@ from typing import Any
 import yaml
 
 BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION = "benchmark_relative_equal_weight_drawdown_v1"
+RELATIVE_CURRENT_DRAWDOWN_CONSTRAINT_VERSION = "relative_current_drawdown_v1"
 ALLOCATION_CONSTRAINT_VERSION = "soft_allocation_penalty_v1"
+ALLOCATION_DRAWDOWN_CONSTRAINT_VERSION = "soft_allocation_plus_drawdown_penalty_v1"
+ALLOCATION_RELATIVE_DRAWDOWN_CONSTRAINT_VERSION = (
+    "soft_allocation_plus_relative_current_drawdown_v1"
+)
 
 
 @dataclass
@@ -61,11 +66,13 @@ class EnvironmentConfig:
     transaction_cost_bps: float = 1.0
     turnover_cap: float = 0.40
     constraint_mode: str = "max_drawdown"
+    observation_schema_version: int = 1
     drawdown_budget_floor: float = 0.02
     drawdown_benchmark_mode: str = "true_equal_weight"
     benchmark_drawdown_margin: float = 0.90
     drawdown_cost_scale: float = 0.01
     allocation_constraint_cost_scale: float = 20.0
+    combined_drawdown_cost_weight: float = 0.25
     diversification_beta: float = 0.03
     allocation_constraint_1_indices: list[int] = field(default_factory=lambda: [1, 2, 4])
     allocation_constraint_2_indices: list[int] = field(default_factory=lambda: [0, 4, 5])
@@ -193,6 +200,12 @@ class EvaluationConfig:
 
 
 @dataclass
+class LoggingConfig:
+    metrics_schema_version: int = 1
+    print_interval_updates: int = 1
+    branch_diagnostic_interval_updates: int = 50
+
+@dataclass
 class ProjectConfig:
     experiment: ExperimentConfig = field(default_factory=ExperimentConfig)
     runtime: RuntimeConfig = field(default_factory=RuntimeConfig)
@@ -205,6 +218,7 @@ class ProjectConfig:
     reward_correction: RewardCorrectionConfig = field(default_factory=RewardCorrectionConfig)
     reward_noise: RewardNoiseConfig = field(default_factory=RewardNoiseConfig)
     evaluation: EvaluationConfig = field(default_factory=EvaluationConfig)
+    logging: LoggingConfig = field(default_factory=LoggingConfig)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -234,10 +248,18 @@ def sync_rcpo_constraint_settings(config: ProjectConfig) -> None:
             "Simplex branch policy architectures require "
             "environment.action_mode='simplex_decomposition'."
         )
-    if config.network.branch_credit_mode not in {"global", "standalone"}:
-        raise ValueError("network.branch_credit_mode must be 'global' or 'standalone'.")
+    valid_branch_credit_modes = {
+        "global",
+        "standalone",
+        "standalone_reward_global_cost",
+    }
+    if config.network.branch_credit_mode not in valid_branch_credit_modes:
+        raise ValueError(
+            "network.branch_credit_mode must be one of: "
+            f"{sorted(valid_branch_credit_modes)}."
+        )
     if (
-        config.network.branch_credit_mode == "standalone"
+        config.network.branch_credit_mode != "global"
         and config.environment.action_mode != "simplex_decomposition"
     ):
         raise ValueError("Standalone branch credit requires simplex_decomposition action mode.")
@@ -264,8 +286,18 @@ def sync_rcpo_constraint_settings(config: ProjectConfig) -> None:
         raise ValueError(
             "network.dirichlet_init_concentration must lie within the configured bounds."
         )
-    if config.rcpo.constraint_mode not in {"max_drawdown", "allocation"}:
-        raise ValueError("rcpo.constraint_mode must be either 'max_drawdown' or 'allocation'.")
+    valid_constraint_modes = {
+        "max_drawdown",
+        "relative_current_drawdown",
+        "allocation",
+        "allocation_drawdown",
+        "allocation_relative_drawdown",
+    }
+    if config.rcpo.constraint_mode not in valid_constraint_modes:
+        raise ValueError(
+            "rcpo.constraint_mode must be one of: "
+            f"{sorted(valid_constraint_modes)}."
+        )
     config.environment.constraint_mode = config.rcpo.constraint_mode
     if config.environment.drawdown_budget_floor < 0.0:
         raise ValueError("environment.drawdown_budget_floor cannot be negative.")
@@ -283,14 +315,38 @@ def sync_rcpo_constraint_settings(config: ProjectConfig) -> None:
         raise ValueError("environment.drawdown_cost_scale must be positive.")
     if config.environment.allocation_constraint_cost_scale <= 0.0:
         raise ValueError("environment.allocation_constraint_cost_scale must be positive.")
-    if config.rcpo.constraint_mode == "allocation" and config.rcpo.alpha is None:
-        raise ValueError("rcpo.alpha must be set when rcpo.constraint_mode='allocation'.")
+    if config.environment.combined_drawdown_cost_weight < 0.0:
+        raise ValueError("environment.combined_drawdown_cost_weight cannot be negative.")
+    if (
+        config.rcpo.constraint_mode in {"allocation", "allocation_drawdown"}
+        and config.rcpo.alpha is None
+    ):
+        raise ValueError(
+            "rcpo.alpha must be set when rcpo.constraint_mode is 'allocation' "
+            "or 'allocation_drawdown'."
+        )
     if config.rcpo.alpha_budget_ratio < 0.0:
         raise ValueError("rcpo.alpha_budget_ratio cannot be negative.")
     if config.rcpo.lambda_lr_up <= 0.0:
         raise ValueError("rcpo.lambda_lr_up must be positive.")
     if config.rcpo.lambda_lr_down <= 0.0:
         raise ValueError("rcpo.lambda_lr_down must be positive.")
+    if config.environment.observation_schema_version not in {1, 2}:
+        raise ValueError("environment.observation_schema_version must be 1 or 2.")
+    if (
+        config.rcpo.constraint_mode
+        in {"relative_current_drawdown", "allocation_relative_drawdown"}
+        and config.environment.observation_schema_version != 2
+    ):
+        raise ValueError(
+            "Relative-current-drawdown modes require observation_schema_version=2."
+        )
+    if config.logging.metrics_schema_version not in {1, 2}:
+        raise ValueError("logging.metrics_schema_version must be 1 or 2.")
+    if config.logging.print_interval_updates < 1:
+        raise ValueError("logging.print_interval_updates must be positive.")
+    if config.logging.branch_diagnostic_interval_updates < 1:
+        raise ValueError("logging.branch_diagnostic_interval_updates must be positive.")
 
 
 def validate_reward_correction_settings(config: ProjectConfig) -> None:
@@ -328,7 +384,7 @@ def validate_reward_correction_settings(config: ProjectConfig) -> None:
         raise ValueError("reward_correction.correction_coef cannot be negative.")
     if reward_config.correction_delta_clip < 0.0:
         raise ValueError("reward_correction.correction_delta_clip cannot be negative.")
-    if config.network.branch_credit_mode == "standalone" and reward_config.mode != "none":
+    if config.network.branch_credit_mode != "global" and reward_config.mode != "none":
         raise ValueError(
             "Standalone branch credit currently requires reward_correction.mode='none'."
         )
@@ -340,7 +396,7 @@ def validate_reward_noise_settings(config: ProjectConfig) -> None:
         raise ValueError("reward_noise.mode must be 'gaussian'.")
     if noise_config.std < 0.0:
         raise ValueError("reward_noise.std cannot be negative.")
-    if config.network.branch_credit_mode == "standalone" and noise_config.enabled:
+    if config.network.branch_credit_mode != "global" and noise_config.enabled:
         raise ValueError("Standalone branch credit currently requires clean rewards.")
 
 
@@ -377,7 +433,38 @@ def _from_dict(payload: dict[str, Any]) -> ProjectConfig:
             RewardNoiseConfig, payload.get("reward_noise", {})
         ),
         evaluation=_dataclass_from_dict(EvaluationConfig, payload.get("evaluation", {})),
+        logging=_dataclass_from_dict(LoggingConfig, payload.get("logging", {})),
     )
+
+
+def _load_config_payload(
+    config_path: Path,
+    ancestry: tuple[Path, ...] = (),
+) -> dict[str, Any]:
+    resolved_path = config_path.resolve()
+    if resolved_path in ancestry:
+        chain = " -> ".join(str(path) for path in (*ancestry, resolved_path))
+        raise ValueError(f"Config inheritance cycle detected: {chain}")
+
+    with config_path.open("r", encoding="utf-8") as handle:
+        payload = yaml.safe_load(handle) or {}
+    if not isinstance(payload, dict):
+        raise ValueError(f"Config file must contain a mapping: {config_path}")
+
+    base_reference = payload.pop("extends", None)
+    if base_reference is None:
+        return payload
+    if not isinstance(base_reference, str) or not base_reference.strip():
+        raise ValueError("Config 'extends' must be a non-empty path string.")
+
+    base_path = Path(base_reference)
+    if not base_path.is_absolute():
+        base_path = config_path.parent / base_path
+    base_payload = _load_config_payload(
+        base_path,
+        ancestry=(*ancestry, resolved_path),
+    )
+    return _merge_dicts(base_payload, payload)
 
 
 def load_config(path: str | Path | None = None) -> ProjectConfig:
@@ -385,8 +472,7 @@ def load_config(path: str | Path | None = None) -> ProjectConfig:
     if path is None:
         return _from_dict(defaults)
     config_path = Path(path)
-    with config_path.open("r", encoding="utf-8") as handle:
-        payload = yaml.safe_load(handle) or {}
+    payload = _load_config_payload(config_path)
     merged = _merge_dicts(defaults, payload)
     return _from_dict(merged)
 

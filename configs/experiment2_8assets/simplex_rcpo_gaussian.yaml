@@ -1,0 +1,31 @@
+extends: base.yaml
+
+experiment:
+  run_name: simplex_v2.5_rcpo_gaussian
+
+environment:
+  constraint_mode: max_drawdown
+  simplex_action_format: branch_logits
+
+network:
+  policy_architecture: simplex_autoregressive_gaussian
+  branch_credit_mode: standalone
+
+optimization:
+  total_updates: 120000
+  rollout_steps: 2048
+  epochs: 3
+  minibatch_size: 512
+  learning_rate: 0.000075
+  learning_rate_final: 0.000040
+  clip_epsilon: 0.10
+  entropy_coef: 0.0015
+  target_kl: 0.02
+
+rcpo:
+  initial_lambda: 0.0
+  lambda_lr_up: 0.00075
+  lambda_lr_down: 0.03
+  alpha:
+  alpha_budget_ratio: 0.05
+  constraint_mode: max_drawdown

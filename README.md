@@ -111,7 +111,7 @@ py -3.11 train.py --algo ppo_unconstrained  --resume-run-dir "runs\simplex_v1_pp
 To resume from a specific checkpoint file inside the run directory:
 
 ```powershell
-py -3.11 train.py --algo rcpo --constraint-drawdown --resume-run-dir "runs\new_rcpo_none_YYYYMMDD_HHMMSS\seed_0" --resume-checkpoint checkpoint_best.pt
+py -3.11 train.py --algo rcpo --constraint-drawdown --resume-run-dir "runs\new_rcpo_none_YYYYMMDD_HHMMSS\seed_0" --resume-checkpoint checkpoint_best_return.pt
 ```
 
 Resume the soft allocation-constraint RCPO baseline:
@@ -125,7 +125,7 @@ py -3.11 train.py --algo rcpo --constraint-allocation --resume-run-dir "runs\rcp
 Evaluate the best checkpoint:
 
 ```powershell
-py -3.11 evaluate.py --run-dir "runs\latest_rcpo_none_YYYYMMDD_HHMMSS\seed_0" --checkpoint checkpoint_best.pt
+py -3.11 evaluate.py --run-dir "runs\latest_rcpo_none_YYYYMMDD_HHMMSS\seed_0" --checkpoint checkpoint_best_return.pt
 ```
 
 Evaluate the last checkpoint with 20 future continuation markets:
@@ -333,12 +333,12 @@ Training creates a run directory containing:
 - `config_snapshot.yaml`
 - `metrics.jsonl`
 - `checkpoint_last.pt`
-- `checkpoint_best.pt` for maximum validation excess return
-- `checkpoint_best_feasible.pt` for maximum validation excess return with validation constraint cost at or below validation alpha (RCPO only, when found)
+- `checkpoint_best_return.pt` for maximum validation return
+- `checkpoint_best_feasible.pt` for the highest validation feasible-branch rate, with validation return used as the tie-breaker
 - `training_summary.json`
 - `evaluation/`
 - `evaluation_best/`
-- `evaluation_best_feasible/` when a feasible RCPO checkpoint exists
+- `evaluation_best_feasible/` for the feasible-rate-prioritized checkpoint
 - `evaluation_last/`
 
 Evaluation folders contain JSON summaries and PNG plots for cumulative return, mean cumulative return across future branches, portfolio weights, turnover, drawdown, drawdown constraint cost, and lambda trajectory.

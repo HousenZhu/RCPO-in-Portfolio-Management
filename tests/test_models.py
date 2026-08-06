@@ -33,9 +33,9 @@ def test_default_config_exposes_standalone_credit_and_dirichlet_settings() -> No
     assert config.network.branch_credit_mode == "standalone"
     assert config.environment.initial_portfolio_mode == "constrained_neutral"
     assert config.environment.simplex_action_format == "branch_weights"
-    assert config.network.dirichlet_min_concentration == 0.3
-    assert config.network.dirichlet_init_concentration == 2.0
-    assert config.network.dirichlet_max_concentration == 12.0
+    assert config.network.dirichlet_min_concentration == 0.5
+    assert config.network.dirichlet_init_concentration == 1.5
+    assert config.network.dirichlet_max_concentration == 8.0
 
 
 def test_parallel_branch_gaussian_uses_four_branch_heads() -> None:
@@ -213,3 +213,102 @@ def test_autoregressive_dirichlet_deterministic_initial_action_is_uniform() -> N
     torch.testing.assert_close(output.action, expected)
     torch.testing.assert_close(output.branch_log_probs[:, 0], torch.zeros(1))
     torch.testing.assert_close(output.branch_entropies[:, 0], torch.zeros(1))
+
+def test_inactive_parallel_gaussian_branch_is_fixed_and_has_no_gradient() -> None:
+    config = NetworkConfig(
+        policy_architecture="simplex_branch_gaussian",
+        branch_credit_mode="standalone",
+        hidden_sizes=[8],
+    )
+    model = ActorCritic(
+        obs_dim=4,
+        action_dim=8,
+        config=config,
+        branch_sizes=[2, 2, 2, 2],
+        branch_train_mask=[False, True, True, True],
+    )
+
+    output = model.get_policy_output(torch.zeros((3, 4)))
+    torch.testing.assert_close(output.action[:, :2], torch.zeros((3, 2)))
+    torch.testing.assert_close(output.branch_log_probs[:, 0], torch.zeros(3))
+    torch.testing.assert_close(output.branch_entropies[:, 0], torch.zeros(3))
+    torch.testing.assert_close(output.branch_reward_values[:, 0], torch.zeros(3))
+    torch.testing.assert_close(output.branch_cost_values[:, 0], torch.zeros(3))
+
+    loss = (
+        output.branch_log_probs[:, 1:].sum()
+        + output.branch_reward_values[:, 1:].sum()
+        + output.branch_cost_values[:, 1:].sum()
+    )
+    loss.backward()
+
+    assert model.branch_mean_heads[0].weight.grad is None
+    assert model.branch_log_stds[0].grad is None
+    assert model.branch_reward_values[0].weight.grad is None
+    assert model.branch_cost_values[0].weight.grad is None
+    assert model.branch_mean_heads[1].weight.grad is not None
+
+
+def test_inactive_autoregressive_gaussian_branch_is_neutral() -> None:
+    config = NetworkConfig(
+        policy_architecture="simplex_autoregressive_gaussian",
+        hidden_sizes=[8],
+    )
+    model = ActorCritic(
+        obs_dim=4,
+        action_dim=8,
+        config=config,
+        branch_sizes=[2, 2, 2, 2],
+        branch_train_mask=[False, True, True, True],
+    )
+
+    output = model.get_policy_output(torch.zeros((3, 4)))
+
+    torch.testing.assert_close(output.action[:, :2], torch.zeros((3, 2)))
+    torch.testing.assert_close(output.branch_log_probs[:, 0], torch.zeros(3))
+    torch.testing.assert_close(output.branch_entropies[:, 0], torch.zeros(3))
+    assert torch.isfinite(output.log_prob).all()
+
+
+def test_inactive_autoregressive_dirichlet_branch_is_uniform() -> None:
+    config = NetworkConfig(
+        policy_architecture="simplex_autoregressive_dirichlet",
+        hidden_sizes=[8],
+        dirichlet_min_concentration=0.5,
+        dirichlet_init_concentration=1.5,
+        dirichlet_max_concentration=8.0,
+    )
+    model = ActorCritic(
+        obs_dim=4,
+        action_dim=8,
+        config=config,
+        branch_sizes=[2, 2, 2, 2],
+        branch_train_mask=[False, True, True, True],
+    )
+
+    output = model.get_policy_output(torch.zeros((3, 4)))
+
+    torch.testing.assert_close(output.action[:, :2], torch.full((3, 2), 0.5))
+    torch.testing.assert_close(output.branch_log_probs[:, 0], torch.zeros(3))
+    torch.testing.assert_close(output.branch_entropies[:, 0], torch.zeros(3))
+    assert torch.isfinite(output.log_prob).all()
+
+
+def test_flat_gaussian_masks_inactive_simplex_action_components() -> None:
+    config = NetworkConfig(
+        policy_architecture="flat_gaussian",
+        hidden_sizes=[8],
+    )
+    model = ActorCritic(
+        obs_dim=4,
+        action_dim=8,
+        config=config,
+        branch_sizes=[2, 2, 2, 2],
+        branch_train_mask=[False, True, True, True],
+    )
+
+    output = model.get_policy_output(torch.zeros((3, 4)))
+
+    torch.testing.assert_close(output.action[:, :2], torch.zeros((3, 2)))
+    assert torch.isfinite(output.log_prob).all()
+    assert torch.isfinite(output.entropy).all()

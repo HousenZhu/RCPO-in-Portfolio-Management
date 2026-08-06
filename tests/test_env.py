@@ -175,7 +175,15 @@ def test_standalone_branch_reward_and_cost_use_same_market_step() -> None:
 
     _, _, _, _, info = env.step(action)
 
+    branch_train_mask = env.simplex_branch_train_mask()
     for branch_index, branch_weights in enumerate(initial_branches):
+        if not branch_train_mask[branch_index]:
+            assert np.isclose(info["branch_rewards"][branch_index], 0.0)
+            assert np.isclose(info["branch_transaction_costs"][branch_index], 0.0)
+            assert np.isclose(info["branch_max_drawdowns"][branch_index], 0.0)
+            assert np.isclose(info["branch_costs"][branch_index], 0.0)
+            continue
+
         expected_raw = float(np.dot(branch_weights[1:], current_returns))
         expected_reward = float(np.log1p(expected_raw))
         expected_max_drawdown = max(0.0, -expected_raw)
@@ -456,6 +464,28 @@ def test_allocation_constraint_mode_uses_scaled_allocation_violation_cost() -> N
     assert np.isclose(info["allocation_constraint_raw_cost"], expected_raw)
     assert np.isclose(info["allocation_constraint_cost"], expected_scaled)
     assert np.isclose(info["constraint_cost"], expected_scaled)
+
+
+def test_allocation_drawdown_mode_combines_scaled_allocation_and_drawdown_costs() -> None:
+    env = build_env(
+        constraint_mode="allocation_drawdown",
+        allocation_constraint_cost_scale=20.0,
+        combined_drawdown_cost_weight=0.25,
+    )
+    env.reset(options={"start_index": 4})
+    target_weights = np.array([0.02, 0.97, 0.01], dtype=np.float32)
+
+    _, _, _, _, info = env.step(np.log(target_weights).astype(np.float32))
+
+    expected = (
+        info["allocation_constraint_cost"]
+        + 0.25 * info["drawdown_constraint_cost"]
+    )
+    assert info["allocation_constraint_cost"] > 0.0
+    assert info["drawdown_constraint_cost"] >= 0.0
+    assert info["combined_drawdown_cost_weight"] == 0.25
+    assert np.isclose(info["allocation_drawdown_constraint_cost"], expected)
+    assert np.isclose(info["constraint_cost"], expected)
 
 
 def test_drawdown_constraint_mode_keeps_allocation_cost_diagnostic_only() -> None:

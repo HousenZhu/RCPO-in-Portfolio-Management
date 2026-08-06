@@ -25,6 +25,22 @@ class SimplexDecomposition:
     def action_dim(self) -> int:
         return int(sum(len(indices) for indices in self.branch_indices))
 
+    def branch_training_mask(
+        self,
+        epsilon: float = 1e-8,
+    ) -> tuple[bool, bool, bool, bool]:
+        """Return branches with both portfolio mass and allocation freedom.
+
+        Only z1 is fixed entirely by the two constraint thresholds. The other
+        CAOSD coefficients depend on sampled upstream branch allocations.
+        """
+        z1 = max(
+            0.0,
+            self.constraint_1_min_weight + self.constraint_2_min_weight - 1.0,
+        )
+        train_branch_1 = z1 > epsilon and len(self.branch_indices[0]) > 1
+        return (train_branch_1, True, True, True)
+
     def map_logits(self, action: np.ndarray) -> SimplexDecompositionResult:
         logits = np.asarray(action, dtype=np.float32)
         if logits.shape != (self.action_dim,):

@@ -19,7 +19,10 @@ from .algorithms import (
 )
 from .config import (
     ALLOCATION_CONSTRAINT_VERSION,
+    ALLOCATION_DRAWDOWN_CONSTRAINT_VERSION,
+    ALLOCATION_RELATIVE_DRAWDOWN_CONSTRAINT_VERSION,
     BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION,
+    RELATIVE_CURRENT_DRAWDOWN_CONSTRAINT_VERSION,
     ProjectConfig,
     save_config,
     sync_rcpo_constraint_settings,
@@ -32,6 +35,8 @@ from .env_pool import PortfolioEnvPool
 from .evaluation import (
     EvaluationResult,
     evaluate_policy,
+    format_signed_percent,
+    relative_wealth_path,
     save_evaluation_artifacts,
     save_group_weights_artifact,
     save_training_progress_artifacts,
@@ -71,6 +76,7 @@ class RCPOTrainer:
         self.resume_checkpoint = resume_checkpoint
         self.profiler = profiler
         self.disable_artifacts = bool(disable_artifacts)
+        self.resume_learning_rate: float | None = None
         self.skip_validation = bool(skip_validation)
         self.resume_completed_updates = 0
         set_global_seeds(seed)
@@ -119,6 +125,7 @@ class RCPOTrainer:
             action_dim=action_dim,
             config=config.network,
             branch_sizes=self.train_env.simplex_branch_sizes(),
+            branch_train_mask=self.train_env.simplex_branch_train_mask(),
         ).to(self.device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.optimization.learning_rate)
         self.reward_corrector = build_reward_corrector(
@@ -130,6 +137,7 @@ class RCPOTrainer:
         self.lambda_value = 0.0 if algo == "ppo_unconstrained" else config.rcpo.initial_lambda
         self.alpha = self._resolve_alpha()
         self.metrics_path = self.run_dir / "metrics.jsonl"
+        self.validation_metrics_path = self.run_dir / "validation_metrics.jsonl"
         self.lambda_history: list[float] = [float(self.lambda_value)]
         self._resolved_preset = self.train_env.resolved_constraint_preset()
         if self.resume_checkpoint is not None:
@@ -157,9 +165,13 @@ class RCPOTrainer:
             f"branch_credit_mode={self.config.network.branch_credit_mode} "
             f"initial_portfolio_mode={self.config.environment.initial_portfolio_mode} "
             f"branch_sizes={self.train_env.simplex_branch_sizes()} "
+            f"branch_train_mask={self.train_env.simplex_branch_train_mask()} "
             f"drawdown_budget_floor={self.config.environment.drawdown_budget_floor} "
             f"drawdown_benchmark_mode={self.config.environment.drawdown_benchmark_mode} "
             f"benchmark_drawdown_margin={self.config.environment.benchmark_drawdown_margin} "
+            f"drawdown_cost_scale={self.config.environment.drawdown_cost_scale} "
+            f"allocation_cost_scale={self.config.environment.allocation_constraint_cost_scale} "
+            f"combined_drawdown_weight={self.config.environment.combined_drawdown_cost_weight} "
             f"preset={self._resolved_preset['preset_name']} "
             f"allocation_constraint_1_indices={self.config.environment.allocation_constraint_1_indices} "
             f"allocation_constraint_1_min={self._resolved_preset['allocation_constraint_1_min_weight']} "
@@ -179,71 +191,56 @@ class RCPOTrainer:
         elapsed_seconds: float,
         is_best: bool,
     ) -> None:
-        best_marker = " best-checkpoint" if is_best else ""
-        print(
-            (
-                f"[train] update={update_index + 1}/{total_updates} "
-                f"elapsed={elapsed_seconds:.1f}s update_time={update_seconds:.1f}s "
-                f"batch_reward={metric_row['batch_reward_mean']:.6f} "
-                f"observed_reward={metric_row['observed_reward_mean']:.6f} "
-                f"reward_delta_abs={metric_row['reward_correction_delta_abs_mean']:.6f} "
-                f"reward_oce={metric_row['reward_correction_oce']:.6f} "
-                f"gdrc_bins={metric_row['gdrc_selected_bins']} "
-                f"batch_constraint={metric_row['batch_constraint_cost_mean']:.6f} "
-                f"alloc_cost={metric_row['batch_allocation_constraint_cost_mean']:.6f} "
-                f"alloc_raw={metric_row['batch_allocation_constraint_raw_cost_mean']:.6f} "
-                f"batch_max_drawdown={metric_row['batch_max_drawdown_mean']:.6f} "
-                f"batch_benchmark_max_drawdown={metric_row['batch_benchmark_max_drawdown_mean']:.6f} "
-                f"batch_budget={metric_row['batch_effective_drawdown_budget_mean']:.6f} "
-                f"batch_dd_violation={metric_row['batch_drawdown_violation_mean']:.6f} "
-                f"episode_return={metric_row['episode_return_mean']:.6f} "
-                f"turnover={metric_row['batch_turnover_mean']:.6f} "
-                f"alloc1={metric_row['batch_allocation_constraint_1_weight_mean']:.4f} "
-                f"alloc2={metric_row['batch_allocation_constraint_2_weight_mean']:.4f} "
-                f"alloc_violation=({metric_row['batch_allocation_constraint_1_violation_cost_mean']:.2e},"
-                f"{metric_row['batch_allocation_constraint_2_violation_cost_mean']:.2e}) "
-                f"z=({metric_row['batch_simplex_z1_mean']:.3f},"
-                f"{metric_row['batch_simplex_z2_mean']:.3f},"
-                f"{metric_row['batch_simplex_z3_mean']:.3f},"
-                f"{metric_row['batch_simplex_z4_mean']:.3f}) "
-                f"policy_loss={metric_row['policy_loss']:.6f} "
-                f"value_loss_r={metric_row['reward_value_loss']:.6f} "
-                f"value_loss_c={metric_row['cost_value_loss']:.6f} "
-                f"lambda={metric_row['lambda_value']:.6f} "
-                f"lambda_adv_ratio={metric_row['batch_lambda_cost_advantage_ratio']:.3f} "
-                f"lambda_cost_reward={metric_row['lambda_cost_to_reward_ratio']:.3f} "
-                f"alpha={metric_row['alpha']:.6f} "
-                f"kl={metric_row['approx_kl']:.6f} "
-                f"optimizer_steps={metric_row['optimizer_steps_completed']} "
-                f"trigger_kl={metric_row['trigger_minibatch_kl']} "
-                f"branch_kl=({metric_row['approx_kl_branch_1']:.5f},"
-                f"{metric_row['approx_kl_branch_2']:.5f},"
-                f"{metric_row['approx_kl_branch_3']:.5f},"
-                f"{metric_row['approx_kl_branch_4']:.5f}) "
-                f"clip_frac={metric_row['clip_fraction']:.4f} "
-                f"lr={metric_row['learning_rate']:.8f} "
-                f"val_eval={metric_row['validation_evaluated']} "
-                f"val_return={metric_row['validation_annualized_return']:.6f} "
-                f"val_excess={metric_row['validation_mean_excess_cumulative_return']:.6f} "
-                f"val_win={metric_row['validation_win_rate_vs_equal_weight']:.3f} "
-                f"val_max_drawdown={metric_row['validation_max_drawdown']:.6f} "
-                f"val_benchmark_max_drawdown={metric_row['validation_benchmark_max_drawdown']:.6f} "
-                f"val_budget={metric_row['validation_effective_drawdown_budget']:.6f} "
-                f"val_alpha={metric_row['validation_alpha_target']:.6f} "
-                f"val_constraint={metric_row['validation_constraint_cost']:.6f} "
-                f"val_alloc=({metric_row['validation_allocation_constraint_1_weight']:.4f},"
-                f"{metric_row['validation_allocation_constraint_2_weight']:.4f}) "
-                f"val_z=({metric_row['validation_simplex_z1']:.3f},"
-                f"{metric_row['validation_simplex_z2']:.3f},"
-                f"{metric_row['validation_simplex_z3']:.3f},"
-                f"{metric_row['validation_simplex_z4']:.3f}) "
-                f"score={validation_score:.6f}{best_marker}"
-            ),
-            flush=True,
+        del validation_score
+        best_marker = " best-return" if is_best else ""
+        if metric_row.get("validation_feasible_best", 0):
+            best_marker += " best-feasible"
+        branch_kls = ",".join(
+            "null" if metric_row.get(f"approx_kl_branch_{index}") is None
+            else f"{float(metric_row[f'approx_kl_branch_{index}']):.5f}"
+            for index in range(1, 5)
         )
+        message = (
+            f"[train] update={update_index + 1}/{total_updates} "
+            f"elapsed={elapsed_seconds:.1f}s update_time={update_seconds:.1f}s "
+            f"reward={metric_row['batch_reward_mean']:.6f} "
+            f"constraint={metric_row['batch_constraint_cost_mean']:.6f} "
+            f"alpha={metric_row['alpha']:.6f} "
+            f"lambda={metric_row['lambda_value']:.6f} "
+            f"lambda_gap={metric_row.get('lambda_gap', 0.0):.6f} "
+            f"lambda_updates={metric_row.get('lambda_update_count', 0)} "
+            f"current_dd={metric_row['batch_current_drawdown_mean']:.6f} "
+            f"benchmark_current_dd={metric_row['batch_benchmark_current_drawdown_mean']:.6f} "
+            f"budget={metric_row['batch_effective_drawdown_budget_mean']:.6f} "
+            f"turnover={metric_row['batch_turnover_mean']:.6f} "
+            f"policy_loss={metric_row['policy_loss']:.6f} "
+            f"kl={metric_row['approx_kl']:.6f} "
+            f"branch_kl=({branch_kls}) "
+            f"steps={metric_row['optimizer_steps_completed']}/"
+            f"{metric_row.get('optimizer_steps_attempted', 0)} "
+            f"rejected_kl={metric_row.get('rejected_minibatch_kl')} "
+            f"lr={metric_row['learning_rate']:.8f}"
+        )
+        if metric_row.get("validation_evaluated", 0):
+            display_score = float(
+                metric_row.get(
+                    "validation_mean_relative_wealth_vs_constrained_neutral",
+                    0.0,
+                )
+            )
+            message += (
+                f" val_vs_neutral={format_signed_percent(display_score)} "
+                f"val_win={metric_row['validation_win_rate_vs_equal_weight']:.3f} "
+                f"val_constraint={metric_row['validation_constraint_cost']:.6f} "
+                f"val_alpha={metric_row['validation_alpha_target']:.6f} "
+                f"feasible_rate={metric_row.get('validation_feasible_branch_rate', 0.0):.0%} "
+                f"tier={metric_row.get('validation_feasibility_tier')}"
+                f"{best_marker}"
+            )
+        print(message, flush=True)
 
     def _equal_weight_action(self) -> np.ndarray:
-        return self.train_env.neutral_action()
+        return self.train_env.constrained_neutral_action()
 
     def _policy_action(self, observation: np.ndarray, deterministic: bool = False) -> np.ndarray:
         observation_tensor = torch.as_tensor(
@@ -286,46 +283,83 @@ class RCPOTrainer:
             profiler=self.profiler,
         )
 
-    def _update_model(self, batch: RolloutBatch) -> dict[str, float]:
+    def _update_model(self, batch: RolloutBatch) -> dict[str, Any]:
         if self.algo == "ppo_unconstrained":
-            return update_ppo_actor_critic(
+            losses = update_ppo_actor_critic(
                 model=self.model,
                 optimizer=self.optimizer,
                 batch=batch,
                 optimization=self.optimization,
                 profiler=self.profiler,
             )
-        effective_alpha = (
-            self.alpha
-            if self.alpha is not None
-            else float(batch.info_summary["batch_alpha_target_mean"])
+        else:
+            effective_alpha = (
+                self.alpha
+                if self.alpha is not None
+                else float(batch.info_summary["batch_alpha_target_mean"])
+            )
+            lambda_gap = float(batch.info_summary["batch_constraint_cost_mean"]) - float(
+                effective_alpha
+            )
+            losses, self.lambda_value, lambda_updates = update_rcpo_actor_critic(
+                model=self.model,
+                optimizer=self.optimizer,
+                batch=batch,
+                optimization=self.optimization,
+                lambda_value=self.lambda_value,
+                alpha=effective_alpha,
+                lambda_lr=self.config.rcpo.lambda_lr,
+                lambda_lr_up=self.config.rcpo.lambda_lr_up,
+                lambda_lr_down=self.config.rcpo.lambda_lr_down,
+                profiler=self.profiler,
+            )
+            losses["lambda_gap"] = lambda_gap
+            losses["lambda_lr_up"] = float(self.config.rcpo.lambda_lr_up)
+            losses["lambda_lr_down"] = float(self.config.rcpo.lambda_lr_down)
+            self.lambda_history.extend(lambda_updates)
+        losses.update(
+            self.model.distribution_diagnostics(
+                batch.observations,
+                batch.actions,
+            )
         )
-        lambda_gap = float(batch.info_summary["batch_constraint_cost_mean"]) - float(
-            effective_alpha
-        )
-        losses, self.lambda_value, lambda_updates = update_rcpo_actor_critic(
-            model=self.model,
-            optimizer=self.optimizer,
-            batch=batch,
-            optimization=self.optimization,
-            lambda_value=self.lambda_value,
-            alpha=effective_alpha,
-            lambda_lr=self.config.rcpo.lambda_lr,
-            lambda_lr_up=self.config.rcpo.lambda_lr_up,
-            lambda_lr_down=self.config.rcpo.lambda_lr_down,
-            profiler=self.profiler,
-        )
-        losses["lambda_gap"] = lambda_gap
-        losses["lambda_lr_up"] = float(self.config.rcpo.lambda_lr_up)
-        losses["lambda_lr_down"] = float(self.config.rcpo.lambda_lr_down)
-        self.lambda_history.extend(lambda_updates)
         return losses
 
     def _write_metric_row(self, payload: dict[str, Any]) -> None:
+        stored_payload = payload
+        if self.config.logging.metrics_schema_version >= 2:
+            stored_payload = {
+                key: value
+                for key, value in payload.items()
+                if not key.startswith("validation_")
+            }
         with self.metrics_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(stored_payload) + "\n")
+
+    def _write_validation_metric_row(
+        self,
+        update_index: int,
+        summary: dict[str, Any],
+        score: float,
+        feasibility_tier: str | None,
+    ) -> None:
+        if self.config.logging.metrics_schema_version < 2:
+            return
+        payload = {
+            "metrics_schema_version": 2,
+            "update": int(update_index),
+            "validation_score": float(score),
+            "validation_feasibility_tier": feasibility_tier,
+            **self._validation_metric_fields(summary),
+        }
+        with self.validation_metrics_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(payload) + "\n")
 
-    def _checkpoint(self, name: str) -> None:
+    def _checkpoint(
+        self,
+        name: str,
+        extra_metadata: dict[str, Any] | None = None,
+    ) -> None:
         safe_torch_save(
             {
                 "algo": self.algo,
@@ -333,11 +367,20 @@ class RCPOTrainer:
                 "alpha": self.alpha,
                 "alpha_budget_ratio": float(self.config.rcpo.alpha_budget_ratio),
                 "constraint_mode": self.config.rcpo.constraint_mode,
-                "constraint_semantics": (
-                    ALLOCATION_CONSTRAINT_VERSION
-                    if self.config.rcpo.constraint_mode == "allocation"
-                    else BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION
-                ),
+                "constraint_semantics": {
+                    "max_drawdown": BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION,
+                    "relative_current_drawdown": RELATIVE_CURRENT_DRAWDOWN_CONSTRAINT_VERSION,
+                    "allocation": ALLOCATION_CONSTRAINT_VERSION,
+                    "allocation_drawdown": ALLOCATION_DRAWDOWN_CONSTRAINT_VERSION,
+                    "allocation_relative_drawdown": ALLOCATION_RELATIVE_DRAWDOWN_CONSTRAINT_VERSION,
+                }[self.config.rcpo.constraint_mode],
+                "constraint_semantics_version": {
+                    "max_drawdown": BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION,
+                    "relative_current_drawdown": RELATIVE_CURRENT_DRAWDOWN_CONSTRAINT_VERSION,
+                    "allocation": ALLOCATION_CONSTRAINT_VERSION,
+                    "allocation_drawdown": ALLOCATION_DRAWDOWN_CONSTRAINT_VERSION,
+                    "allocation_relative_drawdown": ALLOCATION_RELATIVE_DRAWDOWN_CONSTRAINT_VERSION,
+                }[self.config.rcpo.constraint_mode],
                 "drawdown_budget_floor": float(self.config.environment.drawdown_budget_floor),
                 "drawdown_benchmark_mode": self.config.environment.drawdown_benchmark_mode,
                 "benchmark_drawdown_margin": float(
@@ -347,13 +390,23 @@ class RCPOTrainer:
                 "allocation_constraint_cost_scale": float(
                     self.config.environment.allocation_constraint_cost_scale
                 ),
+                "combined_drawdown_cost_weight": float(
+                    self.config.environment.combined_drawdown_cost_weight
+                ),
                 "action_mode": self.config.environment.action_mode,
                 "simplex_action_format": self.config.environment.simplex_action_format,
                 "action_dim": int(self.train_env.action_space.shape[0]),
                 "simplex_branch_sizes": self.train_env.simplex_branch_sizes(),
+                "simplex_branch_train_mask": self.train_env.simplex_branch_train_mask(),
                 "policy_architecture": self.config.network.policy_architecture,
                 "branch_credit_mode": self.config.network.branch_credit_mode,
                 "initial_portfolio_mode": self.config.environment.initial_portfolio_mode,
+                "observation_schema_version": int(
+                    self.config.environment.observation_schema_version
+                ),
+                "metrics_schema_version": int(
+                    self.config.logging.metrics_schema_version
+                ),
                 "dirichlet_min_concentration": float(
                     self.config.network.dirichlet_min_concentration
                 ),
@@ -390,6 +443,7 @@ class RCPOTrainer:
                 "optimizer_state_dict": self.optimizer.state_dict(),
                 "reward_corrector_state_dict": self.reward_corrector.state_dict(),
                 "completed_updates": self.resume_completed_updates,
+                **(extra_metadata or {}),
             },
             self.run_dir / name,
         )
@@ -444,6 +498,17 @@ class RCPOTrainer:
                 f"Checkpoint initial_portfolio_mode {checkpoint_initial_portfolio_mode!r} "
                 f"does not match requested {self.config.environment.initial_portfolio_mode!r}."
             )
+        checkpoint_observation_schema = int(
+            checkpoint.get("observation_schema_version", 1)
+        )
+        if (
+            checkpoint_observation_schema
+            != self.config.environment.observation_schema_version
+        ):
+            raise ValueError(
+                "Checkpoint observation schema is incompatible with the current config. "
+                "V2.5 checkpoints cannot resume under V2.6 drawdown observations."
+            )
         if self.config.network.policy_architecture == "simplex_autoregressive_dirichlet":
             for field_name in (
                 "dirichlet_min_concentration",
@@ -482,6 +547,15 @@ class RCPOTrainer:
                 raise ValueError(
                     "Checkpoint simplex_branch_sizes do not match current config."
                 )
+            checkpoint_branch_train_mask = checkpoint.get(
+                "simplex_branch_train_mask"
+            )
+            if (
+                checkpoint_branch_train_mask is not None
+                and list(checkpoint_branch_train_mask)
+                != self.train_env.simplex_branch_train_mask()
+            ):
+                raise ValueError("Checkpoint simplex_branch_train_mask does not match current config.")
             expected_c1 = list(self.config.environment.allocation_constraint_1_indices)
             expected_c2 = list(self.config.environment.allocation_constraint_2_indices)
             if checkpoint.get("allocation_constraint_1_indices") != expected_c1:
@@ -527,14 +601,28 @@ class RCPOTrainer:
                     f"requested {self.config.rcpo.constraint_mode!r}. Legacy downside/sortino "
                     "checkpoints are not supported."
                 )
-            if self.config.rcpo.constraint_mode == "max_drawdown":
-                checkpoint_semantics = checkpoint.get("constraint_semantics")
-                if checkpoint_semantics != BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION:
+            expected_semantics = {
+                "max_drawdown": BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION,
+                "allocation": ALLOCATION_CONSTRAINT_VERSION,
+                "allocation_drawdown": ALLOCATION_DRAWDOWN_CONSTRAINT_VERSION,
+                "relative_current_drawdown": RELATIVE_CURRENT_DRAWDOWN_CONSTRAINT_VERSION,
+                "allocation_relative_drawdown": ALLOCATION_RELATIVE_DRAWDOWN_CONSTRAINT_VERSION,
+            }[self.config.rcpo.constraint_mode]
+            if checkpoint.get("constraint_semantics") != expected_semantics:
+                if self.config.rcpo.constraint_mode == "max_drawdown":
                     raise ValueError(
-                        "RCPO resume requires checkpoints saved with the benchmark-relative "
-                        "drawdown constraint semantics. Legacy fixed-budget drawdown checkpoints "
-                        "are not supported."
+                        "RCPO resume requires benchmark-relative drawdown semantics. "
+                        "Legacy fixed-budget drawdown checkpoints are not supported."
                     )
+                raise ValueError(
+                    "RCPO resume requires a checkpoint with matching constraint semantics."
+                )
+            if self.config.rcpo.constraint_mode in {
+                "max_drawdown",
+                "relative_current_drawdown",
+                "allocation_drawdown",
+                "allocation_relative_drawdown",
+            }:
                 if not math.isclose(
                     float(checkpoint.get("drawdown_budget_floor", math.nan)),
                     float(self.config.environment.drawdown_budget_floor),
@@ -570,13 +658,11 @@ class RCPOTrainer:
                     raise ValueError(
                         "Checkpoint drawdown_cost_scale does not match the current config."
                     )
-            if self.config.rcpo.constraint_mode == "allocation":
-                checkpoint_semantics = checkpoint.get("constraint_semantics")
-                if checkpoint_semantics != ALLOCATION_CONSTRAINT_VERSION:
-                    raise ValueError(
-                        "RCPO resume requires checkpoints saved with the soft allocation "
-                        "constraint semantics."
-                    )
+            if self.config.rcpo.constraint_mode in {
+                "allocation",
+                "allocation_drawdown",
+                "allocation_relative_drawdown",
+            }:
                 if not math.isclose(
                     float(checkpoint.get("allocation_constraint_cost_scale", math.nan)),
                     float(self.config.environment.allocation_constraint_cost_scale),
@@ -585,6 +671,19 @@ class RCPOTrainer:
                 ):
                     raise ValueError(
                         "Checkpoint allocation_constraint_cost_scale does not match the current config."
+                    )
+            if self.config.rcpo.constraint_mode in {
+                "allocation_drawdown",
+                "allocation_relative_drawdown",
+            }:
+                if not math.isclose(
+                    float(checkpoint.get("combined_drawdown_cost_weight", math.nan)),
+                    float(self.config.environment.combined_drawdown_cost_weight),
+                    rel_tol=0.0,
+                    abs_tol=1e-12,
+                ):
+                    raise ValueError(
+                        "Checkpoint combined_drawdown_cost_weight does not match the current config."
                     )
         checkpoint_reward_mode = checkpoint.get("reward_correction_mode", "none")
         if checkpoint_reward_mode != self.config.reward_correction.mode:
@@ -637,15 +736,28 @@ class RCPOTrainer:
             self.alpha = float(checkpoint["alpha"])
         self.lambda_value = float(checkpoint.get("lambda_value", self.lambda_value))
         self.resume_completed_updates = int(checkpoint.get("completed_updates", 0))
+        self.resume_learning_rate = float(self.optimizer.param_groups[0]["lr"])
 
     def _read_metric_rows(self) -> list[dict[str, Any]]:
         if not self.metrics_path.exists():
             return []
         rows: list[dict[str, Any]] = []
+        malformed_line_count = 0
+        escaped_newline_prefix_count = 0
         with self.metrics_path.open("r", encoding="utf-8") as handle:
             for line in handle:
-                if line.strip():
-                    rows.append(json.loads(line))
+                payload = line.strip()
+                # Interrupted writes and legacy repair scripts can leave a literal
+                # "\\n" prefix before an otherwise valid JSON object.
+                while payload.startswith("\\n"):
+                    payload = payload[2:].lstrip()
+                    escaped_newline_prefix_count += 1
+                if not payload:
+                    continue
+                try:
+                    rows.append(json.loads(payload))
+                except json.JSONDecodeError:
+                    malformed_line_count += 1
         if self.resume_checkpoint is not None and rows:
             by_update: dict[int, dict[str, Any]] = {}
             for row in rows:
@@ -655,7 +767,12 @@ class RCPOTrainer:
             normalized_rows = [by_update[update] for update in sorted(by_update)]
             original_updates = [int(row.get("update", -1)) for row in rows]
             normalized_updates = [int(row["update"]) for row in normalized_rows]
-            if original_updates != normalized_updates:
+            needs_repair = (
+                malformed_line_count > 0
+                or escaped_newline_prefix_count > 0
+                or original_updates != normalized_updates
+            )
+            if needs_repair:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 backup_path = self.metrics_path.with_name(
                     f"metrics_before_resume_repair_{timestamp}.jsonl"
@@ -667,10 +784,32 @@ class RCPOTrainer:
                 print(
                     f"[train] repaired_metrics duplicates_or_ordering=true "
                     f"rows_before={len(rows)} rows_after={len(normalized_rows)} "
+                    f"malformed_lines={malformed_line_count} "
+                    f"escaped_newline_prefixes={escaped_newline_prefix_count} "
                     f"backup={backup_path}",
                     flush=True,
                 )
                 rows = normalized_rows
+        if (
+            getattr(getattr(self, "config", None), "logging", None) is not None
+            and self.config.logging.metrics_schema_version >= 2
+            and getattr(self, "validation_metrics_path", Path()).exists()
+        ):
+            validation_by_update: dict[int, dict[str, Any]] = {}
+            with self.validation_metrics_path.open("r", encoding="utf-8") as handle:
+                for line in handle:
+                    payload = line.strip()
+                    if not payload:
+                        continue
+                    try:
+                        row = json.loads(payload)
+                    except json.JSONDecodeError:
+                        continue
+                    validation_by_update[int(row.get("update", -1))] = row
+            rows = [
+                {**row, **validation_by_update.get(int(row.get("update", -1)), {})}
+                for row in rows
+            ]
         return rows
 
     def _best_from_metric_rows(
@@ -695,10 +834,71 @@ class RCPOTrainer:
                 best_summary = validation_summary
         return best_score, best_summary
 
-    def _set_learning_rate(self, update_index: int, total_updates: int) -> float:
-        start_lr = float(self.optimization.learning_rate)
+    @staticmethod
+    def _validation_feasibility_tier(
+        validation_summary: dict[str, Any],
+    ) -> str | None:
+        rate = float(validation_summary.get("feasible_branch_rate", 0.0))
+        if rate >= 1.0 - 1e-12:
+            return "strict"
+        if rate >= 0.80 - 1e-12:
+            return "robust_80"
+        return None
+
+    @staticmethod
+    def _validation_feasible_rate(validation_summary: dict[str, Any]) -> float:
+        return float(validation_summary.get("feasible_branch_rate", 0.0))
+
+    @staticmethod
+    def _is_better_feasible_candidate(
+        candidate_rate: float,
+        candidate_score: float,
+        best_rate: float,
+        best_score: float,
+    ) -> bool:
+        if candidate_rate > best_rate + 1e-12:
+            return True
+        return abs(candidate_rate - best_rate) <= 1e-12 and candidate_score > best_score
+
+    def _best_feasible_from_metric_rows(
+        self,
+        rows: list[dict[str, Any]],
+    ) -> tuple[float, dict[str, Any] | None]:
+        best_rate = -math.inf
+        best_score = -math.inf
+        best_summary: dict[str, Any] | None = None
+        for row in rows:
+            if "validation_annualized_return" not in row:
+                continue
+            validation_summary = {
+                key[len("validation_") :]: value
+                for key, value in row.items()
+                if key.startswith("validation_")
+            }
+            validation_summary["annualized_return"] = row["validation_annualized_return"]
+            validation_summary["split"] = "validation"
+            rate = self._validation_feasible_rate(validation_summary)
+            score = self._validation_score(validation_summary)
+            if self._is_better_feasible_candidate(
+                rate, score, best_rate, best_score
+            ):
+                best_rate = rate
+                best_score = score
+                best_summary = validation_summary
+        return best_score, best_summary
+
+    def _set_learning_rate(
+        self,
+        update_index: int,
+        total_updates: int,
+        start_learning_rate: float | None = None,
+    ) -> float:
+        start_lr = (
+            float(self.optimization.learning_rate)
+            if start_learning_rate is None else float(start_learning_rate)
+        )
         final_lr = self.optimization.learning_rate_final
-        if self.algo != "ppo_unconstrained" or final_lr is None or total_updates <= 1:
+        if final_lr is None or total_updates <= 1:
             learning_rate = start_lr
         else:
             progress = update_index / float(total_updates - 1)
@@ -735,6 +935,7 @@ class RCPOTrainer:
             "mean_cumulative_return": 0.0,
             "equal_weight_mean_cumulative_return": 0.0,
             "mean_excess_cumulative_return": 0.0,
+            "mean_relative_wealth_vs_constrained_neutral": 0.0,
             "win_rate_vs_equal_weight": 0.0,
             "return_std": 0.0,
             "branches": 0,
@@ -754,6 +955,7 @@ class RCPOTrainer:
             "average_allocation_constraint_2_violation_cost": 0.0,
             "average_allocation_constraint_raw_cost": 0.0,
             "average_allocation_constraint_cost": 0.0,
+            "average_allocation_drawdown_constraint_cost": 0.0,
             "average_simplex_z1": 0.0,
             "average_simplex_z2": 0.0,
             "average_simplex_z3": 0.0,
@@ -819,6 +1021,15 @@ class RCPOTrainer:
         }
         model_cumulative = np.asarray(model_cumulative_returns, dtype=np.float64)
         equal_weight_cumulative = np.asarray(equal_weight_cumulative_returns, dtype=np.float64)
+        relative_wealth_values = np.asarray(
+            [
+                relative_wealth_path(model_path, baseline_path)[-1]
+                for model_path, baseline_path in zip(
+                    model_returns, equal_weight_returns, strict=True
+                )
+            ],
+            dtype=np.float64,
+        )
         aggregate.update(
             {
                 "mean_annualized_return": float(aggregate["annualized_return"]),
@@ -827,6 +1038,9 @@ class RCPOTrainer:
                 "mean_excess_cumulative_return": float(
                     np.mean(model_cumulative - equal_weight_cumulative)
                 ),
+                "mean_relative_wealth_vs_constrained_neutral": float(
+                    np.mean(relative_wealth_values)
+                ),
                 "win_rate_vs_equal_weight": float(
                     np.mean(model_cumulative > equal_weight_cumulative)
                 ),
@@ -834,6 +1048,33 @@ class RCPOTrainer:
                 "branches": len(branch_results),
                 "drawdown_benchmark_mode": self.config.environment.drawdown_benchmark_mode,
                 "split": split_name,
+            }
+        )
+        branch_constraint_costs = [
+            float(summary["average_constraint_cost"]) for summary in summaries
+        ]
+        branch_alpha_targets = [
+            (
+                float(self.alpha)
+                if self.alpha is not None
+                else float(summary.get("average_alpha_target", 0.0))
+            )
+            for summary in summaries
+        ]
+        branch_cost_gaps = [
+            cost - alpha
+            for cost, alpha in zip(
+                branch_constraint_costs, branch_alpha_targets, strict=True
+            )
+        ]
+        branch_feasible = [gap <= 1e-12 for gap in branch_cost_gaps]
+        aggregate.update(
+            {
+                "branch_constraint_costs": branch_constraint_costs,
+                "branch_alpha_targets": branch_alpha_targets,
+                "branch_cost_gaps": branch_cost_gaps,
+                "feasible_branch_rate": float(np.mean(branch_feasible)),
+                "worst_branch_cost_gap": float(max(branch_cost_gaps)),
             }
         )
         first_result = branch_results[0]
@@ -858,6 +1099,9 @@ class RCPOTrainer:
             ],
             "validation_mean_excess_cumulative_return": summary[
                 "mean_excess_cumulative_return"
+            ],
+            "validation_mean_relative_wealth_vs_constrained_neutral": summary[
+                "mean_relative_wealth_vs_constrained_neutral"
             ],
             "validation_win_rate_vs_equal_weight": summary["win_rate_vs_equal_weight"],
             "validation_return_std": summary["return_std"],
@@ -892,11 +1136,24 @@ class RCPOTrainer:
             "validation_allocation_constraint_cost": summary[
                 "average_allocation_constraint_cost"
             ],
+            "validation_allocation_drawdown_constraint_cost": summary[
+                "average_allocation_drawdown_constraint_cost"
+            ],
             "validation_simplex_z1": summary["average_simplex_z1"],
             "validation_simplex_z2": summary["average_simplex_z2"],
             "validation_simplex_z3": summary["average_simplex_z3"],
             "validation_simplex_z4": summary["average_simplex_z4"],
             "validation_constraint_violation_rate": summary["constraint_violation_rate"],
+            "validation_feasible_branch_rate": summary.get("feasible_branch_rate", 0.0),
+            "validation_worst_branch_cost_gap": summary.get(
+                "worst_branch_cost_gap", 0.0
+            ),
+            "validation_branch_constraint_costs": summary.get(
+                "branch_constraint_costs", []
+            ),
+            "validation_branch_alpha_targets": summary.get(
+                "branch_alpha_targets", []
+            ),
         }
 
     def _evaluate_checkpoint_artifacts(
@@ -955,6 +1212,19 @@ class RCPOTrainer:
             self._read_metric_rows() if self.resume_checkpoint is not None else []
         )
         best_score, best_summary = self._best_from_metric_rows(metrics_rows)
+        best_feasible_score, best_feasible_summary = self._best_feasible_from_metric_rows(
+            metrics_rows
+        )
+        best_feasible_rate = (
+            self._validation_feasible_rate(best_feasible_summary)
+            if best_feasible_summary is not None
+            else -math.inf
+        )
+        if not (self.run_dir / "checkpoint_best_feasible.pt").exists():
+            # Metrics cannot reconstruct the model state for a missing checkpoint.
+            best_feasible_rate = -math.inf
+            best_feasible_score = -math.inf
+            best_feasible_summary = None
         training_start_time = time.perf_counter()
         additional_updates = self.optimization.total_updates
         start_update = max(self.resume_completed_updates, len(metrics_rows))
@@ -993,9 +1263,16 @@ class RCPOTrainer:
         for local_update_index in range(additional_updates):
             update_index = start_update + local_update_index
             update_start_time = time.perf_counter()
-            current_learning_rate = self._set_learning_rate(
-                update_index, target_total_updates
-            )
+            if self.resume_checkpoint is not None:
+                current_learning_rate = self._set_learning_rate(
+                    local_update_index,
+                    additional_updates,
+                    start_learning_rate=self.resume_learning_rate,
+                )
+            else:
+                current_learning_rate = self._set_learning_rate(
+                    update_index, target_total_updates
+                )
             with profile_section(self.profiler, "rollout_total"):
                 rollout = self._collect_rollout()
             with profile_section(self.profiler, "optimization_total"):
@@ -1039,6 +1316,22 @@ class RCPOTrainer:
                     last_validation_summary = validation_result.summary
                     validation_evaluated = True
             validation_score = self._validation_score(last_validation_summary)
+            feasible_branch_rate = self._validation_feasible_rate(
+                last_validation_summary
+            )
+            feasibility_tier = self._validation_feasibility_tier(
+                last_validation_summary
+            )
+            validation_feasible = feasibility_tier is not None
+            is_feasible_best = bool(
+                validation_evaluated
+                and self._is_better_feasible_candidate(
+                    feasible_branch_rate,
+                    validation_score,
+                    best_feasible_rate,
+                    best_feasible_score,
+                )
+            )
             metric_row = {
                 "update": update_index,
                 "algo": self.algo,
@@ -1050,12 +1343,21 @@ class RCPOTrainer:
                 "alpha_mode": "fixed" if self.alpha is not None else "budget_ratio",
                 "alpha_budget_ratio": float(self.config.rcpo.alpha_budget_ratio),
                 "constraint_mode": self.config.rcpo.constraint_mode,
+                "combined_drawdown_cost_weight": float(
+                    self.config.environment.combined_drawdown_cost_weight
+                ),
                 "drawdown_benchmark_mode": self.config.environment.drawdown_benchmark_mode,
                 "action_mode": self.config.environment.action_mode,
                 "simplex_action_format": self.config.environment.simplex_action_format,
                 "policy_architecture": self.config.network.policy_architecture,
                 "branch_credit_mode": self.config.network.branch_credit_mode,
                 "initial_portfolio_mode": self.config.environment.initial_portfolio_mode,
+                "observation_schema_version": int(
+                    self.config.environment.observation_schema_version
+                ),
+                "metrics_schema_version": int(
+                    self.config.logging.metrics_schema_version
+                ),
                 "reward_correction_mode": self.config.reward_correction.mode,
                 "lambda_value": self.lambda_value,
                 "learning_rate": current_learning_rate,
@@ -1063,6 +1365,9 @@ class RCPOTrainer:
                 "device": str(self.device),
                 "turnover_cap": self.config.environment.turnover_cap,
                 "validation_evaluated": int(validation_evaluated),
+                "validation_constraint_feasible": int(validation_feasible),
+                "validation_feasible_best": int(is_feasible_best),
+                "validation_feasibility_tier": feasibility_tier,
                 "validation_interval_updates": int(
                     self.config.evaluation.validation_interval_updates
                 ),
@@ -1081,36 +1386,90 @@ class RCPOTrainer:
             metric_row["lambda_cost_to_reward_ratio"] = float(
                 abs(lambda_value) * abs(batch_constraint_mean) / max(abs(batch_reward_mean), 1e-12)
             )
+            if (
+                self.config.environment.action_mode == "simplex_decomposition"
+                and not bool(metric_row.get("allocation_feasible", 1))
+            ):
+                print(
+                    "[train] warning=hard_allocation_violation "
+                    f"max_violation={metric_row['allocation_max_violation']:.3e}",
+                    flush=True,
+                )
             with profile_section(self.profiler, "metric_write"):
                 self._write_metric_row(metric_row)
+                if validation_evaluated:
+                    self._write_validation_metric_row(
+                        update_index,
+                        last_validation_summary,
+                        validation_score,
+                        feasibility_tier,
+                    )
             metrics_rows.append(metric_row)
 
             is_best = False
             previous_best_score = best_score
             min_delta = self.optimization.early_stop_min_delta
+            self.resume_completed_updates = update_index + 1
             if validation_evaluated and validation_score > best_score:
                 best_score = validation_score
                 best_summary = last_validation_summary
                 with profile_section(self.profiler, "checkpoint_best"):
-                    self._checkpoint("checkpoint_best.pt")
+                    self._checkpoint(
+                        "checkpoint_best_return.pt",
+                        extra_metadata={
+                            "checkpoint_selection": "maximum_validation_return",
+                            "validation_score": float(validation_score),
+                        },
+                    )
                 is_best = True
+            if is_feasible_best:
+                best_feasible_rate = feasible_branch_rate
+                best_feasible_score = validation_score
+                best_feasible_summary = last_validation_summary
+                feasible_metadata = {
+                    "checkpoint_selection": (
+                        "maximum_feasible_branch_rate_then_validation_return"
+                    ),
+                    "feasibility_tier": feasibility_tier,
+                    "feasible_branch_rate": float(feasible_branch_rate),
+                    "validation_score": float(validation_score),
+                    "validation_average_constraint_cost": float(
+                        last_validation_summary.get("average_constraint_cost", 0.0)
+                    ),
+                    "validation_average_alpha_target": float(
+                        last_validation_summary.get("average_alpha_target", 0.0)
+                    ),
+                    "validation_worst_branch_cost_gap": float(
+                        last_validation_summary.get("worst_branch_cost_gap", 0.0)
+                    ),
+                }
+                with profile_section(self.profiler, "checkpoint_best"):
+                    self._checkpoint(
+                        "checkpoint_best_feasible.pt",
+                        extra_metadata=feasible_metadata,
+                    )
             if validation_evaluated and validation_score > previous_best_score + min_delta:
                 stale_updates = 0
             elif validation_evaluated:
                 stale_updates += 1
-            self.resume_completed_updates = update_index + 1
             with profile_section(self.profiler, "checkpoint_last"):
                 self._checkpoint("checkpoint_last.pt")
-            with profile_section(self.profiler, "print_summary"):
-                self._print_update_summary(
-                    update_index=update_index,
-                    total_updates=target_total_updates,
-                    metric_row=metric_row,
-                    validation_score=validation_score,
-                    update_seconds=time.perf_counter() - update_start_time,
-                    elapsed_seconds=time.perf_counter() - training_start_time,
-                    is_best=is_best,
-                )
+            should_print = (
+                validation_evaluated
+                or (update_index + 1) % self.config.logging.print_interval_updates == 0
+                or local_update_index == 0
+            )
+            if should_print:
+                with profile_section(self.profiler, "print_summary"):
+                    self._print_update_summary(
+                        update_index=update_index,
+                        total_updates=target_total_updates,
+                        metric_row=metric_row,
+                        validation_score=validation_score,
+                        update_seconds=time.perf_counter() - update_start_time,
+                        elapsed_seconds=time.perf_counter() - training_start_time,
+                        is_best=is_best,
+                    )
             if (
                 self.optimization.early_stop_patience is not None
                 and stale_updates >= self.optimization.early_stop_patience
@@ -1128,20 +1487,31 @@ class RCPOTrainer:
             raise RuntimeError("Training did not produce a validation summary.")
         if self.disable_artifacts:
             best_evaluation = {}
+            best_feasible_evaluation = {}
             last_evaluation = {}
         else:
             save_training_progress_artifacts(metrics_rows, self.run_dir / "evaluation")
             lambda_plot_history, lambda_plot_steps = self._lambda_plot_series(metrics_rows)
-            best_checkpoint = self.run_dir / "checkpoint_best.pt"
+            best_checkpoint = self.run_dir / "checkpoint_best_return.pt"
             if best_checkpoint.exists():
                 best_evaluation = self._evaluate_checkpoint_artifacts(
-                    "checkpoint_best.pt",
+                    "checkpoint_best_return.pt",
                     self.run_dir / "evaluation_best",
                     lambda_history=lambda_plot_history,
                     lambda_update_steps=lambda_plot_steps,
                 )
             else:
                 best_evaluation = {}
+            best_feasible_checkpoint = self.run_dir / "checkpoint_best_feasible.pt"
+            if best_feasible_checkpoint.exists():
+                best_feasible_evaluation = self._evaluate_checkpoint_artifacts(
+                    "checkpoint_best_feasible.pt",
+                    self.run_dir / "evaluation_best_feasible",
+                    lambda_history=lambda_plot_history,
+                    lambda_update_steps=lambda_plot_steps,
+                )
+            else:
+                best_feasible_evaluation = {}
             last_evaluation = self._evaluate_checkpoint_artifacts(
                 "checkpoint_last.pt",
                 self.run_dir / "evaluation_last",
@@ -1159,6 +1529,9 @@ class RCPOTrainer:
             "reward_noise_mode": self.config.reward_noise.mode,
             "reward_noise_std": float(self.config.reward_noise.std),
             "constraint_mode": self.config.rcpo.constraint_mode,
+            "combined_drawdown_cost_weight": float(
+                self.config.environment.combined_drawdown_cost_weight
+            ),
             "drawdown_benchmark_mode": self.config.environment.drawdown_benchmark_mode,
             "action_mode": self.config.environment.action_mode,
             "simplex_action_format": self.config.environment.simplex_action_format,
@@ -1169,7 +1542,9 @@ class RCPOTrainer:
             "device": str(self.device),
             "constraint_preset": self._resolved_preset["preset_name"],
             "best_validation": best_summary,
+            "best_feasible_validation": best_feasible_summary,
             "evaluation_best": best_evaluation,
+            "evaluation_best_feasible": best_feasible_evaluation,
             "evaluation_last": last_evaluation,
             "lambda_final": self.lambda_value,
             "completed_updates": len(metrics_rows),

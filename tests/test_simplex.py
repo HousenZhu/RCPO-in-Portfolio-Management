@@ -79,3 +79,41 @@ def test_simplex_decomposition_rejects_infeasible_disjoint_overlap() -> None:
         assert "thresholds sum above 1" in str(error)
     else:
         raise AssertionError("Expected disjoint constraints above total weight 1 to fail.")
+
+def test_branch_training_mask_skips_zero_mass_overlap_branch() -> None:
+    mapper = build_simplex_decomposition(
+        num_assets=6,
+        constraint_1_indices=[1, 2, 3],
+        constraint_2_indices=[2, 3, 4],
+        constraint_1_min_weight=0.50,
+        constraint_2_min_weight=0.40,
+    )
+
+    assert mapper.branch_indices[0] == (2, 3)
+    assert mapper.branch_training_mask() == (False, True, True, True)
+
+
+def test_branch_training_mask_enables_positive_multi_asset_overlap_branch() -> None:
+    mapper = build_simplex_decomposition(
+        num_assets=6,
+        constraint_1_indices=[1, 2, 3],
+        constraint_2_indices=[2, 3, 4],
+        constraint_1_min_weight=0.60,
+        constraint_2_min_weight=0.50,
+    )
+
+    assert mapper.branch_indices[0] == (2, 3)
+    assert mapper.branch_training_mask() == (True, True, True, True)
+
+
+def test_branch_training_mask_skips_singleton_even_with_positive_mass() -> None:
+    mapper = build_simplex_decomposition(
+        num_assets=6,
+        constraint_1_indices=[1, 2, 4],
+        constraint_2_indices=[0, 4, 5],
+        constraint_1_min_weight=0.55,
+        constraint_2_min_weight=0.55,
+    )
+
+    assert mapper.branch_indices[0] == (4,)
+    assert mapper.branch_training_mask() == (False, True, True, True)

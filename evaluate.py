@@ -27,7 +27,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-dir", required=True, help="Run directory produced by train.py.")
     parser.add_argument(
         "--checkpoint",
-        default="checkpoint_best.pt",
+        default="checkpoint_best_return.pt",
         help="Checkpoint file name inside the run directory.",
     )
     parser.add_argument(
@@ -35,7 +35,7 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help=(
             "Optional evaluation artifact directory. Defaults to evaluation_best for "
-            "checkpoint_best.pt, evaluation_last for checkpoint_last.pt, otherwise evaluation."
+            "checkpoint_best_return.pt, evaluation_last for checkpoint_last.pt, otherwise evaluation."
         ),
     )
     parser.add_argument(
@@ -93,7 +93,7 @@ def main() -> None:
         return action.squeeze(0).cpu().numpy()
 
     def equal_weight_action(env: PortfolioEnv):
-        return env.neutral_action()
+        return env.constrained_neutral_action()
 
     def rollout_returns(env: PortfolioEnv, action_fn):
         obs, _ = env.reset(options={"start_index": int(env.available_start_indices()[0])})
@@ -152,7 +152,7 @@ def main() -> None:
 
     if args.output_dir is not None:
         evaluation_dir = Path(args.output_dir)
-    elif args.checkpoint == "checkpoint_best.pt":
+    elif args.checkpoint in {"checkpoint_best_return.pt", "checkpoint_best.pt"}:
         evaluation_dir = Path(args.run_dir) / "evaluation_best"
     elif args.checkpoint == "checkpoint_last.pt":
         evaluation_dir = Path(args.run_dir) / "evaluation_last"

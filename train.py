@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import argparse
 import sys
@@ -40,12 +40,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--constraint-drawdown",
         action="store_true",
-        help="Use maximum drawdown target-violation cost as the RCPO constraint cost.",
+        help="Use benchmark-relative current-drawdown cost as the RCPO constraint cost.",
     )
     parser.add_argument(
         "--constraint-allocation",
         action="store_true",
         help="Use soft allocation-constraint violation cost as the RCPO constraint cost.",
+    )
+    parser.add_argument(
+        "--constraint-allocation-drawdown",
+        action="store_true",
+        help="Use combined soft allocation and relative-current-drawdown cost for RCPO.",
     )
     reward_group = parser.add_mutually_exclusive_group()
     reward_group.add_argument(
@@ -69,11 +74,18 @@ def parse_args() -> argparse.Namespace:
         help="Checkpoint file inside --resume-run-dir to continue from.",
     )
     args = parser.parse_args()
-    selected_constraint_count = int(args.constraint_drawdown) + int(args.constraint_allocation)
+    selected_constraint_count = (
+        int(args.constraint_drawdown)
+        + int(args.constraint_allocation)
+        + int(args.constraint_allocation_drawdown)
+    )
     if args.algo == "rcpo" and selected_constraint_count != 1:
-        parser.error("RCPO requires exactly one of --constraint-drawdown or --constraint-allocation.")
+        parser.error(
+            "RCPO requires exactly one of --constraint-drawdown, "
+            "--constraint-allocation, or --constraint-allocation-drawdown."
+        )
     if args.algo != "rcpo" and selected_constraint_count:
-        parser.error("--constraint-drawdown and --constraint-allocation are only valid with --algo rcpo.")
+        parser.error("RCPO constraint flags are only valid with --algo rcpo.")
     if args.algo == "equal_weight" and (args.use_drc or args.use_gdrc):
         parser.error("--use-drc and --use-gdrc are not valid with --algo equal_weight.")
     return args
@@ -90,10 +102,15 @@ def main() -> None:
     config = load_config(config_path)
     if args.constraint_preset is not None:
         config.environment.active_constraint_preset = args.constraint_preset
-    if args.constraint_allocation:
-        config.rcpo.constraint_mode = "allocation"
-    elif args.algo == "rcpo":
-        config.rcpo.constraint_mode = "max_drawdown"
+    if resume_run_dir is None:
+        if args.constraint_allocation:
+            config.rcpo.constraint_mode = "allocation"
+        elif args.constraint_allocation_drawdown:
+            config.rcpo.constraint_mode = "allocation_relative_drawdown"
+            config.environment.observation_schema_version = 2
+        elif args.algo == "rcpo":
+            config.rcpo.constraint_mode = "relative_current_drawdown"
+            config.environment.observation_schema_version = 2
     if args.use_drc:
         config.reward_correction.mode = "drc"
     elif args.use_gdrc:

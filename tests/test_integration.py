@@ -80,13 +80,17 @@ def test_short_training_runs_for_rcpo_and_ppo(tmp_path: Path) -> None:
     ppo_gdrc_run = runs[("ppo_unconstrained", "gdrc")]
 
     assert (rcpo_run / "checkpoint_last.pt").exists()
-    assert (rcpo_run / "checkpoint_best.pt").exists()
-    assert (rcpo_drc_run / "checkpoint_best.pt").exists()
-    assert (rcpo_gdrc_run / "checkpoint_best.pt").exists()
+    assert (rcpo_run / "checkpoint_best_return.pt").exists()
+    assert (rcpo_drc_run / "checkpoint_best_return.pt").exists()
+    assert (rcpo_gdrc_run / "checkpoint_best_return.pt").exists()
     assert (ppo_run / "checkpoint_last.pt").exists()
-    assert (ppo_run / "checkpoint_best.pt").exists()
-    assert (ppo_drc_run / "checkpoint_best.pt").exists()
-    assert (ppo_gdrc_run / "checkpoint_best.pt").exists()
+    assert (ppo_run / "checkpoint_best_return.pt").exists()
+    assert (ppo_drc_run / "checkpoint_best_return.pt").exists()
+    assert (ppo_gdrc_run / "checkpoint_best_return.pt").exists()
+    assert (rcpo_run / "checkpoint_best_feasible.pt").exists()
+    assert (ppo_run / "checkpoint_best_feasible.pt").exists()
+    assert not (rcpo_run / "checkpoint_best.pt").exists()
+    assert not (ppo_run / "checkpoint_best.pt").exists()
 
     assert (rcpo_run / "metrics.jsonl").exists()
     assert (rcpo_run / "evaluation" / "group_weights_validation.png").exists()
@@ -162,6 +166,8 @@ def test_short_training_runs_for_rcpo_and_ppo(tmp_path: Path) -> None:
     assert rcpo_metric["alpha"] > 0.0
     assert "validation_turnover" in rcpo_metric
     assert "validation_mean_excess_cumulative_return" in rcpo_metric
+    assert "validation_mean_relative_wealth_vs_constrained_neutral" in rcpo_metric
+    assert "episode_relative_wealth_vs_baseline_mean" in rcpo_metric
     assert "validation_win_rate_vs_equal_weight" in rcpo_metric
     assert "validation_max_drawdown" in rcpo_metric
     assert "validation_benchmark_max_drawdown" in rcpo_metric
@@ -254,6 +260,38 @@ def test_short_rcpo_allocation_penalty_run(tmp_path: Path) -> None:
     assert metric["batch_constraint_cost_mean"] == pytest.approx(
         metric["batch_allocation_constraint_cost_mean"]
     )
+
+
+def test_short_rcpo_allocation_drawdown_run_saves_feasible_best(tmp_path: Path) -> None:
+    config = tiny_config(tmp_path)
+    config.experiment.run_name = "tiny_rcpo_allocation_drawdown"
+    config.environment.action_mode = "softmax"
+    config.environment.initial_portfolio_mode = "constrained_neutral"
+    config.environment.constraint_mode = "allocation_drawdown"
+    config.environment.allocation_constraint_cost_scale = 20.0
+    config.environment.combined_drawdown_cost_weight = 0.25
+    config.network.policy_architecture = "flat_gaussian"
+    config.network.branch_credit_mode = "global"
+    config.rcpo.constraint_mode = "allocation_drawdown"
+    config.rcpo.alpha = 1.0
+    config.rcpo.lambda_lr_up = 0.0005
+    config.rcpo.lambda_lr_down = 0.03
+    config.reward_correction.mode = "none"
+
+    run_dir = run_experiment(config, algo="rcpo")[0]
+    metric = json.loads((run_dir / "metrics.jsonl").read_text().splitlines()[-1])
+    summary = json.loads((run_dir / "training_summary.json").read_text())
+
+    assert metric["constraint_mode"] == "allocation_drawdown"
+    assert metric["validation_constraint_feasible"] == 1
+    assert metric["validation_feasible_best"] == 1
+    assert metric["batch_constraint_cost_mean"] == pytest.approx(
+        metric["batch_allocation_drawdown_constraint_cost_mean"]
+    )
+    assert (run_dir / "checkpoint_best_feasible.pt").exists()
+    assert (run_dir / "evaluation_best_feasible" / "summary_validation.json").exists()
+    assert summary["best_feasible_validation"] is not None
+    assert summary["evaluation_best_feasible"]
 
 
 def test_short_noisy_reward_training_runs(tmp_path: Path) -> None:

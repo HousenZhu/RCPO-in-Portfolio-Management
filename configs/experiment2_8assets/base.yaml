@@ -1,0 +1,66 @@
+extends: ../default.yaml
+
+experiment:
+  run_name: experiment2_8assets_base
+
+market:
+  num_risky_assets: 8
+  lookback: 20
+  train_market_count: 8
+  train_steps: 5040
+  validation_steps: 252
+  test_steps: 252
+  low_vol_drift: 0.0007
+  high_vol_drift: -0.0004
+  low_vol_scale: 0.008
+  high_vol_scale: 0.02
+  base_correlation: 0.25
+  low_vol_correlation: 0.15
+  high_vol_correlation: 0.55
+  enable_learnable_structure: true
+  regime_drift_adjustments:
+    # Assets 1 and 2 are low-vol specialists in separate constraint groups.
+    low_vol: [0.00075, 0.00065, 0.00020, -0.00065, 0.00010, -0.00025, -0.00035, -0.00045]
+    # Assets 6 and 7 are defensive specialists; asset 8 is strongest but unconstrained.
+    high_vol: [-0.00095, -0.00080, -0.00045, -0.00075, -0.00010, 0.00055, 0.00055, 0.00065]
+  momentum_strength: 0.20
+  momentum_decay: 0.94
+  momentum_clip: 0.01
+  transition_matrix:
+    - [0.95, 0.05]
+    - [0.10, 0.90]
+
+environment:
+  action_mode: simplex_decomposition
+  initial_portfolio_mode: constrained_neutral
+  episode_length: 252
+  transaction_cost_bps: 1.0
+  turnover_cap: 0.40
+  drawdown_budget_floor: 0.05
+  drawdown_benchmark_mode: constrained_neutral
+  benchmark_drawdown_margin: 0.90
+  drawdown_cost_scale: 0.10
+  allocation_constraint_cost_scale: 20.0
+  combined_drawdown_cost_weight: 0.25
+  allocation_constraint_1_indices: [1, 4, 6]
+  allocation_constraint_2_indices: [2, 4, 7]
+  active_constraint_preset: c3
+  constraint_presets:
+    c1:
+      allocation_constraint_1_min_weight: 0.35
+      allocation_constraint_2_min_weight: 0.30
+    c2:
+      allocation_constraint_1_min_weight: 0.45
+      allocation_constraint_2_min_weight: 0.35
+    c3:
+      allocation_constraint_1_min_weight: 0.50
+      allocation_constraint_2_min_weight: 0.40
+
+network:
+  hidden_sizes: [192, 128]
+
+reward_correction:
+  mode: none
+
+reward_noise:
+  enabled: false

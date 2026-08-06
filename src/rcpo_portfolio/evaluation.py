@@ -9,12 +9,16 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 import numpy as np
 import torch
 
 from .config import (
     ALLOCATION_CONSTRAINT_VERSION,
+    ALLOCATION_DRAWDOWN_CONSTRAINT_VERSION,
+    ALLOCATION_RELATIVE_DRAWDOWN_CONSTRAINT_VERSION,
     BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION,
+    RELATIVE_CURRENT_DRAWDOWN_CONSTRAINT_VERSION,
     ProjectConfig,
     sync_rcpo_constraint_settings,
 )
@@ -41,6 +45,36 @@ def compute_drawdown(returns: np.ndarray) -> np.ndarray:
     return (running_peak - wealth) / np.maximum(running_peak, 1e-12)
 
 
+def relative_wealth_path(
+    model_returns: np.ndarray,
+    baseline_returns: np.ndarray,
+) -> np.ndarray:
+    model = np.asarray(model_returns, dtype=np.float64)
+    baseline = np.asarray(baseline_returns, dtype=np.float64)
+    common_length = min(len(model), len(baseline))
+    if common_length == 0:
+        return np.asarray([], dtype=np.float64)
+    model_wealth = np.cumprod(1.0 + model[:common_length])
+    baseline_wealth = np.cumprod(1.0 + baseline[:common_length])
+    return model_wealth / np.maximum(baseline_wealth, 1e-12) - 1.0
+
+
+def format_signed_percent(value: float, decimals: int = 2) -> str:
+    if np.isclose(value, 0.0, atol=0.5 * 10 ** (-(decimals + 2))):
+        return f"{0.0:.{decimals}%}"
+    return f"{value:+.{decimals}%}"
+
+
+def apply_signed_percent_axis(axis) -> None:
+    axis.yaxis.set_major_formatter(
+        FuncFormatter(
+            lambda value, _position: (
+                "0%" if np.isclose(value, 0.0, atol=5e-13) else f"{value:+.0%}"
+            )
+        )
+    )
+
+
 def summarize_returns(returns: np.ndarray, turnover: np.ndarray) -> dict[str, float]:
     log_growth = np.log1p(np.clip(returns, -0.999999, None))
     annualized_return = float(np.exp(log_growth.mean() * 252.0) - 1.0)
@@ -62,8 +96,8 @@ def select_start_indices(env: PortfolioEnv, episodes: int) -> np.ndarray:
     return starts[indices]
 
 
-def _neutral_action(env: PortfolioEnv) -> np.ndarray:
-    return env.neutral_action()
+def _constrained_neutral_action(env: PortfolioEnv) -> np.ndarray:
+    return env.constrained_neutral_action()
 
 
 def _rollout_returns(
@@ -116,6 +150,7 @@ def evaluate_policy(
         allocation_constraint_2_violation_costs: list[float] = []
         allocation_constraint_raw_costs: list[float] = []
         allocation_constraint_costs: list[float] = []
+        allocation_drawdown_constraint_costs: list[float] = []
         allocation_constraint_1_weights: list[float] = []
         allocation_constraint_2_weights: list[float] = []
         simplex_z1_values: list[float] = []
@@ -159,6 +194,9 @@ def evaluate_policy(
                 float(info["allocation_constraint_raw_cost"])
             )
             allocation_constraint_costs.append(float(info["allocation_constraint_cost"]))
+            allocation_drawdown_constraint_costs.append(
+                float(info["allocation_drawdown_constraint_cost"])
+            )
             allocation_constraint_1_weights.append(
                 float(info["allocation_constraint_1_weight"])
             )
@@ -240,6 +278,9 @@ def evaluate_policy(
         episode_summary["average_allocation_constraint_cost"] = float(
             np.mean(allocation_constraint_costs)
         )
+        episode_summary["average_allocation_drawdown_constraint_cost"] = float(
+            np.mean(allocation_drawdown_constraint_costs)
+        )
         episode_summary["average_allocation_constraint_1_weight"] = float(
             np.mean(allocation_constraint_1_weights)
         )
@@ -260,7 +301,9 @@ def evaluate_policy(
         episode_summaries.append(episode_summary)
         episode_return_paths.append(episode_returns)
         equal_weight_return_paths.append(
-            _rollout_returns(env, lambda _obs: _neutral_action(env), int(start_index))
+            _rollout_returns(
+                env, lambda _obs: _constrained_neutral_action(env), int(start_index)
+            )
         )
         episode_alpha_threshold = (
             episode_summary["average_alpha_target"]
@@ -322,13 +365,26 @@ def evaluate_policy(
         if (alpha is not None or alpha_budget_ratio is not None)
         else 0.0
     )
+    relative_final_values = [
+        float(relative_wealth_path(model, baseline)[-1])
+        for model, baseline in zip(
+            episode_return_paths,
+            equal_weight_return_paths,
+            strict=True,
+        )
+    ]
+    aggregate["mean_relative_wealth_vs_constrained_neutral"] = float(
+        np.mean(relative_final_values)
+    )
     aggregate["split"] = split_name
     return EvaluationResult(
         summary=aggregate,
         first_episode=first_episode,
         episode_returns=episode_return_paths,
         equal_weight_first_episode_returns=_rollout_returns(
-            env, lambda _obs: _neutral_action(env), first_start_index
+            env,
+            lambda _obs: _constrained_neutral_action(env),
+            first_start_index,
         ),
         equal_weight_episode_returns=equal_weight_return_paths,
         branch_first_episodes=[first_episode],
@@ -356,14 +412,23 @@ def save_evaluation_artifacts(
     weights = result.first_episode["weights"]
     drawdown = compute_drawdown(returns)
     drawdown_constraint_costs = result.first_episode["drawdown_constraint_costs"]
-    cumulative_return = np.cumprod(1.0 + returns) - 1.0
-    equal_weight_cumulative_return = (
-        np.cumprod(1.0 + result.equal_weight_first_episode_returns) - 1.0
+    relative_return = relative_wealth_path(
+        returns,
+        result.equal_weight_first_episode_returns,
     )
     plt.figure(figsize=(8, 4))
-    plt.plot(cumulative_return, label="Model")
-    plt.plot(equal_weight_cumulative_return, label="Equal Weight", linestyle="--")
-    plt.title(f"Cumulative Return ({split_name})")
+    plt.plot(relative_return, label="Model vs Constrained-Neutral Baseline")
+    plt.axhline(
+        0.0,
+        color="#d94801",
+        linewidth=2.0,
+        linestyle="--",
+        label="Constrained-Neutral Baseline",
+    )
+    plt.title(f"Relative Wealth vs Constrained-Neutral Baseline ({split_name})")
+    plt.xlabel("Market Step")
+    plt.ylabel("Relative Wealth")
+    apply_signed_percent_axis(plt.gca())
     plt.legend()
     plt.tight_layout()
     safe_savefig(plt.gcf(), output_path / f"cumulative_return_{split_name}.png")
@@ -390,37 +455,42 @@ def save_evaluation_artifacts(
     equal_weight_mean_paths = equal_weight_mean_episode_returns or result.equal_weight_episode_returns
     if model_mean_paths and equal_weight_mean_paths:
         min_length = min(len(path) for path in model_mean_paths)
-        cumulative_paths = np.asarray(
-            [
-                np.cumprod(1.0 + path[:min_length]) - 1.0
-                for path in model_mean_paths
-            ],
-            dtype=np.float32,
-        )
-        mean_cumulative_return = cumulative_paths.mean(axis=0)
         equal_weight_min_length = min(len(path) for path in equal_weight_mean_paths)
-        equal_weight_cumulative_paths = np.asarray(
+        common_length = min(min_length, equal_weight_min_length)
+        relative_paths = np.asarray(
             [
-                np.cumprod(1.0 + path[:equal_weight_min_length]) - 1.0
-                for path in equal_weight_mean_paths
+                relative_wealth_path(model_path, baseline_path)[:common_length]
+                for model_path, baseline_path in zip(
+                    model_mean_paths,
+                    equal_weight_mean_paths,
+                    strict=True,
+                )
             ],
             dtype=np.float32,
         )
-        common_length = min(len(mean_cumulative_return), equal_weight_cumulative_paths.shape[1])
-        mean_cumulative_return = mean_cumulative_return[:common_length]
-        equal_weight_mean_cumulative_return = equal_weight_cumulative_paths[:, :common_length].mean(axis=0)
+        mean_relative_return = relative_paths.mean(axis=0)
         plt.figure(figsize=(8, 4))
-        for path in cumulative_paths[:, :common_length]:
+        for path in relative_paths:
             plt.plot(path, color="#9ecae1", alpha=0.35, linewidth=1.0)
-        plt.plot(mean_cumulative_return, color="#08519c", linewidth=2.4, label="Mean")
         plt.plot(
-            equal_weight_mean_cumulative_return,
+            mean_relative_return,
+            color="#08519c",
+            linewidth=2.4,
+            label="Mean Relative Wealth",
+        )
+        plt.axhline(
+            0.0,
             color="#d94801",
             linewidth=2.0,
             linestyle="--",
-            label="Equal Weight Mean",
+            label="Constrained-Neutral Baseline",
         )
-        plt.title(f"Mean Cumulative Return ({split_name})")
+        plt.title(
+            f"Mean Relative Wealth vs Constrained-Neutral Baseline ({split_name})"
+        )
+        plt.xlabel("Market Step")
+        plt.ylabel("Relative Wealth")
+        apply_signed_percent_axis(plt.gca())
         plt.legend()
         plt.tight_layout()
         safe_savefig(plt.gcf(), output_path / f"mean_cumulative_return_{split_name}.png")
@@ -520,12 +590,34 @@ def save_training_progress_artifacts(
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
     updates = np.asarray([row["update"] + 1 for row in metrics_rows], dtype=np.int32)
-    rollout_returns = np.asarray([row["episode_return_mean"] for row in metrics_rows], dtype=np.float32)
+    rollout_relative_returns = np.asarray(
+        [
+            row.get("episode_relative_wealth_vs_baseline_mean", np.nan)
+            for row in metrics_rows
+        ],
+        dtype=np.float32,
+    )
     evaluation_prefix = (
         "validation" if "validation_annualized_return" in metrics_rows[0] else "test"
     )
-    evaluation_returns = np.asarray(
-        [row[f"{evaluation_prefix}_annualized_return"] for row in metrics_rows],
+    evaluation_relative_returns = np.asarray(
+        [
+            row.get(
+                f"{evaluation_prefix}_mean_relative_wealth_vs_constrained_neutral",
+                (
+                    (1.0 + row[f"{evaluation_prefix}_mean_cumulative_return"])
+                    / max(
+                        1.0
+                        + row[
+                            f"{evaluation_prefix}_equal_weight_mean_cumulative_return"
+                        ],
+                        1e-12,
+                    )
+                    - 1.0
+                ),
+            )
+            for row in metrics_rows
+        ],
         dtype=np.float32,
     )
     rollout_violation = np.asarray(
@@ -551,11 +643,16 @@ def save_training_progress_artifacts(
     )
 
     fig, axis = plt.subplots(figsize=(10, 4.5))
-    axis.plot(updates, rollout_returns, label="Rollout Return", color="#1f77b4")
     axis.plot(
         updates,
-        evaluation_returns,
-        label=f"{evaluation_prefix.title()} Annualized Return",
+        rollout_relative_returns,
+        label="Rollout Relative Wealth",
+        color="#1f77b4",
+    )
+    axis.plot(
+        updates,
+        evaluation_relative_returns,
+        label=f"{evaluation_prefix.title()} Relative Wealth",
         color="#ff7f0e",
     )
 
@@ -586,10 +683,12 @@ def save_training_progress_artifacts(
 
     constraint_mode = str(metrics_rows[0].get("constraint_mode", "selected"))
     axis.set_title(
-        f"Training Return With {constraint_mode.replace('_', ' ').title()} Constraint Violations"
+        "Relative Wealth vs Constrained-Neutral Baseline With "
+        f"{constraint_mode.replace('_', ' ').title()} Constraint Violations"
     )
     axis.set_xlabel("Update")
-    axis.set_ylabel("Return")
+    axis.set_ylabel("Relative Wealth")
+    apply_signed_percent_axis(axis)
     axis.legend()
     fig.tight_layout()
     safe_savefig(fig, output_path / "training_return.png")
@@ -682,7 +781,7 @@ def save_training_progress_artifacts(
 
 def load_checkpoint_for_evaluation(
     run_dir: str | Path,
-    checkpoint_name: str = "checkpoint_best.pt",
+    checkpoint_name: str = "checkpoint_best_return.pt",
 ) -> tuple[ProjectConfig, dict[str, Any], ActorCritic, dict[str, PortfolioEnv]]:
     run_path = Path(run_dir)
     from .config import load_config
@@ -690,7 +789,14 @@ def load_checkpoint_for_evaluation(
     config = load_config(run_path / "config_snapshot.yaml")
     sync_rcpo_constraint_settings(config)
     device = resolve_device(config.runtime.device)
-    checkpoint = torch.load(run_path / checkpoint_name, map_location=device)
+    checkpoint_path = run_path / checkpoint_name
+    if (
+        checkpoint_name == "checkpoint_best_return.pt"
+        and not checkpoint_path.exists()
+        and (run_path / "checkpoint_best.pt").exists()
+    ):
+        checkpoint_path = run_path / "checkpoint_best.pt"
+    checkpoint = torch.load(checkpoint_path, map_location=device)
     checkpoint_action_mode = checkpoint.get("action_mode", "softmax")
     if checkpoint_action_mode != config.environment.action_mode:
         raise ValueError(
@@ -721,6 +827,13 @@ def load_checkpoint_for_evaluation(
             f"Checkpoint initial_portfolio_mode {checkpoint_initial_portfolio_mode!r} "
             f"does not match config_snapshot {config.environment.initial_portfolio_mode!r}."
         )
+    checkpoint_observation_schema = int(
+        checkpoint.get("observation_schema_version", 1)
+    )
+    if checkpoint_observation_schema != config.environment.observation_schema_version:
+        raise ValueError(
+            "Checkpoint observation schema is incompatible with config_snapshot."
+        )
     if config.network.policy_architecture == "simplex_autoregressive_dirichlet":
         for field_name in (
             "dirichlet_min_concentration",
@@ -743,13 +856,23 @@ def load_checkpoint_for_evaluation(
                 f"Checkpoint constraint mode {checkpoint_constraint_mode!r} does not match "
                 f"config_snapshot {config.rcpo.constraint_mode!r}."
             )
-        if config.rcpo.constraint_mode == "max_drawdown":
-            checkpoint_semantics = checkpoint.get("constraint_semantics")
-            if checkpoint_semantics != BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION:
-                raise ValueError(
-                    "RCPO checkpoint uses incompatible drawdown constraint semantics. "
-                    "Legacy fixed-budget drawdown checkpoints are not supported."
-                )
+        expected_semantics = {
+            "max_drawdown": BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION,
+            "allocation": ALLOCATION_CONSTRAINT_VERSION,
+            "allocation_drawdown": ALLOCATION_DRAWDOWN_CONSTRAINT_VERSION,
+            "relative_current_drawdown": RELATIVE_CURRENT_DRAWDOWN_CONSTRAINT_VERSION,
+            "allocation_relative_drawdown": ALLOCATION_RELATIVE_DRAWDOWN_CONSTRAINT_VERSION,
+        }[config.rcpo.constraint_mode]
+        if checkpoint.get("constraint_semantics") != expected_semantics:
+            raise ValueError(
+                "RCPO checkpoint uses incompatible constraint semantics."
+            )
+        if config.rcpo.constraint_mode in {
+            "max_drawdown",
+            "relative_current_drawdown",
+            "allocation_drawdown",
+            "allocation_relative_drawdown",
+        }:
             if not np.isclose(
                 float(checkpoint.get("drawdown_budget_floor", np.nan)),
                 float(config.environment.drawdown_budget_floor),
@@ -775,17 +898,29 @@ def load_checkpoint_for_evaluation(
                 float(config.environment.drawdown_cost_scale),
             ):
                 raise ValueError("Checkpoint drawdown_cost_scale does not match config_snapshot.")
-        if config.rcpo.constraint_mode == "allocation":
-            checkpoint_semantics = checkpoint.get("constraint_semantics")
-            if checkpoint_semantics != ALLOCATION_CONSTRAINT_VERSION:
-                raise ValueError(
-                    "RCPO checkpoint uses incompatible allocation constraint semantics."
-                )
+        if config.rcpo.constraint_mode in {
+            "allocation",
+            "allocation_drawdown",
+            "allocation_relative_drawdown",
+        }:
             if not np.isclose(
                 float(checkpoint.get("allocation_constraint_cost_scale", np.nan)),
                 float(config.environment.allocation_constraint_cost_scale),
             ):
-                raise ValueError("Checkpoint allocation_constraint_cost_scale does not match config_snapshot.")
+                raise ValueError(
+                    "Checkpoint allocation_constraint_cost_scale does not match config_snapshot."
+                )
+        if config.rcpo.constraint_mode in {
+            "allocation_drawdown",
+            "allocation_relative_drawdown",
+        }:
+            if not np.isclose(
+                float(checkpoint.get("combined_drawdown_cost_weight", np.nan)),
+                float(config.environment.combined_drawdown_cost_weight),
+            ):
+                raise ValueError(
+                    "Checkpoint combined_drawdown_cost_weight does not match config_snapshot."
+                )
     market_splits = generate_market_splits(config.market, int(checkpoint["seed"]))
     environments = {
         split_name: PortfolioEnv(config.environment, market, config.market, seed=int(checkpoint["seed"]))
@@ -796,6 +931,7 @@ def load_checkpoint_for_evaluation(
         action_dim=environments["train"].action_space.shape[0],
         config=config.network,
         branch_sizes=environments["train"].simplex_branch_sizes(),
+        branch_train_mask=environments["train"].simplex_branch_train_mask(),
     ).to(device)
     checkpoint_action_dim = checkpoint.get("action_dim")
     if checkpoint_action_dim is not None and int(checkpoint_action_dim) != int(
@@ -810,6 +946,13 @@ def load_checkpoint_for_evaluation(
         "train"
     ].simplex_branch_sizes():
         raise ValueError("Checkpoint simplex_branch_sizes do not match config_snapshot.")
+    checkpoint_branch_train_mask = checkpoint.get("simplex_branch_train_mask")
+    if (
+        checkpoint_branch_train_mask is not None
+        and list(checkpoint_branch_train_mask)
+        != environments["train"].simplex_branch_train_mask()
+    ):
+        raise ValueError("Checkpoint simplex_branch_train_mask does not match config_snapshot.")
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
     metadata = {
@@ -820,6 +963,13 @@ def load_checkpoint_for_evaluation(
             checkpoint.get("alpha_budget_ratio", config.rcpo.alpha_budget_ratio)
         ),
         "constraint_mode": checkpoint.get("constraint_mode", config.rcpo.constraint_mode),
+        "allocation_constraint_cost_scale": float(
+            config.environment.allocation_constraint_cost_scale
+        ),
+        "drawdown_cost_scale": float(config.environment.drawdown_cost_scale),
+        "combined_drawdown_cost_weight": float(
+            config.environment.combined_drawdown_cost_weight
+        ),
         "constraint_semantics": checkpoint.get(
             "constraint_semantics",
             BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION,
@@ -828,7 +978,9 @@ def load_checkpoint_for_evaluation(
         "branch_credit_mode": config.network.branch_credit_mode,
         "simplex_action_format": config.environment.simplex_action_format,
         "initial_portfolio_mode": config.environment.initial_portfolio_mode,
+        "observation_schema_version": config.environment.observation_schema_version,
         "simplex_branch_sizes": environments["train"].simplex_branch_sizes(),
+        "simplex_branch_train_mask": environments["train"].simplex_branch_train_mask(),
         "lambda_value": float(checkpoint["lambda_value"]),
         "device": str(device),
     }

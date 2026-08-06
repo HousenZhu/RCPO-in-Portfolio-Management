@@ -1,0 +1,35 @@
+﻿extends: base.yaml
+
+experiment:
+  run_name: simplex_v2.6_rcpo_allocation_relative_drawdown
+
+environment:
+  action_mode: softmax
+  simplex_action_format: branch_logits
+  constraint_mode: allocation_relative_drawdown
+  combined_drawdown_cost_weight: 0.25
+
+network:
+  policy_architecture: flat_gaussian
+  branch_credit_mode: global
+
+optimization:
+  total_updates: 60000
+  rollout_steps: 2048
+  epochs: 3
+  minibatch_size: 512
+  learning_rate: 0.000060
+  learning_rate_final: 0.000025
+  clip_epsilon: 0.10
+  entropy_coef: 0.0010
+  target_kl: 0.02
+  early_stop_patience:
+
+rcpo:
+  initial_lambda: 0.0
+  lambda_lr_up: 0.00050
+  lambda_lr_down: 0.01
+  alpha:
+  alpha_budget_ratio: 0.05
+  constraint_mode: allocation_relative_drawdown
+

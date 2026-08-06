@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from dataclasses import dataclass
 
@@ -110,6 +110,7 @@ def collect_rollout(
     max_drawdowns: list[float] = []
     benchmark_current_drawdowns: list[float] = []
     benchmark_max_drawdowns: list[float] = []
+    branch_train_mask: np.ndarray | None = None
     drawdown_benchmark_mode = ""
     effective_drawdown_budgets: list[float] = []
     alpha_targets: list[float] = []
@@ -120,6 +121,7 @@ def collect_rollout(
     allocation_constraint_2_violation_costs: list[float] = []
     allocation_constraint_raw_costs: list[float] = []
     allocation_constraint_costs: list[float] = []
+    allocation_drawdown_constraint_costs: list[float] = []
     allocation_constraint_1_weights: list[float] = []
     allocation_constraint_2_weights: list[float] = []
     simplex_z1_values: list[float] = []
@@ -173,6 +175,9 @@ def collect_rollout(
             )
             branch_rewards.append(np.asarray(info["branch_rewards"], dtype=np.float32))
             branch_costs.append(np.asarray(info["branch_costs"], dtype=np.float32))
+            if branch_train_mask is None:
+                branch_train_mask = np.asarray(
+                    info["branch_train_mask"], dtype=np.float32)
             branch_z_values.append(np.asarray(info["branch_z_values"], dtype=np.float32))
             branch_turnovers.append(np.asarray(info["branch_turnovers"], dtype=np.float32))
             branch_transaction_costs.append(
@@ -207,6 +212,9 @@ def collect_rollout(
             )
             allocation_constraint_raw_costs.append(float(info["allocation_constraint_raw_cost"]))
             allocation_constraint_costs.append(float(info["allocation_constraint_cost"]))
+            allocation_drawdown_constraint_costs.append(
+                float(info["allocation_drawdown_constraint_cost"])
+            )
             allocation_constraint_1_weights.append(
                 float(info["allocation_constraint_1_weight"])
             )
@@ -231,6 +239,11 @@ def collect_rollout(
             episode_metrics.append(
                 {
                     "episode_return": episode_reward,
+                    "episode_relative_wealth_vs_baseline": float(
+                        info["portfolio_value"]
+                        / max(float(info["benchmark_portfolio_value"]), 1e-12)
+                        - 1.0
+                    ),
                     "episode_cost": episode_cost / max(episode_steps, 1),
                     "episode_turnover": episode_turnover / max(episode_steps, 1),
                 }
@@ -333,7 +346,7 @@ def collect_rollout(
             optimization.gamma,
             optimization.gae_lambda,
         )
-    if model.branch_credit_mode == "standalone":
+    if model.branch_credit_mode != "global":
         with profile_section(profiler, "reward_gae"):
             branch_reward_advantages, branch_reward_returns = compute_gae(
                 branch_rewards_tensor,
@@ -343,14 +356,22 @@ def collect_rollout(
                 optimization.gamma,
                 optimization.gae_lambda,
             )
-        with profile_section(profiler, "cost_gae"):
-            branch_cost_advantages, branch_cost_returns = compute_gae(
-                branch_costs_tensor,
-                branch_cost_values_tensor,
-                dones_tensor,
-                next_branch_value_c.squeeze(0).detach(),
-                optimization.gamma,
-                optimization.gae_lambda,
+        if model.branch_credit_mode == "standalone":
+            with profile_section(profiler, "cost_gae"):
+                branch_cost_advantages, branch_cost_returns = compute_gae(
+                    branch_costs_tensor,
+                    branch_cost_values_tensor,
+                    dones_tensor,
+                    next_branch_value_c.squeeze(0).detach(),
+                    optimization.gamma,
+                    optimization.gae_lambda,
+                )
+        else:
+            branch_cost_advantages = cost_advantages.unsqueeze(-1).expand_as(
+                branch_rewards_tensor
+            )
+            branch_cost_returns = cost_returns.unsqueeze(-1).expand_as(
+                branch_rewards_tensor
             )
     else:
         branch_reward_advantages = torch.zeros_like(branch_rewards_tensor)
@@ -381,6 +402,19 @@ def collect_rollout(
         "batch_drawdown_gap_mean": float(np.mean(drawdown_gaps)),
         "batch_drawdown_violation_mean": float(np.mean(drawdown_violations)),
         "batch_drawdown_constraint_cost_mean": float(np.mean(drawdown_constraint_costs)),
+        "allocation_max_violation": float(
+            max(
+                max(allocation_constraint_1_violation_costs, default=0.0),
+                max(allocation_constraint_2_violation_costs, default=0.0),
+            )
+        ),
+        "allocation_feasible": int(
+            max(
+                max(allocation_constraint_1_violation_costs, default=0.0),
+                max(allocation_constraint_2_violation_costs, default=0.0),
+            )
+            <= 1e-10
+        ),
         "batch_allocation_constraint_1_violation_cost_mean": float(
             np.mean(allocation_constraint_1_violation_costs)
         ),
@@ -392,6 +426,9 @@ def collect_rollout(
         ),
         "batch_allocation_constraint_cost_mean": float(
             np.mean(allocation_constraint_costs)
+        ),
+        "batch_allocation_drawdown_constraint_cost_mean": float(
+            np.mean(allocation_drawdown_constraint_costs)
         ),
         "batch_allocation_constraint_1_weight_mean": float(
             np.mean(allocation_constraint_1_weights)
@@ -408,6 +445,9 @@ def collect_rollout(
         "batch_diversification_cost_mean": float(np.mean(diversification_costs)),
         "batch_turnover_mean": _flatten_metrics(episode_metrics, "episode_turnover"),
         "episode_return_mean": _flatten_metrics(episode_metrics, "episode_return"),
+        "episode_relative_wealth_vs_baseline_mean": _flatten_metrics(
+            episode_metrics, "episode_relative_wealth_vs_baseline"
+        ),
         "episode_cost_mean": _flatten_metrics(episode_metrics, "episode_cost"),
         **correction.metrics,
     }
@@ -421,6 +461,10 @@ def collect_rollout(
         number = branch_index + 1
         info_summary[f"batch_branch_{number}_reward_mean"] = float(
             branch_rewards_tensor[:, branch_index].mean().item()
+        )
+        info_summary[f"batch_branch_{number}_training_active"] = int(
+            branch_train_mask is not None
+            and bool(branch_train_mask[branch_index])
         )
         info_summary[f"batch_branch_{number}_transaction_cost_mean"] = float(
             np.mean(np.asarray(branch_transaction_costs)[:, branch_index])

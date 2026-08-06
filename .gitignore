@@ -22,7 +22,7 @@ runs/**
 !runs/**/
 !runs/**/evaluation/**/*.png
 !runs/**/evaluation_*/**/*.png
-runs/*v2.4*/
+
 *.training.lock
 
 .DS_Store
