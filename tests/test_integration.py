@@ -546,6 +546,56 @@ def test_market_splits_include_distinct_validation_and_test() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    "policy_architecture",
+    ["simplex_autoregressive_gaussian", "simplex_autoregressive_dirichlet"],
+)
+@pytest.mark.parametrize(
+    "branch_credit_mode",
+    [
+        "counterfactual_open_loop_reward_global_cost",
+        "standalone_reward_counterfactual_open_loop_cost",
+        "counterfactual_open_loop_reward_cost",
+    ],
+)
+def test_short_counterfactual_reward_cost_rcpo_run(
+    tmp_path: Path,
+    policy_architecture: str,
+    branch_credit_mode: str,
+) -> None:
+    config = tiny_config(tmp_path)
+    architecture_tag = "gauss" if policy_architecture.endswith("gaussian") else "dir"
+    mode_tag = {
+        "counterfactual_open_loop_reward_global_cost": "cfr",
+        "standalone_reward_counterfactual_open_loop_cost": "cfc",
+        "counterfactual_open_loop_reward_cost": "cfrc",
+    }[branch_credit_mode]
+    config.experiment.run_name = f"tiny_{architecture_tag}_{mode_tag}"
+    config.network.policy_architecture = policy_architecture
+    config.network.branch_credit_mode = branch_credit_mode
+    config.environment.initial_portfolio_mode = "constrained_neutral"
+    config.reward_correction.mode = "none"
+    config.reward_noise.enabled = False
+
+    run_dir = run_experiment(config, algo="rcpo")[0]
+    metric = json.loads((run_dir / "metrics.jsonl").read_text().splitlines()[-1])
+    checkpoint = torch.load(run_dir / "checkpoint_last.pt", map_location="cpu")
+
+    assert metric["branch_credit_mode"] == branch_credit_mode
+    assert metric["counterfactual_nonfinite_count"] == 0
+    assert metric["counterfactual_mapping_failure_count"] == 0
+    assert "branch_delta_reward_mean_2" in metric
+    assert "branch_delta_cost_mean_2" in metric
+    if "counterfactual_open_loop_reward" in branch_credit_mode:
+        assert "branch_delta_reward_critic_ev_2" in metric
+    if "counterfactual_open_loop_cost" in branch_credit_mode or branch_credit_mode.endswith(
+        "reward_cost"
+    ):
+        assert "branch_delta_cost_critic_ev_2" in metric
+    assert checkpoint["counterfactual_semantics_version"] == 1
+    assert checkpoint["counterfactual_context_dim"] == config.market.num_risky_assets + 7
+
+
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is not available")
 def test_short_training_can_use_cuda_when_configured(tmp_path: Path) -> None:
     config = tiny_config(tmp_path)

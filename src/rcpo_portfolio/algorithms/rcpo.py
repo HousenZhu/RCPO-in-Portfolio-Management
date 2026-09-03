@@ -3,6 +3,11 @@
 import numpy as np
 import torch
 
+from ..branch_credit import (
+    STANDALONE_REWARD_COUNTERFACTUAL_COST,
+    uses_counterfactual_cost,
+    uses_global_cost_credit,
+)
 from ..models import ActorCritic
 from ..profiling import TrainingProfiler, profile_section
 from ..rollouts import RolloutBatch
@@ -60,6 +65,7 @@ def update_rcpo_actor_critic(
     lambda_lr: float,
     lambda_lr_up: float | None = None,
     lambda_lr_down: float | None = None,
+    lambda_gap_override: float | None = None,
     profiler: TrainingProfiler | None = None,
 ) -> tuple[dict[str, float | int | None], float, list[float]]:
     lambda_before = float(lambda_value)
@@ -68,9 +74,11 @@ def update_rcpo_actor_critic(
         batch.cost_advantages,
         lambda_before,
     )
-    if model.branch_credit_mode == "standalone":
+    if model.branch_credit_mode == "standalone" or uses_counterfactual_cost(
+        model.branch_credit_mode
+    ):
         branch_cost_advantages = batch.branch_cost_advantages
-    elif model.branch_credit_mode == "standalone_reward_global_cost":
+    elif uses_global_cost_credit(model.branch_credit_mode):
         branch_cost_advantages = batch.cost_advantages.unsqueeze(-1).expand_as(
             batch.branch_reward_advantages
         )
@@ -85,6 +93,13 @@ def update_rcpo_actor_critic(
         if branch_cost_advantages is not None
         else None
     )
+    if model.branch_credit_mode == STANDALONE_REWARD_COUNTERFACTUAL_COST:
+        # Standalone reward does not contain CAOSD mass, while the cost difference
+        # already measures the branch's effect on the full portfolio.
+        branch_combined_advantages = (
+            batch.branch_z_values * batch.branch_reward_advantages
+            - lambda_before * batch.branch_cost_advantages
+        )
     metrics = _update_actor_critic_with_advantages(
         model=model,
         optimizer=optimizer,
@@ -107,6 +122,10 @@ def update_rcpo_actor_critic(
                 abs(lambda_before) * _rms(cost_advantage)
                 / max(_rms(reward_advantage), 1e-12)
             )
+            if uses_counterfactual_cost(model.branch_credit_mode):
+                metrics[f"branch_lambda_delta_cost_adv_ratio_{number}"] = metrics[
+                    f"branch_lambda_cost_adv_ratio_{number}"
+                ]
             metrics[f"branch_combined_advantage_std_{number}"] = float(
                 branch_combined_advantages[:, branch_index]
                 .std(unbiased=False)
@@ -120,15 +139,22 @@ def update_rcpo_actor_critic(
     lambda_updates: list[float] = []
     if alpha is not None:
         with profile_section(profiler, "lambda_update"):
+            observed_cost = (
+                float(batch.info_summary["batch_constraint_cost_mean"])
+                if lambda_gap_override is None
+                else float(alpha + lambda_gap_override)
+            )
             lambda_value = update_lagrange_multiplier(
                 lambda_before,
-                float(batch.info_summary["batch_constraint_cost_mean"]),
+                observed_cost,
                 alpha,
                 learning_rate=lambda_lr,
                 learning_rate_up=lambda_lr_up,
                 learning_rate_down=lambda_lr_down,
             )
             lambda_updates.append(float(lambda_value))
+            metrics["lambda_observed_cost"] = observed_cost
+            metrics["lambda_gap"] = float(observed_cost - alpha)
     metrics["lambda_before"] = lambda_before
     metrics["lambda_after"] = float(lambda_value)
     metrics["lambda_delta"] = float(lambda_value - lambda_before)

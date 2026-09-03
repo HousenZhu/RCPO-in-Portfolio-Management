@@ -4,6 +4,12 @@ from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
+from .branch_credit import (
+    VALID_BRANCH_CREDIT_MODES,
+    uses_branch_credit,
+    uses_counterfactual_context,
+)
+
 import yaml
 
 BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION = "benchmark_relative_equal_weight_drawdown_v1"
@@ -95,6 +101,7 @@ class EnvironmentConfig:
     )
     resolved_allocation_constraint_1_min_weight: float | None = None
     resolved_allocation_constraint_2_min_weight: float | None = None
+    counterfactual_branch_credit_enabled: bool = False
 
 
 @dataclass
@@ -109,6 +116,10 @@ class NetworkConfig:
     dirichlet_min_concentration: float = 0.5
     dirichlet_init_concentration: float = 12.0
     dirichlet_max_concentration: float = 80.0
+    counterfactual_semantics_version: int = 1
+    counterfactual_downstream_mode: str = "open_loop_fixed_downstream"
+    counterfactual_neutral_action_mode: str = "branch_uniform"
+    counterfactual_critic_schema_version: int = 1
 
 
 @dataclass
@@ -160,6 +171,10 @@ class RCPOConfig:
     alpha: float | None = None
     alpha_budget_ratio: float = 0.05
     constraint_mode: str = "max_drawdown"
+    lambda_gap_mode: str = "mean_step"
+    constraint_quantile: float = 0.80
+    constraint_gap_window_episodes: int = 64
+    constraint_gap_min_episodes: int = 16
 
 
 @dataclass
@@ -204,6 +219,7 @@ class LoggingConfig:
     metrics_schema_version: int = 1
     print_interval_updates: int = 1
     branch_diagnostic_interval_updates: int = 50
+    live_validation_plot: bool = True
 
 @dataclass
 class ProjectConfig:
@@ -248,21 +264,34 @@ def sync_rcpo_constraint_settings(config: ProjectConfig) -> None:
             "Simplex branch policy architectures require "
             "environment.action_mode='simplex_decomposition'."
         )
-    valid_branch_credit_modes = {
-        "global",
-        "standalone",
-        "standalone_reward_global_cost",
-    }
-    if config.network.branch_credit_mode not in valid_branch_credit_modes:
+    if config.network.branch_credit_mode not in VALID_BRANCH_CREDIT_MODES:
         raise ValueError(
             "network.branch_credit_mode must be one of: "
-            f"{sorted(valid_branch_credit_modes)}."
+            f"{sorted(VALID_BRANCH_CREDIT_MODES)}."
         )
     if (
-        config.network.branch_credit_mode != "global"
+        uses_branch_credit(config.network.branch_credit_mode)
         and config.environment.action_mode != "simplex_decomposition"
     ):
         raise ValueError("Standalone branch credit requires simplex_decomposition action mode.")
+    if config.network.counterfactual_semantics_version != 1:
+        raise ValueError("Only counterfactual_semantics_version=1 is supported.")
+    if (
+        config.network.counterfactual_downstream_mode
+        != "open_loop_fixed_downstream"
+    ):
+        raise ValueError(
+            "Only counterfactual_downstream_mode='open_loop_fixed_downstream' is supported."
+        )
+    if config.network.counterfactual_neutral_action_mode != "branch_uniform":
+        raise ValueError(
+            "Only counterfactual_neutral_action_mode='branch_uniform' is supported."
+        )
+    if config.network.counterfactual_critic_schema_version != 1:
+        raise ValueError("Only counterfactual_critic_schema_version=1 is supported.")
+    config.environment.counterfactual_branch_credit_enabled = (
+        uses_counterfactual_context(config.network.branch_credit_mode)
+    )
     config.environment.simplex_action_format = (
         "branch_weights"
         if config.network.policy_architecture == "simplex_autoregressive_dirichlet"
@@ -331,6 +360,23 @@ def sync_rcpo_constraint_settings(config: ProjectConfig) -> None:
         raise ValueError("rcpo.lambda_lr_up must be positive.")
     if config.rcpo.lambda_lr_down <= 0.0:
         raise ValueError("rcpo.lambda_lr_down must be positive.")
+    if config.rcpo.lambda_gap_mode not in {"mean_step", "episode_quantile"}:
+        raise ValueError(
+            "rcpo.lambda_gap_mode must be 'mean_step' or 'episode_quantile'."
+        )
+    if not 0.0 < config.rcpo.constraint_quantile <= 1.0:
+        raise ValueError("rcpo.constraint_quantile must be in (0, 1].")
+    if config.rcpo.constraint_gap_window_episodes < 1:
+        raise ValueError("rcpo.constraint_gap_window_episodes must be positive.")
+    if config.rcpo.constraint_gap_min_episodes < 1:
+        raise ValueError("rcpo.constraint_gap_min_episodes must be positive.")
+    if (
+        config.rcpo.constraint_gap_min_episodes
+        > config.rcpo.constraint_gap_window_episodes
+    ):
+        raise ValueError(
+            "rcpo.constraint_gap_min_episodes cannot exceed the episode window."
+        )
     if config.environment.observation_schema_version not in {1, 2}:
         raise ValueError("environment.observation_schema_version must be 1 or 2.")
     if (

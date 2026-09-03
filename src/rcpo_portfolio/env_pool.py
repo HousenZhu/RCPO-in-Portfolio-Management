@@ -57,3 +57,10 @@ class PortfolioEnvPool:
 
     def constrained_neutral_action(self):
         return self.envs[0].constrained_neutral_action()
+
+    @property
+    def counterfactual_critic_context_dim(self) -> int:
+        return self.active_env.counterfactual_critic_context_dim
+
+    def counterfactual_critic_context(self):
+        return self.active_env.counterfactual_critic_context()

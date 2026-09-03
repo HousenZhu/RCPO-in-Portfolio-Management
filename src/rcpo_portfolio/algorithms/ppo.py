@@ -6,6 +6,12 @@ import numpy as np
 import torch
 from torch import nn
 
+from ..branch_credit import (
+    uses_branch_credit,
+    uses_counterfactual_context,
+    uses_counterfactual_cost,
+    uses_counterfactual_reward,
+)
 from ..models import ActorCritic
 from ..profiling import TrainingProfiler, profile_section
 from ..rollouts import RolloutBatch
@@ -58,6 +64,20 @@ def standalone_branch_policy_loss(
     return -torch.mean(torch.sum(branch_z_values * branch_surrogate, dim=-1))
 
 
+def counterfactual_branch_policy_loss(
+    branch_ratios: torch.Tensor,
+    clipped_branch_ratios: torch.Tensor,
+    branch_advantages: torch.Tensor,
+    branch_train_mask: torch.Tensor,
+) -> torch.Tensor:
+    """Use direct difference credit without applying CAOSD mass a second time."""
+    branch_surrogate = torch.min(
+        branch_ratios * branch_advantages,
+        clipped_branch_ratios * branch_advantages,
+    )
+    return -torch.mean(torch.sum(branch_train_mask * branch_surrogate, dim=-1))
+
+
 def _update_actor_critic_with_advantages(
     model: ActorCritic,
     optimizer: torch.optim.Optimizer,
@@ -69,7 +89,8 @@ def _update_actor_critic_with_advantages(
     use_target_kl: bool,
     profiler: TrainingProfiler | None = None,
 ) -> dict[str, float | int | None]:
-    standalone_credit = model.branch_credit_mode != "global"
+    standalone_credit = uses_branch_credit(model.branch_credit_mode)
+    counterfactual_credit = uses_counterfactual_context(model.branch_credit_mode)
     advantages = _normalize_advantages(selected_advantages)
     normalized_branch_advantages = (
         _normalize_branch_advantages(branch_selected_advantages)
@@ -87,10 +108,14 @@ def _update_actor_critic_with_advantages(
     )
     branch_reward_evs: list[float | None] = []
     branch_reward_target_variances: list[float | None] = []
+    branch_cost_evs: list[float | None] = []
+    branch_cost_target_variances: list[float | None] = []
     for branch_index in range(len(model.branch_sizes)):
         if not standalone_credit or not model.branch_train_mask[branch_index]:
             branch_reward_evs.append(None)
             branch_reward_target_variances.append(None)
+            branch_cost_evs.append(None)
+            branch_cost_target_variances.append(None)
             continue
         ev, variance = _explained_variance(
             batch.branch_reward_returns[:, branch_index],
@@ -98,6 +123,16 @@ def _update_actor_critic_with_advantages(
         )
         branch_reward_evs.append(ev)
         branch_reward_target_variances.append(variance)
+        if train_cost_value and uses_counterfactual_cost(model.branch_credit_mode):
+            cost_ev, cost_variance = _explained_variance(
+                batch.branch_cost_returns[:, branch_index],
+                batch.branch_cost_values[:, branch_index],
+            )
+            branch_cost_evs.append(cost_ev)
+            branch_cost_target_variances.append(cost_variance)
+        else:
+            branch_cost_evs.append(None)
+            branch_cost_target_variances.append(None)
 
     batch_size = batch.observations.shape[0]
     policy_losses: list[float] = []
@@ -138,9 +173,20 @@ def _update_actor_critic_with_advantages(
                 branch_z_values = batch.branch_z_values[batch_indices]
                 branch_reward_returns = batch.branch_reward_returns[batch_indices]
                 branch_cost_returns = batch.branch_cost_returns[batch_indices]
+                branch_critic_contexts = (
+                    batch.branch_critic_contexts[batch_indices]
+                    if batch.branch_critic_contexts is not None
+                    else None
+                )
 
             with profile_section(profiler, "model_recompute_forward"):
-                output = model.get_policy_output(observations, action=actions)
+                output = model.get_policy_output(
+                    observations,
+                    action=actions,
+                    counterfactual_context=(
+                        branch_critic_contexts if counterfactual_credit else None
+                    ),
+                )
             with profile_section(profiler, "loss_compute"):
                 log_ratio = torch.clamp(output.log_prob - old_log_probs, -20.0, 20.0)
                 ratio = torch.exp(log_ratio)
@@ -191,16 +237,33 @@ def _update_actor_critic_with_advantages(
                 if standalone_credit:
                     if minibatch_branch_advantages is None:
                         raise ValueError("Standalone credit requires branch advantages.")
-                    policy_loss = standalone_branch_policy_loss(
-                        branch_ratios,
-                        clipped_branch_ratios,
-                        minibatch_branch_advantages,
-                        branch_z_values,
-                    )
+                    if counterfactual_credit:
+                        branch_train_mask = torch.as_tensor(
+                            model.branch_train_mask,
+                            dtype=branch_ratios.dtype,
+                            device=branch_ratios.device,
+                        ).unsqueeze(0)
+                        policy_loss = counterfactual_branch_policy_loss(
+                            branch_ratios,
+                            clipped_branch_ratios,
+                            minibatch_branch_advantages,
+                            branch_train_mask,
+                        )
+                        entropy_weights = branch_train_mask
+                    else:
+                        policy_loss = standalone_branch_policy_loss(
+                            branch_ratios,
+                            clipped_branch_ratios,
+                            minibatch_branch_advantages,
+                            branch_z_values,
+                        )
+                        entropy_weights = branch_z_values
                     reward_value_loss = torch.mean(
                         torch.square(branch_reward_returns - output.branch_reward_values)
                     )
-                    if model.branch_credit_mode == "standalone":
+                    if model.branch_credit_mode == "standalone" or uses_counterfactual_cost(
+                        model.branch_credit_mode
+                    ):
                         cost_value_loss = torch.mean(
                             torch.square(branch_cost_returns - output.branch_cost_values)
                         )
@@ -209,7 +272,7 @@ def _update_actor_critic_with_advantages(
                             torch.square(cost_returns - output.cost_value)
                         )
                     entropy_bonus = torch.mean(
-                        torch.sum(branch_z_values * output.branch_entropies, dim=-1)
+                        torch.sum(entropy_weights * output.branch_entropies, dim=-1)
                     )
                 else:
                     policy_loss = -torch.mean(
@@ -338,7 +401,24 @@ def _update_actor_critic_with_advantages(
             if branch_index < len(branch_reward_target_variances)
             else None
         )
-        metrics[f"branch_cost_critic_ev_{number}"] = None
+        metrics[f"branch_cost_critic_ev_{number}"] = (
+            branch_cost_evs[branch_index]
+            if branch_index < len(branch_cost_evs)
+            else None
+        )
+        metrics[f"branch_cost_critic_target_variance_{number}"] = (
+            branch_cost_target_variances[branch_index]
+            if branch_index < len(branch_cost_target_variances)
+            else None
+        )
+        if uses_counterfactual_reward(model.branch_credit_mode):
+            metrics[f"branch_delta_reward_critic_ev_{number}"] = metrics[
+                f"branch_reward_critic_ev_{number}"
+            ]
+        if uses_counterfactual_cost(model.branch_credit_mode):
+            metrics[f"branch_delta_cost_critic_ev_{number}"] = metrics[
+                f"branch_cost_critic_ev_{number}"
+            ]
     return metrics
 
 

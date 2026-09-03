@@ -8,6 +8,7 @@ import torch
 
 import train
 from rcpo_portfolio.algorithms.ppo import (
+    counterfactual_branch_policy_loss,
     standalone_branch_policy_loss,
     update_ppo_actor_critic,
 )
@@ -124,6 +125,25 @@ def test_standalone_branch_policy_loss_is_weighted_by_actual_caosd_mass() -> Non
     assert ratios.grad is not None
     assert ratios.grad[0, 0].abs() > 0.0
     assert ratios.grad[0, 2] == 0.0
+
+
+def test_counterfactual_branch_policy_loss_does_not_multiply_by_caosd_mass() -> None:
+    ratios = torch.tensor([[1.10, 0.90, 1.20, 0.80]], requires_grad=True)
+    clipped = torch.tensor([[1.10, 0.90, 1.15, 0.85]])
+    advantages = torch.tensor([[1.0, -2.0, 0.5, -1.0]])
+    train_mask = torch.tensor([[0.0, 1.0, 1.0, 1.0]])
+
+    loss = counterfactual_branch_policy_loss(
+        ratios, clipped, advantages, train_mask
+    )
+    expected_surrogate = torch.minimum(ratios.detach() * advantages, clipped * advantages)
+    expected = -torch.sum(train_mask * expected_surrogate)
+    assert loss.item() == pytest.approx(expected.item())
+
+    loss.backward()
+    assert ratios.grad is not None
+    assert ratios.grad[0, 0] == 0.0
+    assert ratios.grad[0, 1].abs() > 0.0
 
 
 def _standalone_policy_test_batch(
@@ -251,7 +271,6 @@ def test_rcpo_constraint_flags_are_required(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr(sys, "argv", ["train.py", "--algo", "rcpo"])
     with pytest.raises(SystemExit):
         train.parse_args()
-
     monkeypatch.setattr(sys, "argv", ["train.py", "--algo", "rcpo", "--constraint-drawdown"])
     args = train.parse_args()
     assert args.constraint_drawdown
@@ -287,6 +306,16 @@ def test_rcpo_constraint_flags_are_required(monkeypatch: pytest.MonkeyPatch) -> 
     )
     with pytest.raises(SystemExit):
         train.parse_args()
+
+
+def test_seed_override_parses(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["train.py", "--algo", "ppo_unconstrained", "--seed", "3"],
+    )
+    args = train.parse_args()
+    assert args.seed == 3
 
 
 def test_constraint_flags_are_rejected_for_non_rcpo(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -1,0 +1,16 @@
+extends: ../v2.6_experiment2_8assets/simplex_rcpo_gaussian.yaml
+
+experiment:
+  run_name: simplex_v3.2_cf_reward_gaussian
+  seeds: [0]
+
+network:
+  branch_credit_mode: counterfactual_open_loop_reward_global_cost
+
+optimization:
+  total_updates: 11400
+  learning_rate: 0.000060
+  learning_rate_final: 0.0000543
+
+logging:
+  live_validation_plot: false

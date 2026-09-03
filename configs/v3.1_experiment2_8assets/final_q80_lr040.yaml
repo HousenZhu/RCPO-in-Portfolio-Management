@@ -1,0 +1,12 @@
+extends: base.yaml
+
+experiment:
+  run_name: simplex_v3.1_final_q80_lr040
+
+optimization:
+  total_updates: 40000
+  learning_rate: 0.000075
+  learning_rate_final: 0.000045
+
+rcpo:
+  lambda_lr_up: 0.00040

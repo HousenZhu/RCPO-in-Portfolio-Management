@@ -1,0 +1,20 @@
+extends: ../v2.6_experiment2_8assets/simplex_rcpo_dirichlet.yaml
+
+experiment:
+  run_name: simplex_v3.1_base
+  seeds: [0]
+
+evaluation:
+  validation_interval_updates: 100
+
+logging:
+  live_validation_plot: false
+
+rcpo:
+  constraint_mode: relative_current_drawdown
+  lambda_gap_mode: episode_quantile
+  constraint_quantile: 0.80
+  constraint_gap_window_episodes: 64
+  constraint_gap_min_episodes: 16
+  lambda_lr_down: 0.005
+

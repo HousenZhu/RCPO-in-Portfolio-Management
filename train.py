@@ -32,6 +32,12 @@ def parse_args() -> argparse.Namespace:
         help="Optional override for the experiment output directory.",
     )
     parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Optional single-seed override for parallel experiment terminals.",
+    )
+    parser.add_argument(
         "--constraint-preset",
         choices=["c1", "c2", "c3"],
         default=None,
@@ -100,6 +106,11 @@ def main() -> None:
         else Path(args.config)
     )
     config = load_config(config_path)
+    if args.seed is not None:
+        if resume_run_dir is not None:
+            parser_message = "--seed cannot be used with --resume-run-dir."
+            raise ValueError(parser_message)
+        config.experiment.seeds = [int(args.seed)]
     if args.constraint_preset is not None:
         config.environment.active_constraint_preset = args.constraint_preset
     if resume_run_dir is None:

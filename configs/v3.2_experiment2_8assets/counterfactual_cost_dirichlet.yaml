@@ -1,0 +1,16 @@
+extends: ../v2.6_experiment2_8assets/simplex_rcpo_dirichlet.yaml
+
+experiment:
+  run_name: simplex_v3.2_cf_cost_dirichlet
+  seeds: [0]
+
+network:
+  branch_credit_mode: standalone_reward_counterfactual_open_loop_cost
+
+optimization:
+  total_updates: 11400
+  learning_rate: 0.000075
+  learning_rate_final: 0.00006645
+
+logging:
+  live_validation_plot: false

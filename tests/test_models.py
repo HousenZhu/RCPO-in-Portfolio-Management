@@ -101,6 +101,42 @@ def test_standalone_credit_builds_four_reward_and_cost_critics() -> None:
     assert output.branch_cost_values.shape == (3, 4)
 
 
+def test_counterfactual_critics_use_branch_specific_context() -> None:
+    config = NetworkConfig(
+        policy_architecture="simplex_autoregressive_gaussian",
+        branch_credit_mode="counterfactual_open_loop_reward_cost",
+        hidden_sizes=[8],
+    )
+    model = ActorCritic(
+        obs_dim=4,
+        action_dim=8,
+        config=config,
+        branch_sizes=[2, 2, 2, 2],
+        counterfactual_context_dim=5,
+    )
+    context = torch.randn((3, 4, 5))
+
+    output = model.get_policy_output(
+        torch.zeros((3, 4)), counterfactual_context=context
+    )
+
+    assert output.branch_reward_values.shape == (3, 4)
+    assert output.branch_cost_values.shape == (3, 4)
+    assert model.branch_reward_values[0].in_features == 13
+    assert model.branch_cost_values[0].in_features == 13
+
+
+def test_counterfactual_credit_mode_enables_environment_shadow_paths() -> None:
+    config = ProjectConfig()
+    config.environment.action_mode = "simplex_decomposition"
+    config.network.policy_architecture = "simplex_autoregressive_gaussian"
+    config.network.branch_credit_mode = "counterfactual_open_loop_reward_global_cost"
+
+    sync_rcpo_constraint_settings(config)
+
+    assert config.environment.counterfactual_branch_credit_enabled
+
+
 def test_autoregressive_gaussian_deterministic_action_is_zero_at_init() -> None:
     config = NetworkConfig(
         policy_architecture="simplex_autoregressive_gaussian",

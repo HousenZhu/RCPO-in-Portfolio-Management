@@ -821,6 +821,30 @@ def load_checkpoint_for_evaluation(
             f"Checkpoint branch_credit_mode {checkpoint_branch_credit_mode!r} "
             f"does not match config_snapshot {config.network.branch_credit_mode!r}."
         )
+    if config.environment.counterfactual_branch_credit_enabled:
+        expected_counterfactual_metadata = {
+            "counterfactual_semantics_version": int(
+                config.network.counterfactual_semantics_version
+            ),
+            "counterfactual_downstream_mode": (
+                config.network.counterfactual_downstream_mode
+            ),
+            "counterfactual_neutral_action_mode": (
+                config.network.counterfactual_neutral_action_mode
+            ),
+            "counterfactual_critic_schema_version": int(
+                config.network.counterfactual_critic_schema_version
+            ),
+            "counterfactual_context_dim": int(
+                config.market.num_risky_assets + 7
+            ),
+        }
+        for field_name, expected_value in expected_counterfactual_metadata.items():
+            if checkpoint.get(field_name) != expected_value:
+                raise ValueError(
+                    f"Checkpoint {field_name} {checkpoint.get(field_name)!r} does "
+                    f"not match config_snapshot {expected_value!r}."
+                )
     checkpoint_initial_portfolio_mode = checkpoint.get("initial_portfolio_mode", "all_cash")
     if checkpoint_initial_portfolio_mode != config.environment.initial_portfolio_mode:
         raise ValueError(
@@ -932,6 +956,11 @@ def load_checkpoint_for_evaluation(
         config=config.network,
         branch_sizes=environments["train"].simplex_branch_sizes(),
         branch_train_mask=environments["train"].simplex_branch_train_mask(),
+        counterfactual_context_dim=(
+            environments["train"].counterfactual_critic_context_dim
+            if config.environment.counterfactual_branch_credit_enabled
+            else 0
+        ),
     ).to(device)
     checkpoint_action_dim = checkpoint.get("action_dim")
     if checkpoint_action_dim is not None and int(checkpoint_action_dim) != int(

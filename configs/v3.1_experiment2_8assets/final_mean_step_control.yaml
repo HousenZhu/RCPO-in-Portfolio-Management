@@ -1,0 +1,14 @@
+extends: base.yaml
+
+experiment:
+  run_name: simplex_v3.1_control_mean_step
+
+optimization:
+  total_updates: 40000
+  learning_rate: 0.000075
+  learning_rate_final: 0.000045
+
+rcpo:
+  lambda_gap_mode: mean_step
+  lambda_lr_up: 0.00075
+  lambda_lr_down: 0.01

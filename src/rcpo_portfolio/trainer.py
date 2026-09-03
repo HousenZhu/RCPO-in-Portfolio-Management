@@ -4,6 +4,7 @@ import json
 import math
 import shutil
 import time
+from collections import deque
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -126,6 +127,11 @@ class RCPOTrainer:
             config=config.network,
             branch_sizes=self.train_env.simplex_branch_sizes(),
             branch_train_mask=self.train_env.simplex_branch_train_mask(),
+            counterfactual_context_dim=(
+                self.train_env.counterfactual_critic_context_dim
+                if config.environment.counterfactual_branch_credit_enabled
+                else 0
+            ),
         ).to(self.device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.optimization.learning_rate)
         self.reward_corrector = build_reward_corrector(
@@ -139,6 +145,9 @@ class RCPOTrainer:
         self.metrics_path = self.run_dir / "metrics.jsonl"
         self.validation_metrics_path = self.run_dir / "validation_metrics.jsonl"
         self.lambda_history: list[float] = [float(self.lambda_value)]
+        self.constraint_gap_history: deque[float] = deque(
+            maxlen=int(config.rcpo.constraint_gap_window_episodes)
+        )
         self._resolved_preset = self.train_env.resolved_constraint_preset()
         if self.resume_checkpoint is not None:
             self._load_resume_checkpoint()
@@ -156,6 +165,10 @@ class RCPOTrainer:
             f"alpha_budget_ratio={self.config.rcpo.alpha_budget_ratio} "
             f"lambda_lr_up={self.config.rcpo.lambda_lr_up} "
             f"lambda_lr_down={self.config.rcpo.lambda_lr_down} "
+            f"lambda_gap_mode={self.config.rcpo.lambda_gap_mode} "
+            f"constraint_quantile={self.config.rcpo.constraint_quantile} "
+            f"constraint_gap_window={self.config.rcpo.constraint_gap_window_episodes} "
+            f"constraint_gap_min_episodes={self.config.rcpo.constraint_gap_min_episodes} "
             f"reward_noise_enabled={self.config.reward_noise.enabled} "
             f"reward_noise_std={self.config.reward_noise.std} "
             f"constraint_mode={self.config.rcpo.constraint_mode} "
@@ -163,6 +176,7 @@ class RCPOTrainer:
             f"simplex_action_format={self.config.environment.simplex_action_format} "
             f"policy_architecture={self.config.network.policy_architecture} "
             f"branch_credit_mode={self.config.network.branch_credit_mode} "
+            f"counterfactual_enabled={self.config.environment.counterfactual_branch_credit_enabled} "
             f"initial_portfolio_mode={self.config.environment.initial_portfolio_mode} "
             f"branch_sizes={self.train_env.simplex_branch_sizes()} "
             f"branch_train_mask={self.train_env.simplex_branch_train_mask()} "
@@ -208,6 +222,8 @@ class RCPOTrainer:
             f"alpha={metric_row['alpha']:.6f} "
             f"lambda={metric_row['lambda_value']:.6f} "
             f"lambda_gap={metric_row.get('lambda_gap', 0.0):.6f} "
+            f"gap_mode={metric_row.get('lambda_gap_effective_mode', 'mean_step')} "
+            f"episode_feasible={metric_row.get('batch_episode_feasible_rate', 0.0):.1%} "
             f"lambda_updates={metric_row.get('lambda_update_count', 0)} "
             f"current_dd={metric_row['batch_current_drawdown_mean']:.6f} "
             f"benchmark_current_dd={metric_row['batch_benchmark_current_drawdown_mean']:.6f} "
@@ -278,6 +294,11 @@ class RCPOTrainer:
                 if self.algo == "rcpo" and self.alpha is None
                 else None
             ),
+            fixed_alpha_target=(
+                self.alpha
+                if self.algo == "rcpo" and self.alpha is not None
+                else None
+            ),
             reward_noise_config=self.config.reward_noise,
             reward_noise_rng=self.reward_noise_rng,
             profiler=self.profiler,
@@ -298,9 +319,27 @@ class RCPOTrainer:
                 if self.alpha is not None
                 else float(batch.info_summary["batch_alpha_target_mean"])
             )
-            lambda_gap = float(batch.info_summary["batch_constraint_cost_mean"]) - float(
+            mean_step_gap = float(batch.info_summary["batch_constraint_cost_mean"]) - float(
                 effective_alpha
             )
+            self.constraint_gap_history.extend(batch.episode_constraint_gaps)
+            lambda_gap = mean_step_gap
+            effective_gap_mode = "mean_step"
+            if self.config.rcpo.lambda_gap_mode == "episode_quantile":
+                if (
+                    len(self.constraint_gap_history)
+                    >= self.config.rcpo.constraint_gap_min_episodes
+                ):
+                    lambda_gap = float(
+                        np.quantile(
+                            np.asarray(self.constraint_gap_history, dtype=np.float64),
+                            self.config.rcpo.constraint_quantile,
+                            method="higher",
+                        )
+                    )
+                    effective_gap_mode = "episode_quantile"
+                else:
+                    effective_gap_mode = "mean_step_warmup"
             losses, self.lambda_value, lambda_updates = update_rcpo_actor_critic(
                 model=self.model,
                 optimizer=self.optimizer,
@@ -311,9 +350,40 @@ class RCPOTrainer:
                 lambda_lr=self.config.rcpo.lambda_lr,
                 lambda_lr_up=self.config.rcpo.lambda_lr_up,
                 lambda_lr_down=self.config.rcpo.lambda_lr_down,
+                lambda_gap_override=lambda_gap,
                 profiler=self.profiler,
             )
             losses["lambda_gap"] = lambda_gap
+            losses["lambda_gap_mean_step"] = mean_step_gap
+            losses["lambda_gap_mode"] = self.config.rcpo.lambda_gap_mode
+            losses["lambda_gap_effective_mode"] = effective_gap_mode
+            losses["lambda_constraint_quantile"] = float(
+                self.config.rcpo.constraint_quantile
+            )
+            losses["lambda_gap_window_episode_count"] = len(
+                self.constraint_gap_history
+            )
+            if self.constraint_gap_history:
+                gap_values = np.asarray(
+                    self.constraint_gap_history, dtype=np.float64
+                )
+                losses["lambda_gap_window_mean"] = float(np.mean(gap_values))
+                losses["lambda_gap_window_quantile"] = float(
+                    np.quantile(
+                        gap_values,
+                        self.config.rcpo.constraint_quantile,
+                        method="higher",
+                    )
+                )
+                losses["lambda_gap_window_max"] = float(np.max(gap_values))
+                losses["lambda_gap_window_feasible_rate"] = float(
+                    np.mean(gap_values <= 0.0)
+                )
+            else:
+                losses["lambda_gap_window_mean"] = 0.0
+                losses["lambda_gap_window_quantile"] = 0.0
+                losses["lambda_gap_window_max"] = 0.0
+                losses["lambda_gap_window_feasible_rate"] = 0.0
             losses["lambda_lr_up"] = float(self.config.rcpo.lambda_lr_up)
             losses["lambda_lr_down"] = float(self.config.rcpo.lambda_lr_down)
             self.lambda_history.extend(lambda_updates)
@@ -400,6 +470,23 @@ class RCPOTrainer:
                 "simplex_branch_train_mask": self.train_env.simplex_branch_train_mask(),
                 "policy_architecture": self.config.network.policy_architecture,
                 "branch_credit_mode": self.config.network.branch_credit_mode,
+                "counterfactual_semantics_version": int(
+                    self.config.network.counterfactual_semantics_version
+                ),
+                "counterfactual_downstream_mode": (
+                    self.config.network.counterfactual_downstream_mode
+                ),
+                "counterfactual_neutral_action_mode": (
+                    self.config.network.counterfactual_neutral_action_mode
+                ),
+                "counterfactual_critic_schema_version": int(
+                    self.config.network.counterfactual_critic_schema_version
+                ),
+                "counterfactual_context_dim": int(
+                    self.train_env.counterfactual_critic_context_dim
+                    if self.config.environment.counterfactual_branch_credit_enabled
+                    else 0
+                ),
                 "initial_portfolio_mode": self.config.environment.initial_portfolio_mode,
                 "observation_schema_version": int(
                     self.config.environment.observation_schema_version
@@ -431,6 +518,15 @@ class RCPOTrainer:
                 ),
                 "lambda_lr_up": float(self.config.rcpo.lambda_lr_up),
                 "lambda_lr_down": float(self.config.rcpo.lambda_lr_down),
+                "lambda_gap_mode": self.config.rcpo.lambda_gap_mode,
+                "constraint_quantile": float(self.config.rcpo.constraint_quantile),
+                "constraint_gap_window_episodes": int(
+                    self.config.rcpo.constraint_gap_window_episodes
+                ),
+                "constraint_gap_min_episodes": int(
+                    self.config.rcpo.constraint_gap_min_episodes
+                ),
+                "constraint_gap_history": list(self.constraint_gap_history),
                 "reward_noise_enabled": bool(self.config.reward_noise.enabled),
                 "reward_noise_mode": self.config.reward_noise.mode,
                 "reward_noise_std": float(self.config.reward_noise.std),
@@ -489,6 +585,30 @@ class RCPOTrainer:
                 f"Checkpoint branch_credit_mode {checkpoint_branch_credit_mode!r} "
                 f"does not match requested {self.config.network.branch_credit_mode!r}."
             )
+        if self.config.environment.counterfactual_branch_credit_enabled:
+            expected_counterfactual_metadata = {
+                "counterfactual_semantics_version": int(
+                    self.config.network.counterfactual_semantics_version
+                ),
+                "counterfactual_downstream_mode": (
+                    self.config.network.counterfactual_downstream_mode
+                ),
+                "counterfactual_neutral_action_mode": (
+                    self.config.network.counterfactual_neutral_action_mode
+                ),
+                "counterfactual_critic_schema_version": int(
+                    self.config.network.counterfactual_critic_schema_version
+                ),
+                "counterfactual_context_dim": int(
+                    self.train_env.counterfactual_critic_context_dim
+                ),
+            }
+            for field_name, expected_value in expected_counterfactual_metadata.items():
+                if checkpoint.get(field_name) != expected_value:
+                    raise ValueError(
+                        f"Checkpoint {field_name} {checkpoint.get(field_name)!r} does "
+                        f"not match requested {expected_value!r}."
+                    )
         checkpoint_initial_portfolio_mode = checkpoint.get(
             "initial_portfolio_mode",
             "all_cash",
@@ -617,6 +737,30 @@ class RCPOTrainer:
                 raise ValueError(
                     "RCPO resume requires a checkpoint with matching constraint semantics."
                 )
+            checkpoint_lambda_gap_mode = checkpoint.get(
+                "lambda_gap_mode", "mean_step"
+            )
+            if checkpoint_lambda_gap_mode != self.config.rcpo.lambda_gap_mode:
+                raise ValueError(
+                    f"Checkpoint lambda_gap_mode {checkpoint_lambda_gap_mode!r} does not "
+                    f"match requested {self.config.rcpo.lambda_gap_mode!r}."
+                )
+            for field_name in (
+                "constraint_quantile",
+                "constraint_gap_window_episodes",
+                "constraint_gap_min_episodes",
+            ):
+                checkpoint_value = checkpoint.get(field_name)
+                configured_value = getattr(self.config.rcpo, field_name)
+                if checkpoint_value is not None and not math.isclose(
+                    float(checkpoint_value),
+                    float(configured_value),
+                    rel_tol=0.0,
+                    abs_tol=1e-12,
+                ):
+                    raise ValueError(
+                        f"Checkpoint {field_name} does not match the current config."
+                    )
             if self.config.rcpo.constraint_mode in {
                 "max_drawdown",
                 "relative_current_drawdown",
@@ -735,6 +879,10 @@ class RCPOTrainer:
         if checkpoint.get("alpha") is not None:
             self.alpha = float(checkpoint["alpha"])
         self.lambda_value = float(checkpoint.get("lambda_value", self.lambda_value))
+        self.constraint_gap_history.clear()
+        self.constraint_gap_history.extend(
+            float(value) for value in checkpoint.get("constraint_gap_history", [])
+        )
         self.resume_completed_updates = int(checkpoint.get("completed_updates", 0))
         self.resume_learning_rate = float(self.optimizer.param_groups[0]["lr"])
 
@@ -1287,7 +1435,10 @@ class RCPOTrainer:
                         split_name="validation",
                         policy_fn=lambda obs: self._policy_action(obs, deterministic=True),
                     )
-                if not self.disable_artifacts:
+                if (
+                    not self.disable_artifacts
+                    and self.config.logging.live_validation_plot
+                ):
                     with profile_section(self.profiler, "live_group_weights_plot"):
                         save_group_weights_artifact(
                             validation_result,
@@ -1305,7 +1456,10 @@ class RCPOTrainer:
                             split_name="validation",
                             policy_fn=lambda obs: self._policy_action(obs, deterministic=True),
                         )
-                    if not self.disable_artifacts:
+                    if (
+                        not self.disable_artifacts
+                        and self.config.logging.live_validation_plot
+                    ):
                         with profile_section(self.profiler, "live_group_weights_plot"):
                             save_group_weights_artifact(
                                 validation_result,
@@ -1351,6 +1505,12 @@ class RCPOTrainer:
                 "simplex_action_format": self.config.environment.simplex_action_format,
                 "policy_architecture": self.config.network.policy_architecture,
                 "branch_credit_mode": self.config.network.branch_credit_mode,
+                "counterfactual_semantics_version": int(
+                    self.config.network.counterfactual_semantics_version
+                ),
+                "counterfactual_downstream_mode": (
+                    self.config.network.counterfactual_downstream_mode
+                ),
                 "initial_portfolio_mode": self.config.environment.initial_portfolio_mode,
                 "observation_schema_version": int(
                     self.config.environment.observation_schema_version
@@ -1525,6 +1685,14 @@ class RCPOTrainer:
             "alpha_budget_ratio": float(self.config.rcpo.alpha_budget_ratio),
             "lambda_lr_up": float(self.config.rcpo.lambda_lr_up),
             "lambda_lr_down": float(self.config.rcpo.lambda_lr_down),
+            "lambda_gap_mode": self.config.rcpo.lambda_gap_mode,
+            "constraint_quantile": float(self.config.rcpo.constraint_quantile),
+            "constraint_gap_window_episodes": int(
+                self.config.rcpo.constraint_gap_window_episodes
+            ),
+            "constraint_gap_min_episodes": int(
+                self.config.rcpo.constraint_gap_min_episodes
+            ),
             "reward_noise_enabled": bool(self.config.reward_noise.enabled),
             "reward_noise_mode": self.config.reward_noise.mode,
             "reward_noise_std": float(self.config.reward_noise.std),

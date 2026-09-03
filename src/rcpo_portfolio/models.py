@@ -8,6 +8,11 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
+from .branch_credit import (
+    uses_branch_credit,
+    uses_counterfactual_cost,
+    uses_counterfactual_reward,
+)
 from .config import NetworkConfig
 
 
@@ -50,6 +55,7 @@ class ActorCritic(nn.Module):
         config: NetworkConfig,
         branch_sizes: Sequence[int] | None = None,
         branch_train_mask: Sequence[bool] | None = None,
+        counterfactual_context_dim: int = 0,
     ) -> None:
         super().__init__()
         self.policy_architecture = config.policy_architecture
@@ -61,6 +67,7 @@ class ActorCritic(nn.Module):
             if branch_train_mask is not None
             else [True for _ in self.branch_sizes]
         )
+        self.counterfactual_context_dim = int(counterfactual_context_dim)
         self.backbone = _mlp(obs_dim, config.hidden_sizes, config.activation)
         feature_dim = config.hidden_sizes[-1] if config.hidden_sizes else obs_dim
         self.reward_value = nn.Linear(feature_dim, 1)
@@ -70,14 +77,26 @@ class ActorCritic(nn.Module):
         self.dirichlet_init_concentration = float(config.dirichlet_init_concentration)
         self.dirichlet_max_concentration = float(config.dirichlet_max_concentration)
 
-        if self.branch_credit_mode != "global":
+        if uses_branch_credit(self.branch_credit_mode):
             self._validate_branch_sizes()
-            self.branch_reward_values = nn.ModuleList(
-                [nn.Linear(feature_dim, 1) for _ in self.branch_sizes]
+            reward_input_dim = feature_dim + (
+                self.counterfactual_context_dim
+                if uses_counterfactual_reward(self.branch_credit_mode)
+                else 0
             )
-            if self.branch_credit_mode == "standalone":
+            self.branch_reward_values = nn.ModuleList(
+                [nn.Linear(reward_input_dim, 1) for _ in self.branch_sizes]
+            )
+            if self.branch_credit_mode == "standalone" or uses_counterfactual_cost(
+                self.branch_credit_mode
+            ):
+                cost_input_dim = feature_dim + (
+                    self.counterfactual_context_dim
+                    if uses_counterfactual_cost(self.branch_credit_mode)
+                    else 0
+                )
                 self.branch_cost_values = nn.ModuleList(
-                    [nn.Linear(feature_dim, 1) for _ in self.branch_sizes]
+                    [nn.Linear(cost_input_dim, 1) for _ in self.branch_sizes]
                 )
 
         if self.policy_architecture == "flat_gaussian":
@@ -154,25 +173,82 @@ class ActorCritic(nn.Module):
     def _values(self, features: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         return self.reward_value(features).squeeze(-1), self.cost_value(features).squeeze(-1)
 
-    def _branch_values(self, features: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        if self.branch_credit_mode == "global":
+    def _branch_values(
+        self,
+        features: torch.Tensor,
+        counterfactual_context: torch.Tensor | None = None,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        if not uses_branch_credit(self.branch_credit_mode):
             empty = features.new_zeros((features.shape[0], 0))
             return empty, empty
+        if self.counterfactual_context_dim > 0:
+            if counterfactual_context is None:
+                counterfactual_context = features.new_zeros(
+                    (
+                        features.shape[0],
+                        len(self.branch_sizes),
+                        self.counterfactual_context_dim,
+                    )
+                )
+            expected_shape = (
+                features.shape[0],
+                len(self.branch_sizes),
+                self.counterfactual_context_dim,
+            )
+            if tuple(counterfactual_context.shape) != expected_shape:
+                raise ValueError(
+                    "Expected counterfactual critic context shape "
+                    f"{expected_shape}, got {tuple(counterfactual_context.shape)}."
+                )
+
+        def critic_input(branch_index: int, use_context: bool) -> torch.Tensor:
+            if not use_context:
+                return features
+            if counterfactual_context is None:
+                raise RuntimeError("Counterfactual critic context is unavailable.")
+            return torch.cat(
+                [features, counterfactual_context[:, branch_index, :]], dim=-1
+            )
+
         reward_values = torch.cat(
             [
-                head(features) if active else features.new_zeros((features.shape[0], 1))
-                for head, active in zip(
-                    self.branch_reward_values, self.branch_train_mask, strict=True
+                head(
+                    critic_input(
+                        branch_index,
+                        uses_counterfactual_reward(self.branch_credit_mode),
+                    )
+                )
+                if active
+                else features.new_zeros((features.shape[0], 1))
+                for branch_index, (head, active) in enumerate(
+                    zip(
+                        self.branch_reward_values,
+                        self.branch_train_mask,
+                        strict=True,
+                    )
                 )
             ],
             dim=-1,
         )
-        if self.branch_credit_mode == "standalone":
+        if self.branch_credit_mode == "standalone" or uses_counterfactual_cost(
+            self.branch_credit_mode
+        ):
             cost_values = torch.cat(
                 [
-                    head(features) if active else features.new_zeros((features.shape[0], 1))
-                    for head, active in zip(
-                        self.branch_cost_values, self.branch_train_mask, strict=True
+                    head(
+                        critic_input(
+                            branch_index,
+                            uses_counterfactual_cost(self.branch_credit_mode),
+                        )
+                    )
+                    if active
+                    else features.new_zeros((features.shape[0], 1))
+                    for branch_index, (head, active) in enumerate(
+                        zip(
+                            self.branch_cost_values,
+                            self.branch_train_mask,
+                            strict=True,
+                        )
                     )
                 ],
                 dim=-1,
@@ -305,10 +381,13 @@ class ActorCritic(nn.Module):
         obs: torch.Tensor,
         action: torch.Tensor | None = None,
         deterministic: bool = False,
+        counterfactual_context: torch.Tensor | None = None,
     ) -> PolicyOutput:
         features = self.backbone(obs)
         reward_value, cost_value = self._values(features)
-        branch_reward_values, branch_cost_values = self._branch_values(features)
+        branch_reward_values, branch_cost_values = self._branch_values(
+            features, counterfactual_context
+        )
         if self.policy_architecture == "flat_gaussian":
             mean = self.policy_mean(features)
             std = torch.exp(torch.clamp(self.log_std, min=self.min_log_std)).expand_as(mean)
@@ -513,9 +592,13 @@ class ActorCritic(nn.Module):
         return self._values(features)
 
     def value_with_branches(
-        self, obs: torch.Tensor
+        self,
+        obs: torch.Tensor,
+        counterfactual_context: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         features = self.backbone(obs)
         reward_value, cost_value = self._values(features)
-        branch_reward_values, branch_cost_values = self._branch_values(features)
+        branch_reward_values, branch_cost_values = self._branch_values(
+            features, counterfactual_context
+        )
         return reward_value, cost_value, branch_reward_values, branch_cost_values

@@ -1,0 +1,98 @@
+{
+  "evaluation_design": "Each training seed is evaluated on 20 continuations from its own anchor train endpoint; method summaries pool both paired seeds.",
+  "checkpoint": "checkpoint_best_return.pt",
+  "training_seeds": [
+    3,
+    4
+  ],
+  "future_markets_per_seed": 20,
+  "future_seed_offset": 20000,
+  "total_future_paths_per_method": 40,
+  "baseline": "constrained_neutral",
+  "policies": {
+    "Q80 lambda-up 0.00025": {
+      "checkpoint": "checkpoint_best_return.pt",
+      "training_seeds": [
+        3,
+        4
+      ],
+      "evaluation_paths": 40,
+      "mean_relative_wealth_vs_constrained_neutral": 0.048373022771236604,
+      "relative_wealth_std": 0.0648196567755973,
+      "win_rate_vs_constrained_neutral": 0.75,
+      "mean_excess_cumulative_return": 0.0511980876326561,
+      "mean_annualized_return": 0.11006872671266218,
+      "mean_annualized_volatility": 0.16495065894770025,
+      "mean_max_drawdown": 0.15758992061018945,
+      "mean_average_turnover": 0.09927103631198406,
+      "mean_concentration": 0.22836319357156754,
+      "mean_constraint_cost": 0.0019270087934359025,
+      "mean_alpha": 0.00024331269945832907,
+      "constraint_feasible_branch_rate": 0.3,
+      "active_constraint_feasible": false
+    },
+    "Q80 lambda-up 0.00040": {
+      "checkpoint": "checkpoint_best_return.pt",
+      "training_seeds": [
+        3,
+        4
+      ],
+      "evaluation_paths": 40,
+      "mean_relative_wealth_vs_constrained_neutral": 0.04930168486182886,
+      "relative_wealth_std": 0.0668322540399571,
+      "win_rate_vs_constrained_neutral": 0.775,
+      "mean_excess_cumulative_return": 0.05172316431999206,
+      "mean_annualized_return": 0.11059365417944098,
+      "mean_annualized_volatility": 0.16827637389531602,
+      "mean_max_drawdown": 0.1601711011491716,
+      "mean_average_turnover": 0.05466036621946842,
+      "mean_concentration": 0.26542156226933,
+      "mean_constraint_cost": 0.0035461151856978844,
+      "mean_alpha": 0.00024331269945832907,
+      "constraint_feasible_branch_rate": 0.3,
+      "active_constraint_feasible": false
+    },
+    "Mean-step control": {
+      "checkpoint": "checkpoint_best_return.pt",
+      "training_seeds": [
+        3,
+        4
+      ],
+      "evaluation_paths": 40,
+      "mean_relative_wealth_vs_constrained_neutral": 0.06021067604783033,
+      "relative_wealth_std": 0.06445694145227306,
+      "win_rate_vs_constrained_neutral": 0.85,
+      "mean_excess_cumulative_return": 0.059482231736183167,
+      "mean_annualized_return": 0.1183527877472335,
+      "mean_annualized_volatility": 0.16620939891750142,
+      "mean_max_drawdown": 0.15363799380138515,
+      "mean_average_turnover": 0.1436457907781005,
+      "mean_concentration": 0.2459021620452404,
+      "mean_constraint_cost": 0.0015006034202201591,
+      "mean_alpha": 0.00024331269945832907,
+      "constraint_feasible_branch_rate": 0.375,
+      "active_constraint_feasible": false
+    },
+    "Constrained-neutral baseline": {
+      "checkpoint": "neutral_action",
+      "training_seeds": [
+        3,
+        4
+      ],
+      "evaluation_paths": 40,
+      "mean_relative_wealth_vs_constrained_neutral": 0.0,
+      "relative_wealth_std": 0.0,
+      "win_rate_vs_constrained_neutral": 0.0,
+      "mean_excess_cumulative_return": 0.0,
+      "mean_annualized_return": 0.058870461403351705,
+      "mean_annualized_volatility": 0.15631726686965225,
+      "mean_max_drawdown": 0.16234123324975372,
+      "mean_average_turnover": 0.0,
+      "mean_concentration": 0.1787654310464859,
+      "mean_constraint_cost": 0.001045400853124079,
+      "mean_alpha": 0.00024331269945832907,
+      "constraint_feasible_branch_rate": 0.15,
+      "active_constraint_feasible": false
+    }
+  }
+}

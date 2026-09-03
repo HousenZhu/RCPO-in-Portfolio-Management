@@ -34,6 +34,12 @@ class EpisodeState:
     branch_running_peak_values: np.ndarray
     branch_current_drawdowns: np.ndarray
     branch_max_drawdowns: np.ndarray
+    counterfactual_weights: np.ndarray
+    counterfactual_previous_turnovers: np.ndarray
+    counterfactual_portfolio_values: np.ndarray
+    counterfactual_running_peak_values: np.ndarray
+    counterfactual_current_drawdowns: np.ndarray
+    counterfactual_max_drawdowns: np.ndarray
 
 
 class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
@@ -204,6 +210,11 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             return []
         return list(self._simplex_decomposition.branch_training_mask())
 
+    @property
+    def counterfactual_critic_context_dim(self) -> int:
+        # Weights plus turnover, relative wealth, current/max drawdown, gap, and progress.
+        return self.num_assets + 6
+
 
     def neutral_action(self) -> np.ndarray:
         if self.config.action_mode == "simplex_decomposition":
@@ -284,6 +295,68 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
     def _weights_from_action(self, action: np.ndarray) -> np.ndarray:
         weights, _ = self._weights_and_action_components(action)
         return weights
+
+    def _counterfactual_weights_from_action(
+        self,
+        action: np.ndarray,
+        branch_index: int,
+    ) -> np.ndarray:
+        if self._simplex_decomposition is None:
+            raise RuntimeError("Counterfactual branch credit requires simplex decomposition.")
+        branch_sizes = self.simplex_branch_sizes()
+        if branch_index < 0 or branch_index >= len(branch_sizes):
+            raise IndexError(f"Invalid simplex branch index: {branch_index}.")
+        start = int(sum(branch_sizes[:branch_index]))
+        stop = start + int(branch_sizes[branch_index])
+        counterfactual_action = np.asarray(action, dtype=np.float32).copy()
+        if self.config.simplex_action_format == "branch_weights":
+            counterfactual_action[start:stop] = 1.0 / float(branch_sizes[branch_index])
+        else:
+            counterfactual_action[start:stop] = 0.0
+        return self._weights_from_action(counterfactual_action).astype(np.float32)
+
+    def counterfactual_critic_context(self) -> np.ndarray:
+        if self.state is None:
+            raise RuntimeError("Environment must be reset before requesting critic context.")
+        benchmark_drawdown = (
+            self.state.benchmark_current_drawdown
+            if self.config.constraint_mode in {
+                "relative_current_drawdown",
+                "allocation_relative_drawdown",
+            }
+            else self.state.benchmark_max_drawdown
+        )
+        effective_budget = max(
+            float(self.config.drawdown_budget_floor),
+            float(self.config.benchmark_drawdown_margin) * float(benchmark_drawdown),
+        )
+        progress = float(self.state.steps_elapsed) / max(
+            float(self.config.episode_length), 1.0
+        )
+        contexts = np.zeros(
+            (4, self.counterfactual_critic_context_dim), dtype=np.float32
+        )
+        for branch_index in range(4):
+            contexts[branch_index] = np.concatenate(
+                [
+                    self.state.counterfactual_weights[branch_index],
+                    np.asarray(
+                        [
+                            self.state.counterfactual_previous_turnovers[branch_index],
+                            self.state.counterfactual_portfolio_values[branch_index]
+                            / max(self.state.portfolio_value, 1e-12)
+                            - 1.0,
+                            self.state.counterfactual_current_drawdowns[branch_index],
+                            self.state.counterfactual_max_drawdowns[branch_index],
+                            self.state.counterfactual_current_drawdowns[branch_index]
+                            - effective_budget,
+                            progress,
+                        ],
+                        dtype=np.float32,
+                    ),
+                ]
+            )
+        return contexts
 
     def _weights_and_action_components(
         self,
@@ -620,6 +693,14 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             branch_running_peak_values=np.ones(4, dtype=np.float64),
             branch_current_drawdowns=np.zeros(4, dtype=np.float64),
             branch_max_drawdowns=np.zeros(4, dtype=np.float64),
+            counterfactual_weights=np.repeat(
+                initial_weights[np.newaxis, :], 4, axis=0
+            ).astype(np.float32),
+            counterfactual_previous_turnovers=np.zeros(4, dtype=np.float64),
+            counterfactual_portfolio_values=np.ones(4, dtype=np.float64),
+            counterfactual_running_peak_values=np.ones(4, dtype=np.float64),
+            counterfactual_current_drawdowns=np.zeros(4, dtype=np.float64),
+            counterfactual_max_drawdowns=np.zeros(4, dtype=np.float64),
         )
         return self._get_observation(), {"start_index": start_index}
 
@@ -693,6 +774,144 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             ),
         }
 
+    def _active_constraint_cost(
+        self,
+        allocation_cost: float,
+        drawdown_cost: float,
+    ) -> float:
+        if self.config.constraint_mode == "allocation":
+            return float(allocation_cost)
+        if self.config.constraint_mode in {
+            "allocation_drawdown",
+            "allocation_relative_drawdown",
+        }:
+            return float(
+                allocation_cost
+                + float(self.config.combined_drawdown_cost_weight) * drawdown_cost
+            )
+        return float(drawdown_cost)
+
+    def _counterfactual_branch_components(
+        self,
+        action: np.ndarray,
+        current_returns: np.ndarray,
+        effective_drawdown_budget: float,
+        actual_reward: float,
+        actual_constraint_cost: float,
+    ) -> dict[str, np.ndarray | int]:
+        if self.state is None:
+            raise RuntimeError("Environment has not been reset.")
+        counterfactual_rewards = np.zeros(4, dtype=np.float32)
+        counterfactual_costs = np.zeros(4, dtype=np.float32)
+        delta_rewards = np.zeros(4, dtype=np.float32)
+        delta_costs = np.zeros(4, dtype=np.float32)
+        weight_distances = np.zeros(4, dtype=np.float32)
+        turnover_differences = np.zeros(4, dtype=np.float32)
+        drawdown_differences = np.zeros(4, dtype=np.float32)
+        zero_effects = np.zeros(4, dtype=np.float32)
+        nonfinite_count = 0
+        mapping_failure_count = 0
+        branch_train_mask = self.simplex_branch_train_mask()
+        actual_weights = self._weights_from_action(action)
+        actual_turnover = float(np.sum(np.abs(actual_weights - self.state.weights)))
+        actual_drawdown = self._updated_drawdown_state(
+            portfolio_value=self.state.portfolio_value,
+            running_peak_value=self.state.running_peak_value,
+            max_drawdown=self.state.max_drawdown,
+            net_simple_return=float(
+                np.dot(actual_weights[1:], current_returns.astype(np.float32))
+                - self.transaction_cost_rate * actual_turnover
+            ),
+        )["current_drawdown"]
+
+        for branch_index in range(4):
+            if not branch_train_mask[branch_index]:
+                continue
+            try:
+                weights = self._counterfactual_weights_from_action(action, branch_index)
+            except (ValueError, FloatingPointError):
+                mapping_failure_count += 1
+                continue
+            previous_weights = self.state.counterfactual_weights[branch_index]
+            turnover = float(np.sum(np.abs(weights - previous_weights)))
+            raw_return = float(np.dot(weights[1:], current_returns.astype(np.float32)))
+            net_return = raw_return - self.transaction_cost_rate * turnover
+            reward = float(np.log1p(np.clip(net_return, -0.999999, None)))
+            drawdown_state = self._updated_drawdown_state(
+                portfolio_value=float(
+                    self.state.counterfactual_portfolio_values[branch_index]
+                ),
+                running_peak_value=float(
+                    self.state.counterfactual_running_peak_values[branch_index]
+                ),
+                max_drawdown=float(
+                    self.state.counterfactual_max_drawdowns[branch_index]
+                ),
+                net_simple_return=net_return,
+            )
+            constrained_drawdown = (
+                float(drawdown_state["current_drawdown"])
+                if self.config.constraint_mode in {
+                    "relative_current_drawdown",
+                    "allocation_relative_drawdown",
+                }
+                else float(drawdown_state["max_drawdown"])
+            )
+            violation = max(0.0, constrained_drawdown - effective_drawdown_budget)
+            drawdown_cost = violation**2 / max(
+                float(self.config.drawdown_cost_scale), 1e-12
+            )
+            allocation_cost = float(
+                self._constraint_components(weights)["allocation_constraint_cost"]
+            )
+            cost = self._active_constraint_cost(allocation_cost, drawdown_cost)
+            values = np.asarray([reward, cost, *weights], dtype=np.float64)
+            if not np.all(np.isfinite(values)):
+                nonfinite_count += 1
+                continue
+
+            counterfactual_rewards[branch_index] = reward
+            counterfactual_costs[branch_index] = cost
+            delta_rewards[branch_index] = float(actual_reward - reward)
+            delta_costs[branch_index] = float(actual_constraint_cost - cost)
+            weight_distances[branch_index] = float(
+                np.sum(np.abs(actual_weights - weights))
+            )
+            turnover_differences[branch_index] = float(actual_turnover - turnover)
+            drawdown_differences[branch_index] = float(
+                actual_drawdown - drawdown_state["current_drawdown"]
+            )
+            zero_effects[branch_index] = float(
+                weight_distances[branch_index] <= 1e-8
+            )
+            self.state.counterfactual_weights[branch_index] = weights
+            self.state.counterfactual_previous_turnovers[branch_index] = turnover
+            self.state.counterfactual_portfolio_values[branch_index] = float(
+                drawdown_state["portfolio_value"]
+            )
+            self.state.counterfactual_running_peak_values[branch_index] = float(
+                drawdown_state["running_peak_value"]
+            )
+            self.state.counterfactual_current_drawdowns[branch_index] = float(
+                drawdown_state["current_drawdown"]
+            )
+            self.state.counterfactual_max_drawdowns[branch_index] = float(
+                drawdown_state["max_drawdown"]
+            )
+
+        return {
+            "counterfactual_branch_rewards": counterfactual_rewards,
+            "counterfactual_branch_costs": counterfactual_costs,
+            "branch_delta_rewards": delta_rewards,
+            "branch_delta_costs": delta_costs,
+            "counterfactual_weight_l1_distances": weight_distances,
+            "counterfactual_turnover_differences": turnover_differences,
+            "counterfactual_drawdown_differences": drawdown_differences,
+            "counterfactual_zero_effects": zero_effects,
+            "counterfactual_nonfinite_count": nonfinite_count,
+            "counterfactual_mapping_failure_count": mapping_failure_count,
+        }
+
     def step(self, action: np.ndarray) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
         if self.state is None:
             raise RuntimeError("Environment must be reset before stepping.")
@@ -715,15 +934,10 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             + float(self.config.combined_drawdown_cost_weight)
             * drawdown_components["drawdown_constraint_cost"]
         )
-        if self.config.constraint_mode == "allocation":
-            constraint_cost = float(constraint_components["allocation_constraint_cost"])
-        elif self.config.constraint_mode in {
-            "allocation_drawdown",
-            "allocation_relative_drawdown",
-        }:
-            constraint_cost = allocation_drawdown_constraint_cost
-        else:
-            constraint_cost = float(drawdown_components["drawdown_constraint_cost"])
+        constraint_cost = self._active_constraint_cost(
+            float(constraint_components["allocation_constraint_cost"]),
+            float(drawdown_components["drawdown_constraint_cost"]),
+        )
         branch_weights = action_components["simplex_branch_weights"]
         z_values = np.asarray(
             [
@@ -740,6 +954,30 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             float(benchmark_components["effective_drawdown_budget"]),
             z_values,
         )
+        if self.config.counterfactual_branch_credit_enabled:
+            counterfactual_components = self._counterfactual_branch_components(
+                action=action,
+                current_returns=current_returns,
+                effective_drawdown_budget=float(
+                    benchmark_components["effective_drawdown_budget"]
+                ),
+                actual_reward=reward,
+                actual_constraint_cost=constraint_cost,
+            )
+        else:
+            zeros = np.zeros(4, dtype=np.float32)
+            counterfactual_components = {
+                "counterfactual_branch_rewards": zeros.copy(),
+                "counterfactual_branch_costs": zeros.copy(),
+                "branch_delta_rewards": zeros.copy(),
+                "branch_delta_costs": zeros.copy(),
+                "counterfactual_weight_l1_distances": zeros.copy(),
+                "counterfactual_turnover_differences": zeros.copy(),
+                "counterfactual_drawdown_differences": zeros.copy(),
+                "counterfactual_zero_effects": zeros.copy(),
+                "counterfactual_nonfinite_count": 0,
+                "counterfactual_mapping_failure_count": 0,
+            }
 
         self.state.weights = weights
         self.state.previous_turnover = turnover
@@ -786,6 +1024,7 @@ class PortfolioEnv(gym.Env[np.ndarray, np.ndarray]):
             **benchmark_components,
             **action_components,
             **branch_components,
+            **counterfactual_components,
             "weights": weights.copy(),
             "regime": int(self.market.regimes[self.state.current_index - 1]),
             **constraint_components,

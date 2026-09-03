@@ -5,6 +5,11 @@ from dataclasses import dataclass
 import numpy as np
 import torch
 
+from .branch_credit import (
+    uses_counterfactual_context,
+    uses_counterfactual_cost,
+    uses_counterfactual_reward,
+)
 from .config import RewardNoiseConfig
 from .env import PortfolioEnv
 from .models import ActorCritic
@@ -41,6 +46,8 @@ class RolloutBatch:
     branch_reward_advantages: torch.Tensor
     branch_cost_advantages: torch.Tensor
     info_summary: dict[str, float | int | str]
+    branch_critic_contexts: torch.Tensor | None = None
+    episode_constraint_gaps: tuple[float, ...] = ()
 
 
 def compute_gae(
@@ -81,6 +88,7 @@ def collect_rollout(
     device: torch.device | None = None,
     alpha_budget_ratio: float | None = None,
     drawdown_cost_scale: float | None = None,
+    fixed_alpha_target: float | None = None,
     reward_noise_config: RewardNoiseConfig | None = None,
     reward_noise_rng: np.random.Generator | None = None,
     profiler: TrainingProfiler | None = None,
@@ -105,6 +113,19 @@ def collect_rollout(
     branch_turnovers: list[np.ndarray] = []
     branch_transaction_costs: list[np.ndarray] = []
     branch_max_drawdowns: list[np.ndarray] = []
+    branch_critic_contexts: list[np.ndarray] = []
+    branch_actual_rewards: list[np.ndarray] = []
+    branch_counterfactual_rewards: list[np.ndarray] = []
+    branch_delta_rewards: list[np.ndarray] = []
+    branch_actual_costs: list[np.ndarray] = []
+    branch_counterfactual_costs: list[np.ndarray] = []
+    branch_delta_costs: list[np.ndarray] = []
+    counterfactual_weight_distances: list[np.ndarray] = []
+    counterfactual_turnover_differences: list[np.ndarray] = []
+    counterfactual_drawdown_differences: list[np.ndarray] = []
+    counterfactual_zero_effects: list[np.ndarray] = []
+    counterfactual_nonfinite_count = 0
+    counterfactual_mapping_failure_count = 0
     episode_metrics: list[dict[str, float]] = []
     current_drawdowns: list[float] = []
     max_drawdowns: list[float] = []
@@ -135,13 +156,29 @@ def collect_rollout(
     obs, _ = env.reset()
     episode_reward = 0.0
     episode_cost = 0.0
+    episode_alpha_target = 0.0
     episode_turnover = 0.0
     episode_steps = 0
     for _ in range(optimization.rollout_steps):
         with profile_section(profiler, "policy_action_forward"):
             obs_tensor = torch.as_tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
+            critic_context = (
+                env.counterfactual_critic_context()
+                if uses_counterfactual_context(model.branch_credit_mode)
+                else np.zeros((4, 0), dtype=np.float32)
+            )
+            critic_context_tensor = (
+                torch.as_tensor(
+                    critic_context, dtype=torch.float32, device=device
+                ).unsqueeze(0)
+                if uses_counterfactual_context(model.branch_credit_mode)
+                else None
+            )
             with torch.no_grad():
-                policy_output = model.get_policy_output(obs_tensor)
+                policy_output = model.get_policy_output(
+                    obs_tensor,
+                    counterfactual_context=critic_context_tensor,
+                )
                 action_tensor = policy_output.action
                 log_prob_tensor = policy_output.log_prob
                 reward_value_tensor = policy_output.reward_value
@@ -173,8 +210,55 @@ def collect_rollout(
             branch_cost_values.append(
                 policy_output.branch_cost_values.squeeze(0).cpu().numpy().astype(np.float32)
             )
-            branch_rewards.append(np.asarray(info["branch_rewards"], dtype=np.float32))
-            branch_costs.append(np.asarray(info["branch_costs"], dtype=np.float32))
+            branch_critic_contexts.append(critic_context)
+            actual_branch_rewards = np.asarray(info["branch_rewards"], dtype=np.float32)
+            actual_branch_costs = np.asarray(info["branch_costs"], dtype=np.float32)
+            counterfactual_rewards = np.asarray(
+                info["counterfactual_branch_rewards"], dtype=np.float32
+            )
+            counterfactual_costs = np.asarray(
+                info["counterfactual_branch_costs"], dtype=np.float32
+            )
+            delta_rewards = np.asarray(info["branch_delta_rewards"], dtype=np.float32)
+            delta_costs = np.asarray(info["branch_delta_costs"], dtype=np.float32)
+            branch_actual_rewards.append(
+                np.full(4, float(reward), dtype=np.float32)
+            )
+            branch_counterfactual_rewards.append(counterfactual_rewards)
+            branch_delta_rewards.append(delta_rewards)
+            branch_actual_costs.append(
+                np.full(4, float(info["constraint_cost"]), dtype=np.float32)
+            )
+            branch_counterfactual_costs.append(counterfactual_costs)
+            branch_delta_costs.append(delta_costs)
+            branch_rewards.append(
+                delta_rewards
+                if uses_counterfactual_reward(model.branch_credit_mode)
+                else actual_branch_rewards
+            )
+            branch_costs.append(
+                delta_costs
+                if uses_counterfactual_cost(model.branch_credit_mode)
+                else actual_branch_costs
+            )
+            counterfactual_weight_distances.append(
+                np.asarray(info["counterfactual_weight_l1_distances"], dtype=np.float32)
+            )
+            counterfactual_turnover_differences.append(
+                np.asarray(info["counterfactual_turnover_differences"], dtype=np.float32)
+            )
+            counterfactual_drawdown_differences.append(
+                np.asarray(info["counterfactual_drawdown_differences"], dtype=np.float32)
+            )
+            counterfactual_zero_effects.append(
+                np.asarray(info["counterfactual_zero_effects"], dtype=np.float32)
+            )
+            counterfactual_nonfinite_count += int(
+                info["counterfactual_nonfinite_count"]
+            )
+            counterfactual_mapping_failure_count += int(
+                info["counterfactual_mapping_failure_count"]
+            )
             if branch_train_mask is None:
                 branch_train_mask = np.asarray(
                     info["branch_train_mask"], dtype=np.float32)
@@ -195,12 +279,15 @@ def collect_rollout(
             if alpha_budget_ratio is not None:
                 if drawdown_cost_scale is None:
                     raise ValueError("drawdown_cost_scale is required with alpha_budget_ratio.")
-                alpha_targets.append(
-                    float(
-                        (alpha_budget_ratio * float(info["effective_drawdown_budget"])) ** 2
-                        / max(drawdown_cost_scale, 1e-12)
-                    )
+                step_alpha_target = float(
+                    (alpha_budget_ratio * float(info["effective_drawdown_budget"])) ** 2
+                    / max(drawdown_cost_scale, 1e-12)
                 )
+            elif fixed_alpha_target is not None:
+                step_alpha_target = float(fixed_alpha_target)
+            else:
+                step_alpha_target = 0.0
+            alpha_targets.append(step_alpha_target)
             drawdown_gaps.append(float(info["drawdown_gap"]))
             drawdown_violations.append(float(info["drawdown_violation"]))
             drawdown_constraint_costs.append(float(info["drawdown_constraint_cost"]))
@@ -231,6 +318,7 @@ def collect_rollout(
 
         episode_reward += float(info["net_return"])
         episode_cost += float(info["constraint_cost"])
+        episode_alpha_target += step_alpha_target
         episode_turnover += float(info["turnover"])
         episode_steps += 1
 
@@ -245,18 +333,35 @@ def collect_rollout(
                         - 1.0
                     ),
                     "episode_cost": episode_cost / max(episode_steps, 1),
+                    "episode_alpha_target": episode_alpha_target
+                    / max(episode_steps, 1),
+                    "episode_constraint_gap": (
+                        episode_cost - episode_alpha_target
+                    )
+                    / max(episode_steps, 1),
                     "episode_turnover": episode_turnover / max(episode_steps, 1),
                 }
             )
             obs, _ = env.reset()
             episode_reward = 0.0
             episode_cost = 0.0
+            episode_alpha_target = 0.0
             episode_turnover = 0.0
             episode_steps = 0
 
     with profile_section(profiler, "policy_action_forward"):
-        next_value_r, next_value_c, next_branch_value_r, next_branch_value_c = model.value_with_branches(
-            torch.as_tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
+        next_context_tensor = None
+        if uses_counterfactual_context(model.branch_credit_mode):
+            next_context_tensor = torch.as_tensor(
+                env.counterfactual_critic_context(),
+                dtype=torch.float32,
+                device=device,
+            ).unsqueeze(0)
+        next_value_r, next_value_c, next_branch_value_r, next_branch_value_c = (
+            model.value_with_branches(
+                torch.as_tensor(obs, dtype=torch.float32, device=device).unsqueeze(0),
+                counterfactual_context=next_context_tensor,
+            )
         )
     with profile_section(profiler, "tensor_conversion"):
         observations_tensor = torch.as_tensor(
@@ -328,6 +433,9 @@ def collect_rollout(
         branch_cost_values_tensor = torch.as_tensor(
             np.asarray(branch_cost_values), dtype=torch.float32, device=device
         )
+        branch_critic_contexts_tensor = torch.as_tensor(
+            np.asarray(branch_critic_contexts), dtype=torch.float32, device=device
+        )
     with profile_section(profiler, "reward_gae"):
         reward_advantages, reward_returns = compute_gae(
             rewards_tensor,
@@ -356,7 +464,9 @@ def collect_rollout(
                 optimization.gamma,
                 optimization.gae_lambda,
             )
-        if model.branch_credit_mode == "standalone":
+        if model.branch_credit_mode == "standalone" or uses_counterfactual_cost(
+            model.branch_credit_mode
+        ):
             with profile_section(profiler, "cost_gae"):
                 branch_cost_advantages, branch_cost_returns = compute_gae(
                     branch_costs_tensor,
@@ -379,6 +489,19 @@ def collect_rollout(
         branch_reward_returns = torch.zeros_like(branch_rewards_tensor)
         branch_cost_returns = torch.zeros_like(branch_costs_tensor)
 
+    episode_constraint_gaps = tuple(
+        float(metric["episode_constraint_gap"]) for metric in episode_metrics
+    )
+    episode_feasible_rate = (
+        float(np.mean(np.asarray(episode_constraint_gaps) <= 0.0))
+        if episode_constraint_gaps
+        else 0.0
+    )
+    episode_gap_p80 = (
+        float(np.quantile(episode_constraint_gaps, 0.80, method="higher"))
+        if episode_constraint_gaps
+        else 0.0
+    )
     info_summary: dict[str, float | int | str] = {
         "batch_reward_mean": float(rewards_tensor.mean().item()),
         "batch_true_reward_mean": float(true_rewards_tensor.mean().item()),
@@ -399,6 +522,17 @@ def collect_rollout(
             np.mean(effective_drawdown_budgets)
         ),
         "batch_alpha_target_mean": float(np.mean(alpha_targets)) if alpha_targets else 0.0,
+        "batch_completed_episode_count": len(episode_constraint_gaps),
+        "batch_episode_constraint_gap_mean": float(
+            np.mean(episode_constraint_gaps)
+        )
+        if episode_constraint_gaps
+        else 0.0,
+        "batch_episode_constraint_gap_p80": episode_gap_p80,
+        "batch_episode_constraint_gap_max": float(max(episode_constraint_gaps))
+        if episode_constraint_gaps
+        else 0.0,
+        "batch_episode_feasible_rate": episode_feasible_rate,
         "batch_drawdown_gap_mean": float(np.mean(drawdown_gaps)),
         "batch_drawdown_violation_mean": float(np.mean(drawdown_violations)),
         "batch_drawdown_constraint_cost_mean": float(np.mean(drawdown_constraint_costs)),
@@ -484,6 +618,63 @@ def collect_rollout(
         info_summary[f"batch_branch_{number}_cost_advantage_std"] = float(
             branch_cost_advantages[:, branch_index].std(unbiased=False).item()
         )
+        if uses_counterfactual_context(model.branch_credit_mode):
+            actual_rewards_array = np.asarray(branch_actual_rewards)[:, branch_index]
+            counterfactual_rewards_array = np.asarray(
+                branch_counterfactual_rewards
+            )[:, branch_index]
+            delta_rewards_array = np.asarray(branch_delta_rewards)[:, branch_index]
+            actual_costs_array = np.asarray(branch_actual_costs)[:, branch_index]
+            counterfactual_costs_array = np.asarray(
+                branch_counterfactual_costs
+            )[:, branch_index]
+            delta_costs_array = np.asarray(branch_delta_costs)[:, branch_index]
+            info_summary[f"branch_actual_reward_mean_{number}"] = float(
+                np.mean(actual_rewards_array)
+            )
+            info_summary[f"branch_counterfactual_reward_mean_{number}"] = float(
+                np.mean(counterfactual_rewards_array)
+            )
+            info_summary[f"branch_delta_reward_mean_{number}"] = float(
+                np.mean(delta_rewards_array)
+            )
+            info_summary[f"branch_delta_reward_std_{number}"] = float(
+                np.std(delta_rewards_array)
+            )
+            info_summary[f"branch_actual_cost_mean_{number}"] = float(
+                np.mean(actual_costs_array)
+            )
+            info_summary[f"branch_counterfactual_cost_mean_{number}"] = float(
+                np.mean(counterfactual_costs_array)
+            )
+            info_summary[f"branch_delta_cost_mean_{number}"] = float(
+                np.mean(delta_costs_array)
+            )
+            info_summary[f"branch_delta_cost_std_{number}"] = float(
+                np.std(delta_costs_array)
+            )
+            info_summary[f"counterfactual_weight_l1_distance_mean_{number}"] = float(
+                np.mean(np.asarray(counterfactual_weight_distances)[:, branch_index])
+            )
+            info_summary[f"counterfactual_turnover_difference_mean_{number}"] = float(
+                np.mean(
+                    np.asarray(counterfactual_turnover_differences)[:, branch_index]
+                )
+            )
+            info_summary[f"counterfactual_drawdown_difference_mean_{number}"] = float(
+                np.mean(
+                    np.asarray(counterfactual_drawdown_differences)[:, branch_index]
+                )
+            )
+            info_summary[f"counterfactual_zero_effect_rate_{number}"] = float(
+                np.mean(np.asarray(counterfactual_zero_effects)[:, branch_index])
+            )
+    info_summary["counterfactual_nonfinite_count"] = int(
+        counterfactual_nonfinite_count
+    )
+    info_summary["counterfactual_mapping_failure_count"] = int(
+        counterfactual_mapping_failure_count
+    )
     return RolloutBatch(
         observations=observations_tensor,
         actions=actions_tensor,
@@ -511,5 +702,7 @@ def collect_rollout(
         branch_cost_returns=branch_cost_returns.detach(),
         branch_reward_advantages=branch_reward_advantages.detach(),
         branch_cost_advantages=branch_cost_advantages.detach(),
+        branch_critic_contexts=branch_critic_contexts_tensor,
         info_summary=info_summary,
+        episode_constraint_gaps=episode_constraint_gaps,
     )

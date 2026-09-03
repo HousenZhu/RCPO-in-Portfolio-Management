@@ -162,6 +162,57 @@ def test_constrained_neutral_reset_starts_without_initial_rebalance_cost() -> No
     np.testing.assert_allclose(info["branch_turnovers"], np.zeros(4), atol=1e-8)
 
 
+def test_counterfactual_neutral_replacement_is_online_and_zero_at_neutral_action() -> None:
+    env = build_project_simplex_env(
+        initial_portfolio_mode="constrained_neutral",
+        counterfactual_branch_credit_enabled=True,
+    )
+    neutral_action = env.neutral_action()
+    env.reset(options={"start_index": 2})
+
+    context = env.counterfactual_critic_context()
+    assert context.shape == (4, env.num_assets + 6)
+    _, reward, _, _, info = env.step(neutral_action)
+
+    active = np.asarray(env.simplex_branch_train_mask(), dtype=bool)
+    np.testing.assert_allclose(info["branch_delta_rewards"][active], 0.0, atol=1e-8)
+    np.testing.assert_allclose(info["branch_delta_costs"][active], 0.0, atol=1e-8)
+    np.testing.assert_allclose(
+        info["counterfactual_branch_rewards"][active], reward, atol=1e-8
+    )
+    assert info["counterfactual_nonfinite_count"] == 0
+    assert info["counterfactual_mapping_failure_count"] == 0
+
+
+def test_counterfactual_branch_uses_own_turnover_and_stateful_path() -> None:
+    env = build_project_simplex_env(
+        initial_portfolio_mode="constrained_neutral",
+        counterfactual_branch_credit_enabled=True,
+        drawdown_budget_floor=0.001,
+    )
+    env.reset(options={"start_index": 4})
+    action = env.neutral_action()
+    branch_sizes = env.simplex_branch_sizes()
+    branch_2_start = branch_sizes[0]
+    action[branch_2_start : branch_2_start + branch_sizes[1]] = np.asarray(
+        [4.0, -2.0, -2.0], dtype=np.float32
+    )
+
+    _, reward, _, _, first = env.step(action)
+    assert first["counterfactual_weight_l1_distances"][1] > 0.0
+    assert np.isclose(
+        first["branch_delta_rewards"][1],
+        reward - first["counterfactual_branch_rewards"][1],
+    )
+    first_counterfactual_weights = env.state.counterfactual_weights[1].copy()
+
+    env.step(action)
+    np.testing.assert_allclose(
+        env.state.counterfactual_weights[1], first_counterfactual_weights, atol=1e-8
+    )
+    assert env.state.counterfactual_previous_turnovers[1] >= 0.0
+
+
 def test_standalone_branch_reward_and_cost_use_same_market_step() -> None:
     env = build_project_simplex_env(
         initial_portfolio_mode="constrained_neutral",
