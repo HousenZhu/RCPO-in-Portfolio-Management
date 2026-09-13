@@ -16,9 +16,11 @@ HousenZhu_MEng_Project_Syllabus/
 profile_outputs/
 
 runs_*/
-# Keep raw runs and per-run duplicate plots local. Publish curated comparisons
-# under evaluation/ and reports instead. Already tracked files are unaffected.
+# Keep raw training artifacts local; allow per-run evaluation PNGs.
 runs/**
+!runs/**/
+!runs/**/evaluation/**/*.png
+!runs/**/evaluation_*/**/*.png
 
 # Model binaries and raw logs are not result documents.
 *.pt
