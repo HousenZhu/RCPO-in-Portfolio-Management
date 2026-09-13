@@ -69,6 +69,7 @@ class RCPOTrainer:
         profiler: TrainingProfiler | None = None,
         disable_artifacts: bool = False,
         skip_validation: bool = False,
+        finalize_only: bool = False,
     ) -> None:
         self.config = config
         self.algo = algo
@@ -77,6 +78,7 @@ class RCPOTrainer:
         self.resume_checkpoint = resume_checkpoint
         self.profiler = profiler
         self.disable_artifacts = bool(disable_artifacts)
+        self.finalize_only = bool(finalize_only)
         self.resume_learning_rate: float | None = None
         self.skip_validation = bool(skip_validation)
         self.resume_completed_updates = 0
@@ -1374,7 +1376,7 @@ class RCPOTrainer:
             best_feasible_score = -math.inf
             best_feasible_summary = None
         training_start_time = time.perf_counter()
-        additional_updates = self.optimization.total_updates
+        additional_updates = 0 if self.finalize_only else self.optimization.total_updates
         start_update = max(self.resume_completed_updates, len(metrics_rows))
         target_total_updates = start_update + additional_updates
         if metrics_rows:
@@ -1820,6 +1822,7 @@ def resume_experiment(
     profiler: TrainingProfiler | None = None,
     disable_artifacts: bool = False,
     skip_validation: bool = False,
+    finalize_only: bool = False,
 ) -> Path:
     run_path = Path(run_dir)
     checkpoint_path = run_path / checkpoint_name
@@ -1834,6 +1837,7 @@ def resume_experiment(
         profiler=profiler,
         disable_artifacts=disable_artifacts,
         skip_validation=skip_validation,
+        finalize_only=finalize_only,
     )
     with exclusive_run_lock(run_path):
         trainer.train()

@@ -1,45 +1,49 @@
+# Python caches and build output
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
 __pycache__/
 *.py[cod]
 *$py.class
-
-.venv/
-venv/
-env/
-
 build/
 dist/
 *.egg-info/
 
-HousenZhu_MEng_Project_Syllabus/
+# Local environments and secrets
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
 
+# Local syllabus and profiling workspace
+HousenZhu_MEng_Project_Syllabus/
 profile_outputs/
 
+# Training data stays local, except explicitly allowed evaluation PNGs.
 runs_*/
-# Keep raw training artifacts local; allow per-run evaluation PNGs.
 runs/**
 !runs/**/
 !runs/**/evaluation/**/*.png
 !runs/**/evaluation_*/**/*.png
 
-# Model binaries and raw logs are not result documents.
+# Model binaries and raw logs (including files outside runs/)
 *.pt
 *.pth
 *.ckpt
 *.onnx
 *.jsonl
-
 *.training.lock
 
+# Operating-system metadata
 .DS_Store
 Thumbs.db
-
-runs/**/metrics.jsonl
-runs/**/metrics_before_resume_repair_*.jsonl
 
 # Publish only this finished meeting deck, never its build/render intermediates.
 slides/**
 !slides/v3_2_completed_project_review_20260913/
 !slides/v3_2_completed_project_review_20260913/output/
 !slides/v3_2_completed_project_review_20260913/output/V3.2_Completed_Project_Review.pptx
-scripts/
+# Source scripts are intentionally versioned; their outputs belong above.

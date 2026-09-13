@@ -598,26 +598,32 @@ def save_training_progress_artifacts(
         dtype=np.float32,
     )
     evaluation_prefix = (
-        "validation" if "validation_annualized_return" in metrics_rows[0] else "test"
+        "validation"
+        if any("validation_annualized_return" in row for row in metrics_rows)
+        else "test"
     )
+
+    def evaluation_relative_return(row: dict[str, Any]) -> float:
+        relative_key = (
+            f"{evaluation_prefix}_mean_relative_wealth_vs_constrained_neutral"
+        )
+        if relative_key in row:
+            return float(row[relative_key])
+
+        model_key = f"{evaluation_prefix}_mean_cumulative_return"
+        baseline_key = (
+            f"{evaluation_prefix}_equal_weight_mean_cumulative_return"
+        )
+        if model_key not in row or baseline_key not in row:
+            return float("nan")
+        return float(
+            (1.0 + float(row[model_key]))
+            / max(1.0 + float(row[baseline_key]), 1e-12)
+            - 1.0
+        )
+
     evaluation_relative_returns = np.asarray(
-        [
-            row.get(
-                f"{evaluation_prefix}_mean_relative_wealth_vs_constrained_neutral",
-                (
-                    (1.0 + row[f"{evaluation_prefix}_mean_cumulative_return"])
-                    / max(
-                        1.0
-                        + row[
-                            f"{evaluation_prefix}_equal_weight_mean_cumulative_return"
-                        ],
-                        1e-12,
-                    )
-                    - 1.0
-                ),
-            )
-            for row in metrics_rows
-        ],
+        [evaluation_relative_return(row) for row in metrics_rows],
         dtype=np.float32,
     )
     rollout_violation = np.asarray(
@@ -633,9 +639,17 @@ def save_training_progress_artifacts(
     evaluation_violation = np.asarray(
         [
             (
-                row.get(f"{evaluation_prefix}_alpha_target", row["alpha"]) is not None
-                and row[f"{evaluation_prefix}_constraint_cost"]
-                > row.get(f"{evaluation_prefix}_alpha_target", row["alpha"])
+                row.get(f"{evaluation_prefix}_constraint_cost") is not None
+                and row.get(
+                    f"{evaluation_prefix}_alpha_target", row.get("alpha")
+                )
+                is not None
+                and float(row[f"{evaluation_prefix}_constraint_cost"])
+                > float(
+                    row.get(
+                        f"{evaluation_prefix}_alpha_target", row.get("alpha")
+                    )
+                )
             )
             for row in metrics_rows
         ],
@@ -649,12 +663,14 @@ def save_training_progress_artifacts(
         label="Rollout Relative Wealth",
         color="#1f77b4",
     )
-    axis.plot(
-        updates,
-        evaluation_relative_returns,
-        label=f"{evaluation_prefix.title()} Relative Wealth",
-        color="#ff7f0e",
-    )
+    evaluation_mask = np.isfinite(evaluation_relative_returns)
+    if evaluation_mask.any():
+        axis.plot(
+            updates[evaluation_mask],
+            evaluation_relative_returns[evaluation_mask],
+            label=f"{evaluation_prefix.title()} Relative Wealth",
+            color="#ff7f0e",
+        )
 
     rollout_label_used = False
     for index, is_violating in enumerate(rollout_violation):

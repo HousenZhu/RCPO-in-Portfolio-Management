@@ -79,6 +79,14 @@ def parse_args() -> argparse.Namespace:
         default="checkpoint_last.pt",
         help="Checkpoint file inside --resume-run-dir to continue from.",
     )
+    parser.add_argument(
+        "--finalize-only",
+        action="store_true",
+        help=(
+            "Regenerate final metrics summaries and evaluation artifacts from an "
+            "existing run without collecting rollouts or updating the model."
+        ),
+    )
     args = parser.parse_args()
     selected_constraint_count = (
         int(args.constraint_drawdown)
@@ -94,6 +102,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("RCPO constraint flags are only valid with --algo rcpo.")
     if args.algo == "equal_weight" and (args.use_drc or args.use_gdrc):
         parser.error("--use-drc and --use-gdrc are not valid with --algo equal_weight.")
+    if args.finalize_only and args.resume_run_dir is None:
+        parser.error("--finalize-only requires --resume-run-dir.")
     return args
 
 
@@ -133,6 +143,7 @@ def main() -> None:
             algo=args.algo,
             run_dir=resume_run_dir,
             checkpoint_name=args.resume_checkpoint,
+            finalize_only=args.finalize_only,
         )
         print(run_dir)
     else:
