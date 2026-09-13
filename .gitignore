@@ -16,12 +16,16 @@ HousenZhu_MEng_Project_Syllabus/
 profile_outputs/
 
 runs_*/
-# Keep training artifacts out of Git. Only evaluation PNGs from completed runs
-# are included; current v2.4 runs remain local while training is active.
+# Keep raw runs and per-run duplicate plots local. Publish curated comparisons
+# under evaluation/ and reports instead. Already tracked files are unaffected.
 runs/**
-!runs/**/
-!runs/**/evaluation/**/*.png
-!runs/**/evaluation_*/**/*.png
+
+# Model binaries and raw logs are not result documents.
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.jsonl
 
 *.training.lock
 
@@ -31,5 +35,9 @@ Thumbs.db
 runs/**/metrics.jsonl
 runs/**/metrics_before_resume_repair_*.jsonl
 
-slides/
+# Publish only this finished meeting deck, never its build/render intermediates.
+slides/**
+!slides/v3_2_completed_project_review_20260913/
+!slides/v3_2_completed_project_review_20260913/output/
+!slides/v3_2_completed_project_review_20260913/output/V3.2_Completed_Project_Review.pptx
 scripts/
