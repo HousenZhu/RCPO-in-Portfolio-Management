@@ -28,7 +28,7 @@ from rcpo_portfolio.evaluation import (
     load_checkpoint_for_evaluation,
     relative_wealth_path,
 )
-from rcpo_portfolio.market import generate_continuation_splits
+from rcpo_portfolio.market import generate_continuation_splits, resolve_continuation_anchor
 
 
 @dataclass(frozen=True)
@@ -296,6 +296,66 @@ V32_POLICIES = [
 ]
 
 
+V33_POLICIES = [
+    PolicySpec(
+        label="RCPO Gaussian 8x5040 e3",
+        run_dir=PROJECT_ROOT / "runs" / "simplex_v3.3_rcpo_gaussian_m8_s5040_e3_rcpo_none_20260918_185638" / "seed_0",
+    ),
+    PolicySpec(
+        label="RCPO Gaussian 2x5040 e3",
+        run_dir=PROJECT_ROOT / "runs" / "simplex_v3.3_rcpo_gaussian_m2_s5040_e3_rcpo_none_20260918_185638" / "seed_0",
+    ),
+    PolicySpec(
+        label="RCPO Gaussian 8x10080 e3",
+        run_dir=PROJECT_ROOT / "runs" / "simplex_v3.3_rcpo_gaussian_m8_s10080_e3_rcpo_none_20260918_185638" / "seed_0",
+    ),
+    PolicySpec(
+        label="RCPO Gaussian 2x10080 e3",
+        run_dir=PROJECT_ROOT / "runs" / "simplex_v3.3_rcpo_gaussian_m2_s10080_e3_rcpo_none_20260918_185638" / "seed_0",
+    ),
+    PolicySpec(
+        label="RCPO Gaussian 2x20160 e3",
+        run_dir=PROJECT_ROOT / "runs" / "simplex_v3.3_rcpo_gaussian_m2_s20160_e3_rcpo_none_20260918_185638" / "seed_0",
+    ),
+    PolicySpec(
+        label="RCPO Gaussian 2x10080 e4",
+        run_dir=PROJECT_ROOT / "runs" / "simplex_v3.3_rcpo_gaussian_m2_s10080_e4_rcpo_none_20260918_185638" / "seed_0",
+    ),
+    PolicySpec(
+        label="PPO Gaussian 2x10080 e4",
+        run_dir=PROJECT_ROOT / "runs" / "simplex_v3.3_ppo_gaussian_m2_s10080_e4_ppo_unconstrained_none_20260918_185638" / "seed_0",
+    ),
+    PolicySpec(
+        label="RCPO Dirichlet 2x10080 e4",
+        run_dir=PROJECT_ROOT / "runs" / "simplex_v3.3_rcpo_dirichlet_m2_s10080_e4_rcpo_none_20260918_185638" / "seed_0",
+    ),
+    PolicySpec(
+        label="RCPO Allocation+Drawdown 2x10080 e3",
+        run_dir=PROJECT_ROOT / "runs" / "simplex_v3.3_rcpo_allocation_relative_drawdown_m2_s10080_e3_rcpo_none_20260918_185638" / "seed_0",
+    ),
+    PolicySpec(
+        label="CF Reward Gaussian 2x10080 e3",
+        run_dir=PROJECT_ROOT / "runs" / "simplex_v3.3_cf_reward_gaussian_m2_s10080_e3_rcpo_none_20260918_185638" / "seed_0",
+    ),
+    PolicySpec(
+        label="CF Reward Dirichlet 2x10080 e4",
+        run_dir=PROJECT_ROOT / "runs" / "simplex_v3.3_cf_reward_dirichlet_m2_s10080_e4_rcpo_none_20260918_185638" / "seed_0",
+    ),
+]
+
+V33_POLICY_COLORS = {
+    spec.label: color
+    for spec, color in zip(
+        V33_POLICIES,
+        [
+            "#1f77b4", "#4e79a7", "#17becf", "#2ca02c", "#76b7b2",
+            "#59a14f", "#f28e2b", "#e15759", "#9467bd", "#8c564b", "#d62728",
+        ],
+        strict=True,
+    )
+}
+
+
 V26_CONTROL_POLICIES = [
     PolicySpec(
         label="V2.6 Gaussian Control (Best Return)",
@@ -349,6 +409,8 @@ POLICY_COLORS = {
 
 
 def policy_color(label: str) -> str:
+    if label in V33_POLICY_COLORS:
+        return V33_POLICY_COLORS[label]
     if label == "V2.6 Gaussian Control (Best Return)":
         return POLICY_COLORS["v26_gaussian"]
     if label == "V2.6 Dirichlet Control (Best Return)":
@@ -386,7 +448,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--policy-set",
-        choices=["default", "v2.2", "v2.3", "v2.4", "v2.5", "v2.6", "v3.2"],
+        choices=["default", "v2.2", "v2.3", "v2.4", "v2.5", "v2.6", "v3.2", "v3.3"],
         default="default",
         help="Which Section 9 simplex policy set to compare.",
     )
@@ -458,6 +520,7 @@ def policy_specs_from_args(args: argparse.Namespace) -> list[PolicySpec]:
         "v2.5": V25_POLICIES,
         "v2.6": V26_POLICIES,
         "v3.2": V32_POLICIES,
+        "v3.3": V33_POLICIES,
     }
     specs = list(policy_sets[args.policy_set])
     if args.checkpoint:
@@ -505,6 +568,7 @@ def rollout_policy(
     returns: list[float] = []
     turnovers: list[float] = []
     constraint_costs: list[float] = []
+    drawdown_constraint_costs: list[float] = []
     allocation_constraint_1_weights: list[float] = []
     allocation_constraint_2_weights: list[float] = []
     allocation_constraint_1_violations: list[float] = []
@@ -520,6 +584,7 @@ def rollout_policy(
         returns.append(float(info["net_return"]))
         turnovers.append(float(info["turnover"]))
         constraint_costs.append(float(info["constraint_cost"]))
+        drawdown_constraint_costs.append(float(info["drawdown_constraint_cost"]))
         allocation_constraint_1_weights.append(float(info["allocation_constraint_1_weight"]))
         allocation_constraint_2_weights.append(float(info["allocation_constraint_2_weight"]))
         allocation_constraint_1_violations.append(
@@ -562,6 +627,7 @@ def rollout_policy(
         "max_drawdown": float(np.max(compute_drawdown(returns_array))),
         "average_turnover": float(np.mean(turnover_array)),
         "average_constraint_cost": float(np.mean(constraint_array)),
+        "average_drawdown_constraint_cost": float(np.mean(drawdown_constraint_costs)),
         "average_allocation_constraint_1_weight": float(np.mean(allocation_1_weight_array)),
         "average_allocation_constraint_2_weight": float(np.mean(allocation_2_weight_array)),
         "average_allocation_constraint_1_violation_cost": float(
@@ -584,6 +650,14 @@ def rollout_policy(
         ),
         "average_weights": weights_array.mean(axis=0),
     }
+
+
+def common_drawdown_alpha(config, metric: dict[str, np.ndarray | float]) -> float:
+    return (
+        float(config.rcpo.alpha_budget_ratio) ** 2
+        * float(metric["average_effective_drawdown_budget_squared"])
+        / float(config.environment.drawdown_cost_scale)
+    )
 
 
 def load_policy(spec: PolicySpec):
@@ -666,6 +740,9 @@ def write_branch_metrics(path: Path, rows: list[dict[str, object]]) -> None:
         "max_drawdown",
         "average_turnover",
         "average_constraint_cost",
+        "average_drawdown_constraint_cost",
+        "common_drawdown_alpha",
+        "common_drawdown_feasible",
         "average_allocation_constraint_1_weight",
         "average_allocation_constraint_2_weight",
         "average_allocation_constraint_1_violation_cost",
@@ -940,14 +1017,26 @@ def main() -> None:
         if args.future_market_count is not None
         else int(configured_market_count)
     )
+    configured_seed_offset = (
+        anchor_config.evaluation.validation_seed_offset
+        if split_name == "validation"
+        else anchor_config.evaluation.test_seed_offset
+    )
     seed_offset = (
         int(args.future_seed_offset)
         if args.future_seed_offset is not None
-        else (10_000 if split_name == "validation" else 20_000)
+        else int(configured_seed_offset)
+    )
+    continuation_anchor = resolve_continuation_anchor(
+        anchor_config.market,
+        anchor_envs["train"].market,
+        mode=anchor_config.evaluation.continuation_anchor_mode,
+        fixed_seed=anchor_config.evaluation.fixed_anchor_seed,
+        fixed_steps=anchor_config.evaluation.fixed_anchor_steps,
     )
     future_markets = generate_continuation_splits(
         anchor_config.market,
-        anchor_envs["train"].market,
+        continuation_anchor,
         steps,
         int(anchor_metadata["seed"]) + seed_offset,
         count=market_count,
@@ -957,6 +1046,7 @@ def main() -> None:
     max_drawdowns: dict[str, list[float]] = {}
     turnovers: dict[str, list[float]] = {}
     concentrations: dict[str, list[float]] = {}
+    drawdown_feasibility: dict[str, list[float]] = {}
     csv_rows: list[dict[str, object]] = []
     summaries: dict[str, dict[str, object]] = {}
     baseline_returns: list[np.ndarray] = []
@@ -985,6 +1075,14 @@ def main() -> None:
     concentrations["Constrained-neutral baseline"] = [
         float(metric["average_concentration"]) for metric in baseline_metrics
     ]
+    baseline_drawdown_feasible = [
+        float(metric["average_drawdown_constraint_cost"])
+        <= common_drawdown_alpha(anchor_config, metric) + 1e-12
+        for metric in baseline_metrics
+    ]
+    drawdown_feasibility["Constrained-neutral baseline"] = [
+        float(value) for value in baseline_drawdown_feasible
+    ]
     for branch_index, metric in enumerate(baseline_metrics):
         csv_rows.append(
             {
@@ -998,6 +1096,9 @@ def main() -> None:
                 "max_drawdown": metric["max_drawdown"],
                 "average_turnover": metric["average_turnover"],
                 "average_constraint_cost": metric["average_constraint_cost"],
+                "average_drawdown_constraint_cost": metric["average_drawdown_constraint_cost"],
+                "common_drawdown_alpha": common_drawdown_alpha(anchor_config, metric),
+                "common_drawdown_feasible": baseline_drawdown_feasible[branch_index],
                 "average_allocation_constraint_1_weight": metric[
                     "average_allocation_constraint_1_weight"
                 ],
@@ -1034,6 +1135,7 @@ def main() -> None:
         max_drawdowns[spec.label] = []
         turnovers[spec.label] = []
         concentrations[spec.label] = []
+        drawdown_feasibility[spec.label] = []
         branch_metrics: list[dict[str, np.ndarray | float]] = []
         validation_histories[spec.label] = load_validation_history(spec.run_dir)
         for branch_index, market in enumerate(future_markets):
@@ -1048,6 +1150,11 @@ def main() -> None:
             max_drawdowns[spec.label].append(float(result["max_drawdown"]))
             turnovers[spec.label].append(float(result["average_turnover"]))
             concentrations[spec.label].append(float(result["average_concentration"]))
+            is_drawdown_feasible = (
+                float(result["average_drawdown_constraint_cost"])
+                <= common_drawdown_alpha(config, result) + 1e-12
+            )
+            drawdown_feasibility[spec.label].append(float(is_drawdown_feasible))
             branch_metrics.append(result)
             csv_rows.append(
                 {
@@ -1061,6 +1168,9 @@ def main() -> None:
                     "max_drawdown": result["max_drawdown"],
                     "average_turnover": result["average_turnover"],
                     "average_constraint_cost": result["average_constraint_cost"],
+                    "average_drawdown_constraint_cost": result["average_drawdown_constraint_cost"],
+                    "common_drawdown_alpha": common_drawdown_alpha(config, result),
+                    "common_drawdown_feasible": is_drawdown_feasible,
                     "average_allocation_constraint_1_weight": result[
                         "average_allocation_constraint_1_weight"
                     ],
@@ -1191,6 +1301,9 @@ def main() -> None:
             "mean_constraint_alpha": mean_constraint_alpha,
             "active_constraint_feasible": active_constraint_feasible,
             "constraint_feasible_branch_rate": float(np.mean(feasible_by_branch)),
+            "common_drawdown_feasible_branch_rate": float(
+                np.mean(drawdown_feasibility[spec.label])
+            ),
             "mean_allocation_constraint_raw_cost": float(
                 np.mean(
                     [
@@ -1273,6 +1386,7 @@ def main() -> None:
         "mean_constraint_alpha": None,
         "active_constraint_feasible": True,
         "constraint_feasible_branch_rate": 1.0,
+        "common_drawdown_feasible_branch_rate": float(np.mean(baseline_drawdown_feasible)),
         "mean_allocation_constraint_raw_cost": float(
             np.mean([metric["average_allocation_constraint_raw_cost"] for metric in baseline_metrics])
         ),
@@ -1311,6 +1425,12 @@ def main() -> None:
         "Section 9: Portfolio Concentration Comparison",
         "Mean sum of squared portfolio weights (lower is more diversified)",
         concentrations,
+    )
+    plot_bar_with_points(
+        output_dir / "section9_common_drawdown_feasibility.png",
+        "Section 9: Shared Drawdown Budget Feasibility",
+        "Fraction of future branches meeting the drawdown cost budget",
+        drawdown_feasibility,
     )
     plot_validation_history(
         output_dir / "section9_validation_score_history.png",

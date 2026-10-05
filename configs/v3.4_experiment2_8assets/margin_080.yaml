@@ -1,0 +1,7 @@
+extends: standalone_m2_e4.yaml
+
+experiment:
+  run_name: simplex_v3.4_margin_080
+
+environment:
+  benchmark_drawdown_margin: 0.80

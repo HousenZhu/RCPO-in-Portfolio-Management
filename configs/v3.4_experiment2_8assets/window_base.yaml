@@ -1,0 +1,4 @@
+extends: standalone_m2_e4.yaml
+
+market:
+  train_generation_lookback: 60

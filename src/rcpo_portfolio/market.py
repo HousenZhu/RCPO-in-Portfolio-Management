@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 
@@ -185,10 +185,45 @@ def generate_continuation_splits(
 
 def generate_train_markets(config: MarketConfig, seed: int) -> list[MarketSlice]:
     count = max(1, int(config.train_market_count))
-    return [
-        generate_market_split(config, config.train_steps, seed + 11 + 9973 * index)
+    generation_lookback = config.train_generation_lookback
+    generation_config = (
+        replace(config, lookback=generation_lookback)
+        if generation_lookback is not None
+        else config
+    )
+    markets = [
+        generate_market_split(generation_config, config.train_steps, seed + 11 + 9973 * index)
         for index in range(count)
     ]
+    if generation_lookback is None:
+        return markets
+    length = config.train_steps + config.lookback
+    return [
+        MarketSlice(market.risky_returns[-length:], market.regimes[-length:])
+        for market in markets
+    ]
+
+
+def resolve_continuation_anchor(
+    config: MarketConfig,
+    train_market: MarketSlice,
+    *,
+    mode: str,
+    fixed_seed: int,
+    fixed_steps: int,
+    fixed_generation_lookback: int | None = None,
+) -> MarketSlice:
+    """Return the run's train anchor or a shared, training-independent anchor."""
+    if mode == "train_market":
+        return train_market
+    if mode == "fixed_market":
+        generation_config = (
+            replace(config, lookback=fixed_generation_lookback)
+            if fixed_generation_lookback is not None
+            else config
+        )
+        return generate_market_split(generation_config, fixed_steps, fixed_seed)
+    raise ValueError(f"Unsupported continuation anchor mode: {mode!r}.")
 
 
 def generate_market_splits(config: MarketConfig, seed: int) -> dict[str, MarketSlice]:

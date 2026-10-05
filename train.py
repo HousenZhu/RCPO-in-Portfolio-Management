@@ -80,6 +80,12 @@ def parse_args() -> argparse.Namespace:
         help="Checkpoint file inside --resume-run-dir to continue from.",
     )
     parser.add_argument(
+        "--resume-target-total-updates",
+        type=int,
+        default=None,
+        help="On resume, stop at this absolute completed-update count instead of adding total_updates again.",
+    )
+    parser.add_argument(
         "--finalize-only",
         action="store_true",
         help=(
@@ -104,6 +110,11 @@ def parse_args() -> argparse.Namespace:
         parser.error("--use-drc and --use-gdrc are not valid with --algo equal_weight.")
     if args.finalize_only and args.resume_run_dir is None:
         parser.error("--finalize-only requires --resume-run-dir.")
+    if args.resume_target_total_updates is not None:
+        if args.resume_run_dir is None or args.resume_target_total_updates < 1:
+            parser.error("--resume-target-total-updates requires --resume-run-dir and a positive count.")
+        if args.finalize_only:
+            parser.error("--resume-target-total-updates cannot be combined with --finalize-only.")
     return args
 
 
@@ -144,6 +155,7 @@ def main() -> None:
             run_dir=resume_run_dir,
             checkpoint_name=args.resume_checkpoint,
             finalize_only=args.finalize_only,
+            target_total_updates=args.resume_target_total_updates,
         )
         print(run_dir)
     else:

@@ -11,8 +11,8 @@
 \usepackage[british]{babel}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
-\usepackage{newpxtext,newpxmath}
 \usepackage{amsmath,amssymb,bm}
+\usepackage{newpxtext,newpxmath}
 \usepackage{booktabs,tabularx}
 \usepackage{graphicx}
 \usepackage{caption}
@@ -28,7 +28,10 @@
 \setlength{\hoffset}{-25mm}
 \setlength{\voffset}{-15mm}
 \setlength{\parindent}{0pt}
-\setlength{\parskip}{0.42em}
+% A clearly visible paragraph break improves readability while retaining the
+% course report's unindented style.
+\setlength{\parskip}{0.70em plus 0.08em minus 0.05em}
+\raggedbottom
 \setlength{\abovedisplayskip}{0.45em}
 \setlength{\belowdisplayskip}{0.45em}
 \setlength{\textfloatsep}{0.7em}
@@ -67,7 +70,7 @@
 }
 
 \newcommand{\R}{\mathbb{R}}
-\newcommand{\simplex}{\Delta^{N}}
+\newcommand{\AllocSimplex}{\Delta^N}
 \newcommand{\CAOSD}{\operatorname{CAOSD}}
 
 \begin{document}
@@ -77,8 +80,8 @@
   \small University of Toronto \textbar{} Department of Electrical and Computer Engineering\\
   ECE2500Y: MEng Research Project \hfill Supervisor: A. Bereyhi\\[-0.15em]
   \rule{\linewidth}{0.5pt}\\[0.7em]
-  {\LARGE\bfseries Towards Robust Portfolio Reinforcement Learning with\\[0.12em]
-  Constraint-Aware Simplex Decomposition\par}
+  {\LARGE\bfseries Constrained Allocation Reinforcement Learning with\\[0.12em]
+  Hard Simplex Feasibility and Adaptive Path-Risk Control\par}
   \vspace{0.45em}
   {\large Housen Zhu}\qquad
   {\small 10 September 2026}
@@ -86,130 +89,265 @@
 \vspace{-0.5em}
 
 \begin{abstract}
-This report studies portfolio reinforcement learning (RL) when static allocation requirements and path-dependent risk limits must be treated differently. We combine Constrained Allocation Optimization with Simplex Decomposition (CAOSD) with Reward Constrained Policy Optimization (RCPO). CAOSD maps autoregressive Gaussian-logit or Dirichlet branch actions into long-only portfolios that satisfy two overlapping minimum-exposure constraints at every decision. RCPO separately penalises benchmark-relative current-drawdown violations through a global Lagrange multiplier. To address interacting branch actions, we evaluate an open-loop counterfactual credit rule that replaces one realised branch by a neutral action while holding the remaining realised branches fixed. Policies receive the same 60,000-update interaction budget on eight synthetic regime-switching markets and are evaluated deterministically on 20 unseen one-year continuations. Counterfactual-reward Dirichlet RCPO has the highest observed mean terminal relative wealth, $8.18\%$, but exceeds its standalone-credit control by only $0.12$ percentage points and requires materially higher turnover. By contrast, counterfactual-cost Gaussian RCPO produces the clearest drawdown improvement over its matched control, again with higher turnover. Joint counterfactual reward and cost is not consistently beneficial. Allocation feasibility is guaranteed by construction; reliable out-of-sample drawdown feasibility is not. Claims are therefore limited to single-seed synthetic experiments.
+Sequential allocation problems require an agent to repeatedly distribute a finite, divisible resource among competing entities. Their action space is naturally a probability simplex, but practical requirements introduce two fundamentally different forms of constraint. Hard allocation constraints restrict every realised action, whereas path-dependent constraints regulate cumulative behaviour over a trajectory. This report develops a hybrid reinforcement-learning (RL) formulation that treats these requirements separately. Constrained Allocation Optimization with Simplex Decomposition (CAOSD) parameterises actions satisfying two possibly overlapping group-exposure constraints by construction. Reward Constrained Policy Optimization (RCPO) then adapts a Lagrange multiplier for a soft trajectory cost without altering the hard-feasible action set. The framework is instantiated in portfolio allocation, where assets are the allocation entities, minimum group exposures are hard constraints, and benchmark-relative drawdown is the path cost. To study credit assignment within the decomposed policy, we compare standalone branch returns with an open-loop counterfactual that replaces one realised branch by a neutral allocation while holding the remaining branches fixed. Under matched 60,000-update interaction budgets and evaluation on 20 unseen synthetic market continuations, counterfactual-reward Dirichlet RCPO attains the highest observed mean terminal relative wealth, $8.18\%$, but improves on its standalone-credit control by only $0.12$ percentage points and increases turnover. Counterfactual-cost Gaussian RCPO produces the clearest drawdown improvement over its matched control, whereas joint counterfactual reward and cost is not consistently beneficial. The structural constraints are satisfied for every evaluated action; reliable out-of-sample satisfaction of the path-risk target is not achieved. The results therefore support the general separation of hard action feasibility from adaptive cumulative-risk control, while empirical claims remain limited to a single-seed portfolio study in synthetic markets.
 \end{abstract}
 
 \section{Introduction and Contributions}
 
-Portfolio selection is a sequential control problem: each allocation determines immediate return, transaction costs, and the wealth state from which later decisions are made. Deep RL can represent such feedback, but an unconstrained return objective does not encode institutional allocation mandates or path-risk preferences. The two requirements are mathematically distinct. Long-only and minimum-exposure rules define a static feasible polytope and should hold for every action. Drawdown, by contrast, depends on the realised wealth path and cannot be enforced by projecting a single action.
+Allocation is a recurring decision primitive in finance, computing, logistics, communication networks, and energy systems. At each time step, an agent distributes a limited resource among a set of entities, observes the consequences, and reallocates in response to a changing environment. Examples include dividing capital among assets, assigning workload to servers, distributing power across devices, and allocating capacity among users. Reinforcement learning (RL) is attractive in these settings because an allocation can influence both immediate utility and the state in which future allocations are chosen. The difficulty is that feasible resource use is rarely described by the simplex constraint alone.
 
-Prior portfolio RL studies illustrate the flexibility of sequential allocation while repeatedly identifying transaction costs, constraint handling, and out-of-sample stability as central difficulties \cite{gollart2025}. Safe RL casts such requirements as constrained Markov decision processes (CMDPs) \cite{kushwaha2025}. Reward Constrained Policy Optimization (RCPO) adapts a Lagrange multiplier from observed constraint cost \cite{tessler2019}, whereas CAOSD represents a linearly constrained allocation region by coupled simplex subproblems \cite{winkel2023}. Their combination yields a useful division of labour: geometry enforces action-level feasibility, while optimisation expresses a preference over path-dependent risk within that feasible set.
+Two classes of constraint arise. First, \emph{hard allocation constraints} prescribe which actions may be executed at an individual decision. Group quotas, capacity shares, diversification rules, and minimum service levels belong to this class. Violating such a rule once may make the action operationally invalid, even when the policy is feasible on average. Second, \emph{soft cumulative constraints} regulate behaviour over time. Long-run energy use, average congestion, cumulative risk, and drawdown-related costs depend on the realised trajectory and are naturally represented through cost returns. Conflating the two classes is problematic: a finite expected penalty does not provide a policy-support guarantee, while an action-space construction cannot by itself control a path statistic.
 
-This distinction also clarifies why a single penalty mechanism is insufficient. An expected allocation penalty can make violations rare without ruling them out on a particular rebalance, and a post-hoc projection can distort the action whose probability was evaluated by the policy gradient. Conversely, a static feasible-set map cannot determine whether a sequence of individually admissible allocations produces an acceptable wealth path. The proposed framework evaluates likelihoods in the sampled surrogate space---Gaussian branch logits or Dirichlet branch weights---maps that action to a feasible portfolio, and attaches the risk cost only to the realised portfolio trajectory. This separation is the central design principle rather than an incidental combination of two algorithms.
+The portfolio application makes the distinction concrete. Long-only weights and group-exposure requirements define a static feasible region that every rebalance must respect. Drawdown depends on the complete wealth path and on previous peaks, so it cannot be characterised by the current weight vector alone. Portfolio RL also introduces adjustment costs and generalisation concerns: rebalancing changes realised return, and strong performance on one market path need not transfer to another \cite{gollart2025}. These features make portfolio allocation a useful instance of the broader constrained allocation problem rather than a separate mathematical category.
 
-This work makes three empirical contributions. First, it implements a CAOSD action map for overlapping group-exposure constraints and verifies zero allocation violation for every evaluated simplex-policy action. Second, it couples this map to proximal policy optimisation (PPO) \cite{schulman2017} and RCPO using an observable, benchmark-relative drawdown cost and one multiplier update per rollout. Third, it tests whether open-loop counterfactual branch credit improves upon standalone branch credit under matched environment-interaction budgets and future-market branches. The intended claim is not that drawdown is guaranteed or that the method is profitable in real markets; rather, it is that hard feasibility and adaptive risk learning can be separated coherently, and that the resulting credit-assignment trade-offs can be measured.
+\subsection{Related work and positioning}
+
+Constrained Markov decision processes (CMDPs) augment the reward objective with expected cumulative cost limits. Constrained Policy Optimization (CPO) uses trust-region arguments to obtain near-constraint satisfaction during policy updates \cite{achiam2017}, whereas Reward Constrained Policy Optimization (RCPO) uses a multi-timescale Lagrangian mechanism to adapt a penalty multiplier \cite{tessler2019}. These and related safe-RL methods are well suited to cumulative behavioural requirements, but an expectation constraint does not generally imply that every sampled action is feasible \cite{kushwaha2025}.
+
+Action-constrained RL instead treats admissibility as a property of the action set. Projection and safety-layer methods can enforce zero violation, although projection may couple correction and policy gradients or introduce optimisation overhead \cite{lin2021}. Constrained allocation is a structured action-constrained setting because non-negative resource shares sum to one and group restrictions cut a convex polytope from that simplex. CAOSD exploits the special geometry of two allocation constraints by combining simplex-valued sub-actions through a weighted Minkowski sum \cite{winkel2023}. More recent work, such as Polytope Action Space Policy Optimization (PASPO), uses autoregressive allocation and linear programming to handle more general convex polytopes \cite{winkel2024paspo}. The present work does not implement that broader capability: its hard-feasibility mechanism is deliberately restricted to two, possibly overlapping, group-exposure constraints.
+
+The proposed architecture combines this specialised hard-action map with a cumulative-cost learner. Proximal Policy Optimization (PPO) \cite{schulman2017} optimises a stochastic policy on the decomposed surrogate space; CAOSD deterministically maps its branch actions to the feasible allocation space; and RCPO adjusts behaviour within that space using the realised path cost. Thus, structural feasibility is not delegated to a stochastic penalty, and cumulative risk is not incorrectly treated as a static geometric constraint.
+
+The work makes three contributions:
+\begin{enumerate}
+  \item It formulates sequential constrained allocation with separate requirements for hard, per-decision feasibility and soft, cumulative trajectory cost, and maps portfolio allocation into this general model.
+  \item It combines a two-group CAOSD policy with RCPO so that the policy remains allocation-feasible for every action while learning from an observable path-dependent risk signal.
+  \item It evaluates standalone and open-loop counterfactual credit assignment for the dependent branches of the decomposed policy under matched portfolio experiments.
+\end{enumerate}
+The intended contribution is methodological. The report does not claim support for arbitrary allocation polytopes, guaranteed drawdown control, or profitability in real markets.
 
 \section{Problem Formulation}
 
-\subsection{Portfolio process and structural constraints}
+\subsection{Sequential allocation and information structure}
 
-The environment contains cash (index $0$) and $N=8$ risky assets. At time $t$, the action is a long-only allocation
+Consider a finite-horizon constrained Markov decision process (CMDP) \cite{achiam2017},
 \begin{equation}
-  \bm w_t\in\simplex
-  =\left\{\bm w\in\R_{+}^{N+1}:\sum_{j=0}^{N}w_j=1\right\}.
-  \label{eq:simplex}
+  \mathcal M=(\mathcal S,\mathcal A,P,R,\gamma,\mathcal C),
+  \qquad \mathcal C=(C_1,\ldots,C_Q),
+  \label{eq:allocation-mdp}
 \end{equation}
-For risky-asset simple returns $\bm R_t\in\R^N$ and transaction-cost rate $\kappa$, the net return and learning reward are
+with initial distribution $\rho_0$, horizon $H$, and cost budgets $d_q$. Here $P$ is the transition kernel, $R$ the reward function, $\gamma\in(0,1]$ the discount factor, and $C_q$ integrable transition costs. To separate exogenous conditions from decision memory, write
 \begin{equation}
-  r_t^{\mathrm{net}}
-  =\bm w_{t,1:N}^{\top}\bm R_t
-   -\kappa\lVert\bm w_t-\bm w_{t-1}\rVert_1,
-  \qquad r_t=\log(1+r_t^{\mathrm{net}}).
-  \label{eq:reward}
+  s_t=(x_t,\bm a_{t-1},\zeta_t,t),
+  \label{eq:augmented-state}
 \end{equation}
-The observation includes trailing returns, rolling moments, current weights, turnover, allocation diagnostics, and current drawdown. The latent market regime is not observed.
+where $x_t$ contains sufficient market or system variables and $\zeta_t$ contains endogenous path statistics. In the simulator, the exogenous transition is determined by latent regime and momentum dynamics, or by market identity and index when a fixed tape is replayed. Initial allocation and memory belong to $\rho_0$.
 
-The trading convention is deliberately explicit. At each step the policy observes information available before the rebalance, chooses $\bm w_t$, pays the full $\ell_1$ reallocation cost, and then receives the contemporaneous portfolio return. Wealth evolves multiplicatively as $P_{t+1}=P_t(1+r_t^{\mathrm{net}})$. This timing makes turnover part of both immediate performance and the state passed to the next decision, while the logarithmic reward remains additive across an episode. The environment rejects non-positive gross wealth, so Eq.~\eqref{eq:reward} is well defined on every retained transition.
+The actor observes $o_t=\mathsf O(s_t)$, not the full state: trailing returns, rolling mean and volatility, previous target weights and turnover, allocation and drawdown diagnostics, and elapsed time. Its policy is non-anticipative with respect to available information $\mathcal F_t$; future returns and latent regimes are excluded. Previous allocation is necessary because identical market information and new actions can incur different costs under different prior allocations. Wealth and peak statistics similarly distinguish histories with different drawdowns. This augmentation makes endogenous costs Markovian, but a finite return window need not identify the latent market state; the implemented actor remains an observation-conditioned approximation to partially observed control.
 
-Two overlapping minimum-exposure constraints define the admissible action set:
+\subsection{Hard feasibility and cumulative constraints}
+
+For $N$ allocation entities $\mathcal E=\{1,\ldots,N\}$, the nominal action space is
 \begin{equation}
-  \sum_{j\in V_1}w_j\geq0.50,
-  \quad V_1=\{1,4,6\};
+  \mathcal A=\AllocSimplex
+  :=\left\{\bm a\in\R^N:
+  a_i\geq0\ (i\in\mathcal E),\ \mathbf1^\top\bm a=1\right\}.
+  \label{eq:allocation-simplex}
+\end{equation}
+The superscript counts coordinates; the affine dimension is $N-1$. For groups $V_k\subseteq\mathcal E$ and limits $0\leq\ell_k\leq u_k\leq1$, assume the hard-feasible set is non-empty:
+\begin{equation}
+  \mathcal A_{\mathrm h}
+  =\left\{\bm a\in\AllocSimplex:
+  \ell_k\leq\sum_{i\in V_k}a_i\leq u_k,\
+  k=1,\ldots,K\right\}\neq\varnothing.
+  \label{eq:hard-action-set}
+\end{equation}
+An upper bound is equivalent to $\sum_{i\in\mathcal E\setminus V_k}a_i\geq1-u_k$. The implemented CAOSD map supports only two lower-bound group constraints, not arbitrary polytopes. Define $\Pi_{\mathrm h}$ as the non-anticipative policies satisfying
+\begin{equation}
+  \pi_t(\mathcal A_{\mathrm h}\mid\mathcal F_t)=1
+  \quad\text{almost surely},\qquad t=0,\ldots,H-1.
+  \label{eq:hard-feasibility}
+\end{equation}
+This support condition guarantees feasibility of every executed action. An unconstrained continuous density assigns zero mass to the unit-sum hyperplane, and a finite penalty does not enforce this support. Softmax and Dirichlet policies satisfy the simplex but not necessarily group exposures \cite{lin2021,winkel2023}.
+
+Let $r_t=R(s_t,\bm a_t,s_{t+1})$ and $c_{q,t+1}=C_q(s_t,\bm a_t,s_{t+1})$. Reward may include adjustment costs before a nonlinear utility transformation. Define
+\begin{align}
+  J_R(\pi)&=\mathbb E_\pi\!\left[\sum_{t=0}^{H-1}\gamma^t r_t\right],
+  \label{eq:reward-return}\\
+  J_{C_q}(\pi)&=\mathbb E_\pi\!\left[\sum_{t=0}^{H-1}\gamma^t c_{q,t+1}\right].
+  \label{eq:cost-return}
+\end{align}
+The general constrained-allocation problem is
+\begin{equation}
+  \max_{\pi\in\Pi_{\mathrm h}}J_R(\pi)
+  \quad\text{subject to}\quad J_{C_q}(\pi)\leq d_q,\quad q=1,\ldots,Q.
+  \label{eq:hybrid-problem}
+\end{equation}
+Expected cost limits regulate trajectories, not individual actions. A positive violation budget permits rare violations; exactly zero expected non-negative violation implies almost-sure feasibility, but finite-sample optimisation does not certify that equality. Hard-feasible actions can still produce excessive path cost, and non-emptiness of $\mathcal A_{\mathrm h}$ does not ensure feasible cumulative budgets.
+
+\subsection{Portfolio instantiation}
+
+For a portfolio of $N$ allocation entities, target weights satisfy $\bm w_t\in\Delta^N$ and asset returns $\bm R_{t+1}\in\R^N$ are realised after selecting $\bm w_t$. Any reserve is included as a zero-return entity within this vector. The simulator uses previous target weights, not drifted holdings:
+\begin{align}
+  T_t&=\lVert\bm w_t-\bm w_{t-1}\rVert_1\leq2,\nonumber\\
+  g_{t+1}&=1+\bm w_t^{\top}\bm R_{t+1}-\kappa T_t,
+  \qquad\kappa=10^{-4},
+  \label{eq:portfolio-net-growth}\\
+  r_t&=\log\!\bigl(\max\{10^{-6},g_{t+1}\}\bigr),\nonumber\\
+  W_{t+1}&=W_t\max\{10^{-12},g_{t+1}\},\qquad W_0=1.
+  \label{eq:portfolio-reward}
+\end{align}
+Full-$\ell_1$ turnover covers reallocation across all entities. This target-change cost is a simulator approximation: exact self-financing requires drifted holdings and fee-adjusted cash balance \cite{jiang2017}. Slippage, tiered fees and market impact are omitted, as are the benchmark's drift-induced rebalancing fees. The growth floors avoid undefined numerical operations, not insolvency. Positive growth is ensured if $\min_{1\leq i\leq N}(1+R_{t+1,i})>2\kappa$, but Gaussian returns provide no deterministic guarantee. Without active floors, $r_t=\log(W_{t+1}/W_t)$; only the undiscounted sum telescopes to terminal log wealth.
+
+The experimental group exposures are
+\begin{equation}
+  \sum_{j\in V_1}w_{t,j}\geq0.50,\quad V_1=\{1,4,6\};
   \qquad
-  \sum_{j\in V_2}w_j\geq0.40,
-  \quad V_2=\{2,4,7\}.
-  \label{eq:allocation-constraints}
+  \sum_{j\in V_2}w_{t,j}\geq0.40,\quad V_2=\{2,4,7\}.
+  \label{eq:portfolio-groups}
 \end{equation}
-Asset $4$ lies in both groups. Episodes begin from the same constrained-neutral feasible portfolio used as the evaluation benchmark, avoiding an artificial initial advantage from unequal feasibility.
+Agent and benchmark start from the same feasible constrained-neutral target. The benchmark retains this target, with zero initial and ongoing target-change cost.
 
-\subsection{Benchmark-relative drawdown cost}
+For agent wealth and its benchmark counterpart $W_t^B$, initialised at one, define
+\begin{equation}
+  M_t=\max_{0\leq u\leq t}W_u,\qquad
+  D_t=1-\frac{W_t}{M_t},\qquad
+  D_t^{\max}=\max_{0\leq u\leq t}D_u.
+  \label{eq:portfolio-drawdown}
+\end{equation}
+Benchmark quantities $M_t^B,D_t^B,D_t^{B,\max}$ are analogous. Wealth, peaks, running maximum drawdowns and previous turnover are retained in $\zeta_t$; the actor receives risk ratios and diagnostics rather than absolute wealth. Since peaks never fall below one, drawdown denominators remain positive.
 
-Let $P_t$ and $P_t^B$ denote agent and benchmark wealth. Their current drawdowns from running peaks are
+The adaptive drawdown threshold, excess cost and cost allowance are
+\begin{align}
+  b_{t+1}&=\max\{0.05,0.90D_{t+1}^B\},\qquad
+  c_{t+1}=\frac{[D_{t+1}-b_{t+1}]_+^2}{0.10},
+  \label{eq:portfolio-cost}\\
+  \alpha_{t+1}&=\frac{(0.05b_{t+1})^2}{0.10},
+  \label{eq:portfolio-alpha}
+\end{align}
+where $[x]_+=\max(0,x)$. The actor observes $b_t$; $b_{t+1}$ and its cost are computed only after updating both wealth paths with the realised return. Thus the cost is non-anticipative, and the exogenous benchmark prevents the agent from directly inflating its allowance. The threshold $b_t$ is in drawdown units, whereas $\alpha_t$ is in squared-cost units. The portfolio risk target is
 \begin{equation}
-  D_t=1-\frac{P_t}{\max_{s\leq t}P_s},
-  \qquad
-  D_t^B=1-\frac{P_t^B}{\max_{s\leq t}P_s^B}.
-  \label{eq:drawdown}
+  \begin{aligned}
+    J_{\mathrm{gap}}(\pi)
+    &=\mathbb E_\pi\!\left[\frac1H
+      \sum_{t=0}^{H-1}(c_{t+1}-\alpha_{t+1})\right],\\
+    \max_{\pi\in\Pi_{\mathrm h}}J_R(\pi)
+    &\quad\text{subject to}\quad J_{\mathrm{gap}}(\pi)\leq0.
+  \end{aligned}
+  \label{eq:adaptive-risk-problem}
 \end{equation}
-The time-varying budget, positive violation, and non-negative cost are
-\begin{equation}
-  b_t=\max(0.05,0.90D_t^B),\qquad
-  v_t=[D_t-b_t]_+,\qquad
-  c_t=\frac{v_t^2}{0.10},
-  \label{eq:cost}
-\end{equation}
-where $[x]_+=\max(0,x)$. Unlike maximum drawdown, $c_t$ can return to zero after recovery and is available online. Terminal performance is reported as relative wealth $P_T/P_T^B-1$, so positive performance is measured against a portfolio satisfying the same structural constraints.
+RCPO uses undiscounted rollout-mean residuals for multiplier updates; discounted actor--critic learning is a surrogate, not an exact solution or risk certificate. The cost penalises current drawdown and can vanish after recovery, unlike running maximum drawdown. Terminal relative wealth $W_H/W_H^B-1$ and maximum drawdown are portfolio evaluation metrics, not the general objective.
 
 \section{Proposed Method}
 
-\subsection{Feasible action construction}
+\subsection{Method overview}
 
-CAOSD decomposes the constrained polytope into simplex-valued branches associated with $V_1\cap V_2$, $V_1$, $V_2$, and the full asset universe \cite{winkel2023}. Given padded branch allocations $\bm y_i$, let $q_2=\sum_{j\in V_1\cap V_2}y_{2,j}$. For thresholds $c_1$ and $c_2$, the implementation uses
+The method implements the two constraint classes in Eq.~\eqref{eq:hybrid-problem} through separate mechanisms. A stochastic actor first samples dependent branch actions in a surrogate product of simplexes. CAOSD maps those branches deterministically to an allocation in $\mathcal A_{\mathrm h}$, providing hard feasibility before the environment is evaluated. PPO or RCPO then updates the surrogate policy from reward and cost advantages. RCPO influences which feasible allocations are preferred over a trajectory; it is not responsible for repairing infeasible actions. Thus, every action delivered to the environment satisfies the supported group constraints independently of critic accuracy or multiplier convergence.
+
+\subsection{Hard-feasible CAOSD action map}
+
+Consider two lower-bound constraints
+\begin{equation}
+  \sum_{j\in V_1}a_j\geq \ell_1,
+  \qquad
+  \sum_{j\in V_2}a_j\geq \ell_2,
+  \label{eq:two-group-constraints}
+\end{equation}
+where $V_1,V_2\subseteq\mathcal E$ may overlap and $\ell_1,\ell_2\in[0,1]$. CAOSD constructs four padded simplex branches supported respectively on
+\begin{equation}
+  K_1=V_1\cap V_2,\qquad
+  K_2=V_1,\qquad
+  K_3=V_2,\qquad
+  K_4=\mathcal E.
+  \label{eq:caosd-branches}
+\end{equation}
+Each branch output $\bm y_i\in\R_+^N$ has support only on $K_i$ and unit mass whenever $K_i$ is non-empty. Let
+\begin{equation}
+  q_2=\sum_{j\in V_1\cap V_2}y_{2,j}
+  \label{eq:q2}
+\end{equation}
+denote the fraction of the second branch contributing to the second group's exposure. The implemented combination coefficients are
 \begin{align}
-  z_1&=[c_1+c_2-1]_+,& z_2&=[c_1-z_1]_+,\nonumber\\
-  z_3&=[c_2-z_1-z_2q_2]_+,& z_4&=1-z_1-z_2-z_3.
+  z_1&=[\ell_1+\ell_2-1]_+,& z_2&=[\ell_1-z_1]_+,\nonumber\\
+  z_3&=[\ell_2-z_1-z_2q_2]_+,& z_4&=1-z_1-z_2-z_3.
   \label{eq:caosd-masses}
 \end{align}
-The reconstructed portfolio is
+The environment allocation is the weighted Minkowski sum
 \begin{equation}
-  \bm w_t=\CAOSD(\bm a_t)
+  \bm a_t=\CAOSD(\bm y_{1,t},\ldots,\bm y_{4,t})
   =\sum_{i=1}^{4}z_{i,t}\bm y_{i,t},
   \qquad z_{i,t}\geq0,
   \quad\sum_{i=1}^{4}z_{i,t}=1.
   \label{eq:caosd}
 \end{equation}
-The implementation checks non-negativity, unit mass, and both inequalities in Eq.~\eqref{eq:allocation-constraints} after reconstruction. Consequently, feasibility is a property of the action parameterisation and does not depend on whether a penalty has been learned. In the reported experiment, $c_1=0.50$ and $c_2=0.40$, hence $z_1=0$: the intersection branch exists in the general decomposition but is inactive and receives no policy update. Branches 2--4 remain active, and the overlap still affects $z_3$ through $q_2$.
+For feasible two-group inputs, every positive-mass branch has unit mass; an empty branch can have only zero coefficient. Hence, in exact arithmetic, $\bm a_t\geq0$ and $\mathbf1^\top\bm a_t=\sum_i z_{i,t}=1$. The first group receives at least $z_1+z_2=\ell_1$, and the second receives at least $z_1+z_2q_2+z_3\geq\ell_2$ \cite{winkel2023}. Numerical normalisation and feasibility diagnostics handle floating-point tolerances. This is a specialised exact map, not a solver for arbitrary polytopes or an arbitrary number of groups; methods such as PASPO address the more general case \cite{winkel2024paspo}.
 
-Two autoregressive actors are compared. The Gaussian actor emits real-valued logits, applies a branch-wise softmax, and conditions each later head on earlier branch allocations. The Dirichlet actor emits bounded positive concentrations and samples directly on each branch simplex, again conditioning later heads on realised earlier weights. Both use a shared multilayer perceptron encoder, and both pass their complete branch action through Eq.~\eqref{eq:caosd}.
+For the portfolio constraints in Eq.~\eqref{eq:portfolio-groups}, $\ell_1=0.50$ and $\ell_2=0.40$. Hence $z_1=0$: the mandatory-intersection branch exists in the general construction but is inactive and receives no policy update. Branches 2--4 remain active, and the overlap still affects $z_3$ through $q_2$.
 
-Autoregression is used to model dependencies induced by sequential branch allocations, particularly through the shared set $V_1\cap V_2$; feasibility itself comes from the CAOSD reconstruction. The joint action log probability is the sum of conditional branch log probabilities. This preserves a tractable PPO likelihood ratio while allowing the CAOSD coefficients to react to sampled upstream branches. It also creates the credit-assignment question studied below: a return produced by the final portfolio generally cannot be attributed to one branch independently of its conditional successors.
+\subsection{Autoregressive surrogate policy}
 
-\subsection{RCPO optimisation}
+The learned stochastic action is the collection of active branch variables, not the reconstructed environment allocation. Let $\bm u_t=(\bm u_{1,t},\ldots,\bm u_{4,t})$ denote these surrogate variables and let $\bm y_{i,t}$ be their simplex-valued branch representations. The autoregressive policy factorises as
+\begin{equation}
+  \pi_\theta(\bm u_t\mid o_t)
+  =\prod_{i\in\mathcal I_{\mathrm{active}}}
+  \pi_{\theta,i}(\bm u_{i,t}\mid o_t,\bm u_{<i,t}),
+  \qquad
+  \log\pi_\theta=\sum_{i\in\mathcal I_{\mathrm{active}}}
+  \log\pi_{\theta,i}.
+  \label{eq:autoregressive-policy}
+\end{equation}
+This conditional structure represents dependencies induced by sequential branch allocations, especially the effect of $\bm y_2$ on $q_2$ and therefore on downstream available mass.
 
-PPO uses a clipped likelihood-ratio surrogate \cite{schulman2017}. In the global formulation, RCPO replaces the reward advantage with
+Two branch distributions are evaluated. The autoregressive Gaussian actor emits real-valued branch logits and applies a softmax within each branch. The autoregressive Dirichlet actor emits bounded positive concentration parameters and samples directly on each branch simplex. Both use a shared multilayer perceptron encoder, condition later heads on earlier realised branch weights, and apply Eq.~\eqref{eq:caosd} only after the complete surrogate action has been formed.
+
+PPO likelihood ratios are computed from Eq.~\eqref{eq:autoregressive-policy} in the sampled surrogate space. The environment-action policy in Eq.~\eqref{eq:hard-feasibility} is the pushforward of this law through the branch representation and CAOSD map; notation such as $J_R(\pi_\theta)$ refers to returns under that composite policy. No density is assigned directly to the final allocation, for which the deterministic CAOSD map may be many-to-one. This distinction avoids treating a reconstructed environment action as though it had been sampled from an unrelated flat distribution. The same dependency that motivates autoregression also creates a credit-assignment problem: the joint reward of $\bm a_t$ generally cannot be attributed to one branch independently of its realised mass and downstream branches.
+
+\subsection{RCPO for soft trajectory costs}
+
+For one cumulative constraint, a Lagrangian relaxation of Eq.~\eqref{eq:hybrid-problem} is
+\begin{equation}
+  \mathcal L(\theta,\lambda)
+  =J_R(\pi_\theta)-\lambda\bigl(J_C(\pi_\theta)-d_C\bigr),
+  \qquad \lambda\geq0.
+  \label{eq:lagrangian}
+\end{equation}
+Here $J_C$ is one discounted cost return and $d_C$ its fixed budget. For the adaptive portfolio target in Eq.~\eqref{eq:adaptive-risk-problem}, the corresponding relaxation is $\mathcal L_{\mathrm{ad}}=J_R-\lambda J_{\mathrm{gap}}$, so the state-dependent allowance belongs inside the expectation. PPO supplies the clipped on-policy update \cite{schulman2017}; the RCPO-inspired implementation supplies a projected dual update once per rollout \cite{tessler2019}. In the global formulation, the actor uses the combined advantage
 \begin{equation}
   A_t^{\mathrm{RCPO}}=A_t^R-\lambda A_t^C,
   \label{eq:rcpo-advantage}
 \end{equation}
-where separate critics estimate reward and cost returns. In branch-credit modes, each active branch instead has its own reward critic and, when counterfactual cost is used, its own cost critic. The three tested actor advantages are
+where separate critics estimate reward and cost returns. In branch-credit modes, each active branch has its own reward critic and, when counterfactual cost is used, its own cost critic. The three tested branch advantages are
 \begin{align}
  A_{i,t}^{\mathrm{CF-R}}&=A_{i,t}^{\Delta R}-\lambda A_t^{C,\mathrm{global}},\nonumber\\
  A_{i,t}^{\mathrm{CF-C}}&=z_{i,t}A_{i,t}^{R,\mathrm{standalone}}-\lambda A_{i,t}^{\Delta C},\nonumber\\
  A_{i,t}^{\mathrm{CF-RC}}&=A_{i,t}^{\Delta R}-\lambda A_{i,t}^{\Delta C}.
  \label{eq:branch-advantages}
 \end{align}
-The allowable cost is expressed in the units of Eq.~\eqref{eq:cost} as $\alpha_t=(0.05b_t)^2/0.10$. Once per rollout, the global multiplier is updated from actual portfolio cost,
+The portfolio allowance is defined in Eq.~\eqref{eq:portfolio-alpha}. For the fixed initialisation and market-sampling protocol, its benchmark path is exogenous and the episode horizon is fixed, so the expected allowance is independent of the allocation policy. The global cost critic estimates non-negative excess cost, while counterfactual branch-cost critics estimate signed differences; neither directly estimates $c-\alpha$. However, discounted critic advantages and the undiscounted rollout-mean dual statistic are different surrogates. The combined PPO/RCPO procedure is not an exact primal--dual solver for Eq.~\eqref{eq:adaptive-risk-problem}, and the convergence guarantees of the original RCPO analysis are not asserted for these branch-credit and adaptive-budget variants. Once per rollout, the single global multiplier is updated using realised $c_{t+1}$ and $\alpha_{t+1}$,
 \begin{equation}
   \lambda\leftarrow
-  \left[\lambda+\eta_{\lambda}(\bar c-\bar\alpha)\right]_+,qquad
+  \left[\lambda+\eta_{\lambda}(\bar c-\bar\alpha)\right]_+,\qquad
   \eta_{\lambda}=\begin{cases}
   0.00075,&\bar c>\bar\alpha,\\
   0.01,&\bar c\leq\bar\alpha.
   \end{cases}
   \label{eq:lambda}
 \end{equation}
-Updating once per rollout prevents the number of PPO epochs or minibatches from changing the multiplier time scale. The multiplier is deliberately global: risk is incurred by the reconstructed portfolio, not by an isolated branch.
+where bars denote rollout means. Updating once per rollout prevents the number of PPO epochs or minibatches from changing the multiplier time scale. The unequal upward and downward step sizes are an implementation choice designed to let the multiplier relax faster after realised cost falls below tolerance. The multiplier remains global in every branch-credit variant because the cumulative risk in Eq.~\eqref{eq:portfolio-cost} is incurred by the reconstructed portfolio, not by an isolated branch. It is always updated from the non-negative actual cost, never from a signed branch counterfactual.
 
-\subsection{Open-loop counterfactual branch credit}
+\subsection{Standalone and open-loop counterfactual branch credit}
 
-Standalone credit assigns each branch the return of a fully invested shadow branch portfolio, scales its actor signal by the realised CAOSD mass $z_i$, and retains global portfolio cost. Because CAOSD masses, turnover, and autoregressive conditioning interact, this is only an approximation to a branch's contribution. Related counterfactual credit methods compare an action with a baseline while preserving a shared outcome context \cite{foerster2018}. Here, the counterfactual branch-credit training rule replaces branch $i$ by a neutral action while holding all other realised branch actions fixed:
+The final allocation produces one joint reward and one joint path cost, although the actor samples several dependent branches. Standalone credit constructs a shadow trajectory in which a branch is treated as fully allocated, uses its branch-specific reward return, scales its actor signal by the realised CAOSD mass $z_i$, and retains the global portfolio cost. This provides a low-cost branch signal but ignores interactions through the CAOSD coefficients, transaction costs, and autoregressive successors.
+
+Counterfactual credit instead compares the realised allocation with a matched baseline allocation, following the broader idea of holding a shared outcome context fixed while changing one component \cite{foerster2018}. Let $\bm y_{i,t}^{0}$ denote the neutral allocation on branch $i$. The actual and branch-$i$ counterfactual actions are
 \begin{align}
-  \bm w_t^{\mathrm{act}}&=\CAOSD(\bm a_{1,t},\ldots,\bm a_{4,t}),\nonumber\\
-  \bm w_t^{-i}&=\CAOSD(\bm a_{1,t},\ldots,
-  \bm a_{i,t}^{\mathrm{neutral}},\ldots,\bm a_{4,t}).
+  \bm a_t^{\mathrm{act}}
+  &=\CAOSD(\bm y_{1,t},\ldots,\bm y_{4,t}),\nonumber\\
+  \bm a_t^{-i}
+  &=\CAOSD(\bm y_{1,t},\ldots,\bm y_{i,t}^{0},
+  \ldots,\bm y_{4,t}).
   \label{eq:counterfactual}
 \end{align}
-Each counterfactual maintains its own turnover, wealth, running peak, and drawdown on the same return path, and its critic receives that counterfactual path state. Marginal signals are $\Delta r_{i,t}=r_t^{\mathrm{act}}-r_{i,t}^{\mathrm{cf}}$ and $\Delta c_{i,t}=c_t^{\mathrm{act}}-c_{i,t}^{\mathrm{cf}}$. The latter is signed: neutralising a branch may increase or decrease cost. Equation~\eqref{eq:lambda} nevertheless always uses the actual non-negative portfolio cost, never $\Delta c_i$. Because downstream autoregressive actions are held fixed rather than resampled, this construction is an open-loop marginal-credit heuristic, not an unbiased causal effect.
+The CAOSD map is recomputed rather than subtracting a padded branch from the final action; replacing a branch can change both its direct allocation and downstream masses. On the same exogenous transition, the marginal signals are
+\begin{equation}
+  \Delta r_{i,t}=r_t^{\mathrm{act}}-r_{i,t}^{\mathrm{cf}},
+  \qquad
+  \Delta c_{i,t+1}=c_{t+1}^{\mathrm{act}}-c_{i,t+1}^{\mathrm{cf}}.
+  \label{eq:counterfactual-signals}
+\end{equation}
+In the portfolio implementation, every counterfactual maintains its own turnover, wealth, running peak, and drawdown path, and its critic receives the corresponding counterfactual path features. All paths use the same realised market return, the accounting convention of Eq.~\eqref{eq:portfolio-reward}, and the common exogenous benchmark budget. The cost difference is signed: neutralising a branch may increase or decrease path cost. Equation~\eqref{eq:lambda} nevertheless uses only the actual non-negative portfolio cost.
+
+The construction is open-loop because later autoregressive branch actions are held at their realised values rather than resampled after replacing branch $i$. Because each shadow path retains its own history, cost contrasts can include accumulated consequences of earlier substitutions, not only the current branch action. The signals are path-consistent contrasts conditional on the realised other-branch sequence, not the full closed-loop effect through all downstream policy conditionals. Accordingly, the construction is a branch-credit heuristic rather than an unbiased causal estimator.
 
 \section{Experimental Evaluation}
 
@@ -279,9 +417,9 @@ The evaluation metrics should also be read jointly. Relative wealth answers whet
 
 This study demonstrates a coherent hybrid design for constrained portfolio RL. CAOSD guarantees long-only simplex membership and overlapping group exposures for each action, while RCPO supplies an adaptive mechanism for benchmark-relative path risk. At equal environment-interaction budgets, counterfactual-reward Dirichlet RCPO achieves the highest observed mean relative wealth but does not conclusively improve upon its matched control; counterfactual-cost Gaussian RCPO yields the clearest risk-side improvement, at the cost of greater turnover. Joint counterfactual credit is not consistently effective, and drawdown feasibility remains unreliable. The principal result is therefore methodological rather than financial---structural constraints can be guaranteed without asking a stochastic optimiser to learn them, leaving path-dependent risk to be evaluated and improved as a separate CMDP problem.
 
-% References are intentionally excluded from the five-page main-text limit.
+% References
 \clearpage
-\begin{thebibliography}{9}
+\begin{thebibliography}{99}
 
 \bibitem{winkel2023}
 D. Winkel, N. Stra{\ss}, M. Schubert, and T. Seidl,
@@ -318,6 +456,33 @@ J. Foerster, G. Farquhar, T. Afouras, N. Nardelli, and S. Whiteson,
 ``Counterfactual multi-agent policy gradients,''
 in \emph{Proc. AAAI Conference on Artificial Intelligence}, vol.~32, no.~1, 2018.
 doi: \href{https://doi.org/10.1609/aaai.v32i1.11794}{10.1609/aaai.v32i1.11794}.
+
+\bibitem{achiam2017}
+J. Achiam, D. Held, A. Tamar, and P. Abbeel,
+``Constrained policy optimization,''
+in \emph{Proc. 34th International Conference on Machine Learning (ICML)},
+vol.~70 of Proceedings of Machine Learning Research, pp.~22--31, 2017.
+Available: \url{https://proceedings.mlr.press/v70/achiam17a.html}.
+
+\bibitem{lin2021}
+J.-L. Lin, W. Hung, S.-H. Yang, P.-C. Hsieh, and X. Liu,
+``Escaping from zero gradient: Revisiting action-constrained reinforcement learning via Frank--Wolfe policy optimization,''
+in \emph{Proc. 37th Conference on Uncertainty in Artificial Intelligence (UAI)},
+vol.~161 of Proceedings of Machine Learning Research, pp.~397--407, 2021.
+Available: \url{https://proceedings.mlr.press/v161/lin21b.html}.
+
+\bibitem{jiang2017}
+Z. Jiang, D. Xu, and J. Liang,
+``A deep reinforcement learning framework for the financial portfolio management problem,''
+\emph{arXiv preprint arXiv:1706.10059}, 2017.
+doi: \href{https://doi.org/10.48550/arXiv.1706.10059}{10.48550/arXiv.1706.10059}.
+
+\bibitem{winkel2024paspo}
+D. Winkel, N. Stra{\ss}, M. Bernhard, Z. Li, T. Seidl, and M. Schubert,
+``Autoregressive policy optimization for constrained allocation tasks,''
+in \emph{Advances in Neural Information Processing Systems 37},
+pp.~119150--119173, 2024.
+doi: \href{https://doi.org/10.52202/079017-3785}{10.52202/079017-3785}.
 
 \end{thebibliography}
 

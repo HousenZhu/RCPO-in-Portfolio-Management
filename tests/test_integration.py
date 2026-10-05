@@ -60,6 +60,37 @@ def tiny_config(tmp_path: Path) -> ProjectConfig:
     return config
 
 
+def test_resume_to_absolute_update_target_is_idempotent(tmp_path: Path) -> None:
+    config = tiny_config(tmp_path)
+    config.market.train_steps = 40
+    config.market.validation_steps = 8
+    config.market.test_steps = 8
+    config.environment.episode_length = 8
+    config.optimization.rollout_steps = 16
+    config.optimization.minibatch_size = 16
+    config.evaluation.validation_branch_count = 1
+    config.evaluation.test_branch_count = 1
+    run_dir = run_experiment(config, algo="rcpo", disable_artifacts=True)[0]
+    resume_experiment(
+        config, algo="rcpo", run_dir=run_dir,
+        target_total_updates=2, disable_artifacts=True,
+    )
+    metric_rows = [
+        json.loads(line)
+        for line in (run_dir / "metrics.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert len(metric_rows) == 2
+    assert metric_rows[-1]["learning_rate"] == pytest.approx(config.optimization.learning_rate_final)
+    assert sum(bool(row["validation_evaluated"]) for row in metric_rows) == 1
+    resume_experiment(
+        config, algo="rcpo", run_dir=run_dir,
+        target_total_updates=2, disable_artifacts=True,
+    )
+    assert len((run_dir / "metrics.jsonl").read_text(encoding="utf-8").splitlines()) == 2
+    snapshot = load_config(run_dir / "config_snapshot.yaml")
+    assert snapshot.optimization.total_updates == 1
+
+
 def test_short_training_runs_for_rcpo_and_ppo(tmp_path: Path) -> None:
     config = tiny_config(tmp_path)
     runs: dict[tuple[str, str], Path] = {}

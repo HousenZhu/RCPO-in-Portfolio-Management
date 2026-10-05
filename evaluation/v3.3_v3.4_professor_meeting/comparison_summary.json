@@ -1,0 +1,675 @@
+{
+  "protocol": {
+    "anchor_seeds": [
+      91000,
+      92000,
+      93000,
+      94000,
+      95000
+    ],
+    "branches_per_anchor": 20,
+    "future_steps": 252,
+    "baseline": "constrained-neutral CAOSD",
+    "common_drawdown_rule": {
+      "margin": 0.9,
+      "floor": 0.05,
+      "cost_scale": 0.1,
+      "alpha_budget_ratio": 0.05
+    }
+  },
+  "manifest_entries": 47,
+  "unique_run_directories": 45,
+  "branch_metric_rows": 8900,
+  "conditions": {
+    "v2.6:v26_ppo_dirichlet:best_return": {
+      "condition": "PPO Dirichlet",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.07262751437992898,
+      "min_relative_wealth_across_seeds": 0.07262751437992898,
+      "max_relative_wealth_across_seeds": 0.07262751437992898,
+      "mean_common_feasible_rate": 0.34,
+      "mean_max_drawdown": 0.14571279976516963,
+      "mean_cvar10_relative_wealth": -0.049041014136886316
+    },
+    "v2.6:v26_ppo_gaussian:best_return": {
+      "condition": "PPO Gaussian",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.07593514345380756,
+      "min_relative_wealth_across_seeds": 0.07593514345380756,
+      "max_relative_wealth_across_seeds": 0.07593514345380756,
+      "mean_common_feasible_rate": 0.34,
+      "mean_max_drawdown": 0.14854609090834855,
+      "mean_cvar10_relative_wealth": -0.06610454491863058
+    },
+    "v2.6:v26_rcpo_allocation_+_drawdown:best_return": {
+      "condition": "RCPO Allocation + Drawdown",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.0805105908953428,
+      "min_relative_wealth_across_seeds": 0.0805105908953428,
+      "max_relative_wealth_across_seeds": 0.0805105908953428,
+      "mean_common_feasible_rate": 0.4,
+      "mean_max_drawdown": 0.142752043902874,
+      "mean_cvar10_relative_wealth": -0.06643176265746333
+    },
+    "v2.6:v26_rcpo_allocation_penalty:best_return": {
+      "condition": "RCPO Allocation Penalty",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.07514726313712393,
+      "min_relative_wealth_across_seeds": 0.07514726313712393,
+      "max_relative_wealth_across_seeds": 0.07514726313712393,
+      "mean_common_feasible_rate": 0.43,
+      "mean_max_drawdown": 0.14007262717932462,
+      "mean_cvar10_relative_wealth": -0.054540339483647705
+    },
+    "v2.6:v26_rcpo_allocation_penalty:robust_feasible": {
+      "condition": "RCPO Allocation Penalty",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.07263229581256284,
+      "min_relative_wealth_across_seeds": 0.07263229581256284,
+      "max_relative_wealth_across_seeds": 0.07263229581256284,
+      "mean_common_feasible_rate": 0.51,
+      "mean_max_drawdown": 0.13727829046547413,
+      "mean_cvar10_relative_wealth": -0.03718741896330956
+    },
+    "v2.6:v26_rcpo_dirichlet:best_return": {
+      "condition": "RCPO Dirichlet",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.08854362275843546,
+      "min_relative_wealth_across_seeds": 0.08854362275843546,
+      "max_relative_wealth_across_seeds": 0.08854362275843546,
+      "mean_common_feasible_rate": 0.47,
+      "mean_max_drawdown": 0.13858466513454915,
+      "mean_cvar10_relative_wealth": -0.029013340783871668
+    },
+    "v2.6:v26_rcpo_gaussian:best_return": {
+      "condition": "RCPO Gaussian",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.08718800721426848,
+      "min_relative_wealth_across_seeds": 0.08718800721426848,
+      "max_relative_wealth_across_seeds": 0.08718800721426848,
+      "mean_common_feasible_rate": 0.26,
+      "mean_max_drawdown": 0.15698140151798726,
+      "mean_cvar10_relative_wealth": -0.09688386690210873
+    },
+    "v3.2:v32_cf_cost_dirichlet:best_return": {
+      "condition": "CF Cost Dirichlet",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.0720740118133778,
+      "min_relative_wealth_across_seeds": 0.0720740118133778,
+      "max_relative_wealth_across_seeds": 0.0720740118133778,
+      "mean_common_feasible_rate": 0.42,
+      "mean_max_drawdown": 0.14238995142281055,
+      "mean_cvar10_relative_wealth": -0.048326988995472574
+    },
+    "v3.2:v32_cf_cost_dirichlet:robust_feasible": {
+      "condition": "CF Cost Dirichlet",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.014364522466025553,
+      "min_relative_wealth_across_seeds": 0.014364522466025553,
+      "max_relative_wealth_across_seeds": 0.014364522466025553,
+      "mean_common_feasible_rate": 0.4,
+      "mean_max_drawdown": 0.14639085810631514,
+      "mean_cvar10_relative_wealth": -0.016484159271816744
+    },
+    "v3.2:v32_cf_cost_gaussian:best_return": {
+      "condition": "CF Cost Gaussian",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.07872346100784261,
+      "min_relative_wealth_across_seeds": 0.07872346100784261,
+      "max_relative_wealth_across_seeds": 0.07872346100784261,
+      "mean_common_feasible_rate": 0.33,
+      "mean_max_drawdown": 0.14654460102319716,
+      "mean_cvar10_relative_wealth": -0.062308360943680585
+    },
+    "v3.2:v32_cf_cost_gaussian:robust_feasible": {
+      "condition": "CF Cost Gaussian",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.07872346100784261,
+      "min_relative_wealth_across_seeds": 0.07872346100784261,
+      "max_relative_wealth_across_seeds": 0.07872346100784261,
+      "mean_common_feasible_rate": 0.33,
+      "mean_max_drawdown": 0.14654460102319716,
+      "mean_cvar10_relative_wealth": -0.062308360943680585
+    },
+    "v3.2:v32_cf_reward+cost_dirichlet:best_return": {
+      "condition": "CF Reward+Cost Dirichlet",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.06957513933521108,
+      "min_relative_wealth_across_seeds": 0.06957513933521108,
+      "max_relative_wealth_across_seeds": 0.06957513933521108,
+      "mean_common_feasible_rate": 0.39,
+      "mean_max_drawdown": 0.14326228234916927,
+      "mean_cvar10_relative_wealth": -0.04066573524991877
+    },
+    "v3.2:v32_cf_reward+cost_dirichlet:robust_feasible": {
+      "condition": "CF Reward+Cost Dirichlet",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.08172390095454811,
+      "min_relative_wealth_across_seeds": 0.08172390095454811,
+      "max_relative_wealth_across_seeds": 0.08172390095454811,
+      "mean_common_feasible_rate": 0.46,
+      "mean_max_drawdown": 0.14157745860517024,
+      "mean_cvar10_relative_wealth": -0.037398505962558004
+    },
+    "v3.2:v32_cf_reward+cost_gaussian:best_return": {
+      "condition": "CF Reward+Cost Gaussian",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.07822279277681055,
+      "min_relative_wealth_across_seeds": 0.07822279277681055,
+      "max_relative_wealth_across_seeds": 0.07822279277681055,
+      "mean_common_feasible_rate": 0.26,
+      "mean_max_drawdown": 0.15415034115314483,
+      "mean_cvar10_relative_wealth": -0.08983678435842163
+    },
+    "v3.2:v32_cf_reward+cost_gaussian:robust_feasible": {
+      "condition": "CF Reward+Cost Gaussian",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.07690683265027795,
+      "min_relative_wealth_across_seeds": 0.07690683265027795,
+      "max_relative_wealth_across_seeds": 0.07690683265027795,
+      "mean_common_feasible_rate": 0.27,
+      "mean_max_drawdown": 0.15366610929369925,
+      "mean_cvar10_relative_wealth": -0.08982022660207697
+    },
+    "v3.2:v32_cf_reward_dirichlet:best_return": {
+      "condition": "CF Reward Dirichlet",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.08984292393173433,
+      "min_relative_wealth_across_seeds": 0.08984292393173433,
+      "max_relative_wealth_across_seeds": 0.08984292393173433,
+      "mean_common_feasible_rate": 0.39,
+      "mean_max_drawdown": 0.13853771325200795,
+      "mean_cvar10_relative_wealth": -0.03085539814344329
+    },
+    "v3.2:v32_cf_reward_dirichlet:robust_feasible": {
+      "condition": "CF Reward Dirichlet",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.08984292393173433,
+      "min_relative_wealth_across_seeds": 0.08984292393173433,
+      "max_relative_wealth_across_seeds": 0.08984292393173433,
+      "mean_common_feasible_rate": 0.39,
+      "mean_max_drawdown": 0.13853771325200795,
+      "mean_cvar10_relative_wealth": -0.03085539814344329
+    },
+    "v3.2:v32_cf_reward_gaussian:best_return": {
+      "condition": "CF Reward Gaussian",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.08967139405357068,
+      "min_relative_wealth_across_seeds": 0.08967139405357068,
+      "max_relative_wealth_across_seeds": 0.08967139405357068,
+      "mean_common_feasible_rate": 0.25,
+      "mean_max_drawdown": 0.15692599166184665,
+      "mean_cvar10_relative_wealth": -0.10279427689454294
+    },
+    "v3.2:v32_cf_reward_gaussian:robust_feasible": {
+      "condition": "CF Reward Gaussian",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.08862147970339043,
+      "min_relative_wealth_across_seeds": 0.08862147970339043,
+      "max_relative_wealth_across_seeds": 0.08862147970339043,
+      "mean_common_feasible_rate": 0.26,
+      "mean_max_drawdown": 0.15265443753451108,
+      "mean_cvar10_relative_wealth": -0.08641741757585328
+    },
+    "v3.3:v33_allocation_drawdown_m2_s10080_e3:best_return": {
+      "condition": "Allocation+drawdown RCPO",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.08380653445050582,
+      "min_relative_wealth_across_seeds": 0.08380653445050582,
+      "max_relative_wealth_across_seeds": 0.08380653445050582,
+      "mean_common_feasible_rate": 0.34,
+      "mean_max_drawdown": 0.14784660942852498,
+      "mean_cvar10_relative_wealth": -0.08471194364595538
+    },
+    "v3.3:v33_allocation_drawdown_m2_s10080_e3:robust_feasible": {
+      "condition": "Allocation+drawdown RCPO",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.07720438084559761,
+      "min_relative_wealth_across_seeds": 0.07720438084559761,
+      "max_relative_wealth_across_seeds": 0.07720438084559761,
+      "mean_common_feasible_rate": 0.34,
+      "mean_max_drawdown": 0.147692932151258,
+      "mean_cvar10_relative_wealth": -0.08628856853771044
+    },
+    "v3.3:v33_cf_reward_dirichlet_m2_s10080_e4:best_return": {
+      "condition": "CF reward Dirichlet",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.09722912581907357,
+      "min_relative_wealth_across_seeds": 0.09722912581907357,
+      "max_relative_wealth_across_seeds": 0.09722912581907357,
+      "mean_common_feasible_rate": 0.29,
+      "mean_max_drawdown": 0.1436385851725936,
+      "mean_cvar10_relative_wealth": -0.04184671224160733
+    },
+    "v3.3:v33_cf_reward_dirichlet_m2_s10080_e4:robust_feasible": {
+      "condition": "CF reward Dirichlet",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.05664527642552747,
+      "min_relative_wealth_across_seeds": 0.05664527642552747,
+      "max_relative_wealth_across_seeds": 0.05664527642552747,
+      "mean_common_feasible_rate": 0.48,
+      "mean_max_drawdown": 0.14125312075018884,
+      "mean_cvar10_relative_wealth": -0.03606692057238971
+    },
+    "v3.3:v33_cf_reward_gaussian_m2_s10080_e3:best_return": {
+      "condition": "CF reward Gaussian",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.0850897566626298,
+      "min_relative_wealth_across_seeds": 0.0850897566626298,
+      "max_relative_wealth_across_seeds": 0.0850897566626298,
+      "mean_common_feasible_rate": 0.34,
+      "mean_max_drawdown": 0.14812238939106465,
+      "mean_cvar10_relative_wealth": -0.07069349518769508
+    },
+    "v3.3:v33_cf_reward_gaussian_m2_s10080_e3:robust_feasible": {
+      "condition": "CF reward Gaussian",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.02317048142288896,
+      "min_relative_wealth_across_seeds": 0.02317048142288896,
+      "max_relative_wealth_across_seeds": 0.02317048142288896,
+      "mean_common_feasible_rate": 0.42,
+      "mean_max_drawdown": 0.14435330826789142,
+      "mean_cvar10_relative_wealth": -0.021738928526060707
+    },
+    "v3.3:v33_dirichlet_m2_s10080_e4:best_return": {
+      "condition": "Dirichlet RCPO e4",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.09050418008417094,
+      "min_relative_wealth_across_seeds": 0.09050418008417094,
+      "max_relative_wealth_across_seeds": 0.09050418008417094,
+      "mean_common_feasible_rate": 0.39,
+      "mean_max_drawdown": 0.14105773750692607,
+      "mean_cvar10_relative_wealth": -0.02586333957018825
+    },
+    "v3.3:v33_dirichlet_m2_s10080_e4:robust_feasible": {
+      "condition": "Dirichlet RCPO e4",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.061875787973820644,
+      "min_relative_wealth_across_seeds": 0.061875787973820644,
+      "max_relative_wealth_across_seeds": 0.061875787973820644,
+      "mean_common_feasible_rate": 0.56,
+      "mean_max_drawdown": 0.13823439575731755,
+      "mean_cvar10_relative_wealth": -0.019381663430464702
+    },
+    "v3.3:v33_gaussian_m2_s10080_e3:best_return": {
+      "condition": "Gaussian 2x10080 e3",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.09170885500757571,
+      "min_relative_wealth_across_seeds": 0.09170885500757571,
+      "max_relative_wealth_across_seeds": 0.09170885500757571,
+      "mean_common_feasible_rate": 0.26,
+      "mean_max_drawdown": 0.15079555828124286,
+      "mean_cvar10_relative_wealth": -0.08882623952247526
+    },
+    "v3.3:v33_gaussian_m2_s10080_e3:robust_feasible": {
+      "condition": "Gaussian 2x10080 e3",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.026386860492775225,
+      "min_relative_wealth_across_seeds": 0.026386860492775225,
+      "max_relative_wealth_across_seeds": 0.026386860492775225,
+      "mean_common_feasible_rate": 0.48,
+      "mean_max_drawdown": 0.14378492370247842,
+      "mean_cvar10_relative_wealth": -0.03017681970529672
+    },
+    "v3.3:v33_gaussian_m2_s10080_e4:best_return": {
+      "condition": "Gaussian RCPO e4",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.06303618834223643,
+      "min_relative_wealth_across_seeds": 0.06303618834223643,
+      "max_relative_wealth_across_seeds": 0.06303618834223643,
+      "mean_common_feasible_rate": 0.34,
+      "mean_max_drawdown": 0.14607501361519099,
+      "mean_cvar10_relative_wealth": -0.08363766845542239
+    },
+    "v3.3:v33_gaussian_m2_s10080_e4:robust_feasible": {
+      "condition": "Gaussian RCPO e4",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.06439355264289656,
+      "min_relative_wealth_across_seeds": 0.06439355264289656,
+      "max_relative_wealth_across_seeds": 0.06439355264289656,
+      "mean_common_feasible_rate": 0.34,
+      "mean_max_drawdown": 0.14457749731838704,
+      "mean_cvar10_relative_wealth": -0.07174917176378338
+    },
+    "v3.3:v33_gaussian_m2_s20160_e3:best_return": {
+      "condition": "Gaussian 2x20160 e3",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.07744215643552863,
+      "min_relative_wealth_across_seeds": 0.07744215643552863,
+      "max_relative_wealth_across_seeds": 0.07744215643552863,
+      "mean_common_feasible_rate": 0.3,
+      "mean_max_drawdown": 0.15347233776003122,
+      "mean_cvar10_relative_wealth": -0.08997756893364137
+    },
+    "v3.3:v33_gaussian_m2_s20160_e3:robust_feasible": {
+      "condition": "Gaussian 2x20160 e3",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.04037485847385584,
+      "min_relative_wealth_across_seeds": 0.04037485847385584,
+      "max_relative_wealth_across_seeds": 0.04037485847385584,
+      "mean_common_feasible_rate": 0.44,
+      "mean_max_drawdown": 0.14394320998340845,
+      "mean_cvar10_relative_wealth": -0.04117489470800998
+    },
+    "v3.3:v33_gaussian_m2_s5040_e3:best_return": {
+      "condition": "Gaussian 2x5040 e3",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.0812554818238758,
+      "min_relative_wealth_across_seeds": 0.0812554818238758,
+      "max_relative_wealth_across_seeds": 0.0812554818238758,
+      "mean_common_feasible_rate": 0.24,
+      "mean_max_drawdown": 0.16105424657464026,
+      "mean_cvar10_relative_wealth": -0.11486816888024709
+    },
+    "v3.3:v33_gaussian_m2_s5040_e3:robust_feasible": {
+      "condition": "Gaussian 2x5040 e3",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.043061494692428114,
+      "min_relative_wealth_across_seeds": 0.043061494692428114,
+      "max_relative_wealth_across_seeds": 0.043061494692428114,
+      "mean_common_feasible_rate": 0.48,
+      "mean_max_drawdown": 0.14159536700695752,
+      "mean_cvar10_relative_wealth": -0.020281497040608953
+    },
+    "v3.3:v33_gaussian_m8_s10080_e3:best_return": {
+      "condition": "Gaussian 8x10080 e3",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.0807425379378622,
+      "min_relative_wealth_across_seeds": 0.0807425379378622,
+      "max_relative_wealth_across_seeds": 0.0807425379378622,
+      "mean_common_feasible_rate": 0.42,
+      "mean_max_drawdown": 0.1417180099338293,
+      "mean_cvar10_relative_wealth": -0.03894103964464435
+    },
+    "v3.3:v33_gaussian_m8_s10080_e3:robust_feasible": {
+      "condition": "Gaussian 8x10080 e3",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.05192800380823618,
+      "min_relative_wealth_across_seeds": 0.05192800380823618,
+      "max_relative_wealth_across_seeds": 0.05192800380823618,
+      "mean_common_feasible_rate": 0.55,
+      "mean_max_drawdown": 0.13840654905885458,
+      "mean_cvar10_relative_wealth": -0.02920579788927189
+    },
+    "v3.3:v33_gaussian_m8_s5040_e3:best_return": {
+      "condition": "Gaussian 8x5040 e3",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.08613748869605845,
+      "min_relative_wealth_across_seeds": 0.08613748869605845,
+      "max_relative_wealth_across_seeds": 0.08613748869605845,
+      "mean_common_feasible_rate": 0.26,
+      "mean_max_drawdown": 0.15614919539541006,
+      "mean_cvar10_relative_wealth": -0.09415802206339988
+    },
+    "v3.3:v33_gaussian_m8_s5040_e3:robust_feasible": {
+      "condition": "Gaussian 8x5040 e3",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.039054114183926195,
+      "min_relative_wealth_across_seeds": 0.039054114183926195,
+      "max_relative_wealth_across_seeds": 0.039054114183926195,
+      "mean_common_feasible_rate": 0.48,
+      "mean_max_drawdown": 0.14180363327264786,
+      "mean_cvar10_relative_wealth": -0.01965077379297512
+    },
+    "v3.3:v33_ppo_gaussian_m2_s10080_e4:best_return": {
+      "condition": "Gaussian PPO e4",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.08251536318588074,
+      "min_relative_wealth_across_seeds": 0.08251536318588074,
+      "max_relative_wealth_across_seeds": 0.08251536318588074,
+      "mean_common_feasible_rate": 0.3,
+      "mean_max_drawdown": 0.14765125315636396,
+      "mean_cvar10_relative_wealth": -0.060377169954967926
+    },
+    "v3.3:v33_ppo_gaussian_m2_s10080_e4:robust_feasible": {
+      "condition": "Gaussian PPO e4",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.08643881963533963,
+      "min_relative_wealth_across_seeds": 0.08643881963533963,
+      "max_relative_wealth_across_seeds": 0.08643881963533963,
+      "mean_common_feasible_rate": 0.3,
+      "mean_max_drawdown": 0.14790582206100225,
+      "mean_cvar10_relative_wealth": -0.05948037838989471
+    },
+    "v3.4:v34_cf_reward_m2_e3:best_return": {
+      "condition": "Counterfactual 2x5040 e3",
+      "seed_count": 3,
+      "mean_relative_wealth_across_seeds": 0.06462738628014782,
+      "min_relative_wealth_across_seeds": 0.05805669597137669,
+      "max_relative_wealth_across_seeds": 0.0712052172319199,
+      "mean_common_feasible_rate": 0.3433333333333333,
+      "mean_max_drawdown": 0.14852587912231682,
+      "mean_cvar10_relative_wealth": -0.07274356866898123
+    },
+    "v3.4:v34_cf_reward_m2_e3:robust_feasible": {
+      "condition": "Counterfactual 2x5040 e3",
+      "seed_count": 3,
+      "mean_relative_wealth_across_seeds": 0.0452653203002819,
+      "min_relative_wealth_across_seeds": 0.019094984099011246,
+      "max_relative_wealth_across_seeds": 0.06068140718284829,
+      "mean_common_feasible_rate": 0.41,
+      "mean_max_drawdown": 0.1451720573877295,
+      "mean_cvar10_relative_wealth": -0.04307950822117875
+    },
+    "v3.4:v34_cf_reward_m2_e4:best_return": {
+      "condition": "Counterfactual 2x5040 e4",
+      "seed_count": 3,
+      "mean_relative_wealth_across_seeds": 0.07705808410683024,
+      "min_relative_wealth_across_seeds": 0.06401951584937111,
+      "max_relative_wealth_across_seeds": 0.09317642077854849,
+      "mean_common_feasible_rate": 0.3066666666666667,
+      "mean_max_drawdown": 0.15066589530557395,
+      "mean_cvar10_relative_wealth": -0.07543181750939963
+    },
+    "v3.4:v34_cf_reward_m2_e4:robust_feasible": {
+      "condition": "Counterfactual 2x5040 e4",
+      "seed_count": 3,
+      "mean_relative_wealth_across_seeds": 0.0205365056741741,
+      "min_relative_wealth_across_seeds": 0.013452153120712714,
+      "max_relative_wealth_across_seeds": 0.026530959353267516,
+      "mean_common_feasible_rate": 0.4366666666666666,
+      "mean_max_drawdown": 0.14481342457234858,
+      "mean_cvar10_relative_wealth": -0.01854966955901838
+    },
+    "v3.4:v34_margin_080:best_return": {
+      "condition": "Margin 0.80",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.08259058083675885,
+      "min_relative_wealth_across_seeds": 0.08259058083675885,
+      "max_relative_wealth_across_seeds": 0.08259058083675885,
+      "mean_common_feasible_rate": 0.32,
+      "mean_max_drawdown": 0.150287180878222,
+      "mean_cvar10_relative_wealth": -0.06697087027344371
+    },
+    "v3.4:v34_margin_080:robust_feasible": {
+      "condition": "Margin 0.80",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.07869857669796514,
+      "min_relative_wealth_across_seeds": 0.07869857669796514,
+      "max_relative_wealth_across_seeds": 0.07869857669796514,
+      "mean_common_feasible_rate": 0.37,
+      "mean_max_drawdown": 0.14816233292222022,
+      "mean_cvar10_relative_wealth": -0.07250163370939502
+    },
+    "v3.4:v34_margin_085:best_return": {
+      "condition": "Margin 0.85",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.052218839651906,
+      "min_relative_wealth_across_seeds": 0.052218839651906,
+      "max_relative_wealth_across_seeds": 0.052218839651906,
+      "mean_common_feasible_rate": 0.24,
+      "mean_max_drawdown": 0.1602576683834195,
+      "mean_cvar10_relative_wealth": -0.1250264272903972
+    },
+    "v3.4:v34_margin_085:robust_feasible": {
+      "condition": "Margin 0.85",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.0760589519551698,
+      "min_relative_wealth_across_seeds": 0.0760589519551698,
+      "max_relative_wealth_across_seeds": 0.0760589519551698,
+      "mean_common_feasible_rate": 0.33,
+      "mean_max_drawdown": 0.14688569236546756,
+      "mean_cvar10_relative_wealth": -0.06126041480344151
+    },
+    "v3.4:v34_standalone_m2_e3:best_return": {
+      "condition": "Standalone 2x5040 e3",
+      "seed_count": 3,
+      "mean_relative_wealth_across_seeds": 0.07658763646681477,
+      "min_relative_wealth_across_seeds": 0.06754605424575637,
+      "max_relative_wealth_across_seeds": 0.0812554818238758,
+      "mean_common_feasible_rate": 0.27666666666666667,
+      "mean_max_drawdown": 0.15528625140587488,
+      "mean_cvar10_relative_wealth": -0.09346764382286989
+    },
+    "v3.4:v34_standalone_m2_e3:robust_feasible": {
+      "condition": "Standalone 2x5040 e3",
+      "seed_count": 3,
+      "mean_relative_wealth_across_seeds": 0.04320887923371136,
+      "min_relative_wealth_across_seeds": 0.038818626201979636,
+      "max_relative_wealth_across_seeds": 0.047746516806726313,
+      "mean_common_feasible_rate": 0.47,
+      "mean_max_drawdown": 0.14236101131886245,
+      "mean_cvar10_relative_wealth": -0.025909399728344152
+    },
+    "v3.4:v34_standalone_m2_e4:best_return": {
+      "condition": "Standalone 2x5040 e4",
+      "seed_count": 3,
+      "mean_relative_wealth_across_seeds": 0.08034494203685437,
+      "min_relative_wealth_across_seeds": 0.06467091836101926,
+      "max_relative_wealth_across_seeds": 0.09837956286215783,
+      "mean_common_feasible_rate": 0.3066666666666667,
+      "mean_max_drawdown": 0.1509261843189597,
+      "mean_cvar10_relative_wealth": -0.0744998127023301
+    },
+    "v3.4:v34_standalone_m2_e4:robust_feasible": {
+      "condition": "Standalone 2x5040 e4",
+      "seed_count": 3,
+      "mean_relative_wealth_across_seeds": 0.03234362010067956,
+      "min_relative_wealth_across_seeds": 0.02940571795249837,
+      "max_relative_wealth_across_seeds": 0.03413707225503068,
+      "mean_common_feasible_rate": 0.48333333333333334,
+      "mean_max_drawdown": 0.14321400160590805,
+      "mean_cvar10_relative_wealth": -0.02512313853574563
+    },
+    "v3.4:v34_standalone_m8_e3:best_return": {
+      "condition": "Standalone 8x5040 e3",
+      "seed_count": 3,
+      "mean_relative_wealth_across_seeds": 0.08056810884545412,
+      "min_relative_wealth_across_seeds": 0.07164937169238016,
+      "max_relative_wealth_across_seeds": 0.08613748869605845,
+      "mean_common_feasible_rate": 0.27666666666666667,
+      "mean_max_drawdown": 0.15499018137653667,
+      "mean_cvar10_relative_wealth": -0.09115051837674926
+    },
+    "v3.4:v34_standalone_m8_e3:robust_feasible": {
+      "condition": "Standalone 8x5040 e3",
+      "seed_count": 3,
+      "mean_relative_wealth_across_seeds": 0.030017134724929815,
+      "min_relative_wealth_across_seeds": 0.021148678090445388,
+      "max_relative_wealth_across_seeds": 0.039054114183926195,
+      "mean_common_feasible_rate": 0.45,
+      "mean_max_drawdown": 0.1435955861955881,
+      "mean_cvar10_relative_wealth": -0.023658232897055053
+    },
+    "v3.4:v34_standalone_m8_e4:best_return": {
+      "condition": "Standalone 8x5040 e4",
+      "seed_count": 3,
+      "mean_relative_wealth_across_seeds": 0.07012021233285874,
+      "min_relative_wealth_across_seeds": 0.06603994570459455,
+      "max_relative_wealth_across_seeds": 0.07683111501746742,
+      "mean_common_feasible_rate": 0.33,
+      "mean_max_drawdown": 0.1495411949356397,
+      "mean_cvar10_relative_wealth": -0.07999436624480154
+    },
+    "v3.4:v34_standalone_m8_e4:robust_feasible": {
+      "condition": "Standalone 8x5040 e4",
+      "seed_count": 3,
+      "mean_relative_wealth_across_seeds": 0.04341927286783485,
+      "min_relative_wealth_across_seeds": 0.03535425002479245,
+      "max_relative_wealth_across_seeds": 0.05810673626266162,
+      "mean_common_feasible_rate": 0.47333333333333333,
+      "mean_max_drawdown": 0.14183104760944842,
+      "mean_cvar10_relative_wealth": -0.029634248151746274
+    },
+    "v3.4:v34_window_20:best_return": {
+      "condition": "Window 20",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.0825842198174128,
+      "min_relative_wealth_across_seeds": 0.0825842198174128,
+      "max_relative_wealth_across_seeds": 0.0825842198174128,
+      "mean_common_feasible_rate": 0.31,
+      "mean_max_drawdown": 0.15168871719390153,
+      "mean_cvar10_relative_wealth": -0.0780932291676002
+    },
+    "v3.4:v34_window_20:robust_feasible": {
+      "condition": "Window 20",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.054577455282594445,
+      "min_relative_wealth_across_seeds": 0.054577455282594445,
+      "max_relative_wealth_across_seeds": 0.054577455282594445,
+      "mean_common_feasible_rate": 0.46,
+      "mean_max_drawdown": 0.14127646155655385,
+      "mean_cvar10_relative_wealth": -0.025933223202707113
+    },
+    "v3.4:v34_window_30:best_return": {
+      "condition": "Window 30",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.07327657205892243,
+      "min_relative_wealth_across_seeds": 0.07327657205892243,
+      "max_relative_wealth_across_seeds": 0.07327657205892243,
+      "mean_common_feasible_rate": 0.28,
+      "mean_max_drawdown": 0.1569292851909995,
+      "mean_cvar10_relative_wealth": -0.09268738972268906
+    },
+    "v3.4:v34_window_30:robust_feasible": {
+      "condition": "Window 30",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.0325886181069054,
+      "min_relative_wealth_across_seeds": 0.0325886181069054,
+      "max_relative_wealth_across_seeds": 0.0325886181069054,
+      "mean_common_feasible_rate": 0.46,
+      "mean_max_drawdown": 0.14326775897294283,
+      "mean_cvar10_relative_wealth": -0.021758420803194366
+    },
+    "v3.4:v34_window_40:best_return": {
+      "condition": "Window 40",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.0696277602531378,
+      "min_relative_wealth_across_seeds": 0.0696277602531378,
+      "max_relative_wealth_across_seeds": 0.0696277602531378,
+      "mean_common_feasible_rate": 0.31,
+      "mean_max_drawdown": 0.15294213473796844,
+      "mean_cvar10_relative_wealth": -0.08968308370961095
+    },
+    "v3.4:v34_window_40:robust_feasible": {
+      "condition": "Window 40",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.0438467203338988,
+      "min_relative_wealth_across_seeds": 0.0438467203338988,
+      "max_relative_wealth_across_seeds": 0.0438467203338988,
+      "mean_common_feasible_rate": 0.46,
+      "mean_max_drawdown": 0.14240746736526488,
+      "mean_cvar10_relative_wealth": -0.04152428910408838
+    },
+    "v3.4:v34_window_60:best_return": {
+      "condition": "Window 60",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.0885041563645016,
+      "min_relative_wealth_across_seeds": 0.0885041563645016,
+      "max_relative_wealth_across_seeds": 0.0885041563645016,
+      "mean_common_feasible_rate": 0.24,
+      "mean_max_drawdown": 0.1615417258068919,
+      "mean_cvar10_relative_wealth": -0.11109934939194721
+    },
+    "v3.4:v34_window_60:robust_feasible": {
+      "condition": "Window 60",
+      "seed_count": 1,
+      "mean_relative_wealth_across_seeds": 0.02867837452174683,
+      "min_relative_wealth_across_seeds": 0.02867837452174683,
+      "max_relative_wealth_across_seeds": 0.02867837452174683,
+      "mean_common_feasible_rate": 0.44,
+      "mean_max_drawdown": 0.14384182192385198,
+      "mean_cvar10_relative_wealth": -0.0370399614465549
+    }
+  }
+}

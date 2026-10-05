@@ -19,7 +19,11 @@ from rcpo_portfolio.evaluation import (
     save_evaluation_artifacts,
 )
 from rcpo_portfolio.env import PortfolioEnv
-from rcpo_portfolio.market import generate_continuation_split, generate_continuation_splits
+from rcpo_portfolio.market import (
+    generate_continuation_split,
+    generate_continuation_splits,
+    resolve_continuation_anchor,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -114,7 +118,11 @@ def main() -> None:
             if split_name == "validation"
             else config.market.test_steps
         )
-        seed_offset = 10_000 if split_name == "validation" else 20_000
+        seed_offset = (
+            config.evaluation.validation_seed_offset
+            if split_name == "validation"
+            else config.evaluation.test_seed_offset
+        )
         branch_count = args.future_market_count
         if branch_count is None:
             branch_count = (
@@ -122,9 +130,16 @@ def main() -> None:
                 if split_name == "validation"
                 else config.evaluation.test_branch_count
             )
-        future_markets = generate_continuation_splits(
+        continuation_anchor = resolve_continuation_anchor(
             config.market,
             environments["train"].market,
+            mode=config.evaluation.continuation_anchor_mode,
+            fixed_seed=config.evaluation.fixed_anchor_seed,
+            fixed_steps=config.evaluation.fixed_anchor_steps,
+        )
+        future_markets = generate_continuation_splits(
+            config.market,
+            continuation_anchor,
             steps,
             metadata["seed"] + seed_offset,
             count=branch_count,

@@ -1,0 +1,7 @@
+extends: base.yaml
+
+experiment:
+  run_name: simplex_v3.4_standalone_m2_s5040_e4
+
+optimization:
+  epochs: 4

@@ -1,0 +1,8 @@
+extends: rcpo_gaussian_m2_s10080_e3.yaml
+
+experiment:
+  run_name: simplex_v3.3_rcpo_gaussian_m2_s20160_e3
+
+market:
+  train_market_count: 2
+  train_steps: 20160

@@ -1,11 +1,13 @@
-# Python caches and build output
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.ipynb_checkpoints/
+# Python caches, test caches, and build output
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
 build/
 dist/
 *.egg-info/
@@ -18,32 +20,59 @@ env/
 .env.*
 !.env.example
 
-# Local syllabus and profiling workspace
+# Local reference material and profiling workspace
 HousenZhu_MEng_Project_Syllabus/
 profile_outputs/
+tmp/
 
-# Training data stays local, except explicitly allowed evaluation PNGs.
+# Training artifacts stay local. Publish evaluation plots only.
 runs_*/
 runs/**
 !runs/**/
 !runs/**/evaluation/**/*.png
 !runs/**/evaluation_*/**/*.png
 
-# Model binaries and raw logs (including files outside runs/)
+# Model binaries, raw training logs, scheduler output, and locks
 *.pt
 *.pth
 *.ckpt
 *.onnx
 *.jsonl
 *.training.lock
+*.out
+*.err
+
+# Large archives and reproducible evaluation caches
+*.tar.gz
+*.tgz
+*.zip
+*.sqlite
+*.sqlite3
+
+# LaTeX build intermediates; finished PDFs remain publishable
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.lot
+*.log
+*.out.ps
+*.run.xml
+*.synctex.gz
+*.toc
 
 # Operating-system metadata
 .DS_Store
 Thumbs.db
 
-# Publish only this finished meeting deck, never its build/render intermediates.
+# Publish selected finished decks, never their build/render intermediates.
 slides/**
 !slides/v3_2_completed_project_review_20260913/
 !slides/v3_2_completed_project_review_20260913/output/
 !slides/v3_2_completed_project_review_20260913/output/V3.2_Completed_Project_Review.pptx
-# Source scripts are intentionally versioned; their outputs belong above.
+!slides/simplex_v33_v34_generalization_20261003/
+!slides/simplex_v33_v34_generalization_20261003/output/
+!slides/simplex_v33_v34_generalization_20261003/output/V3.3_V3.4_Generalization_Study_20261003_v4.pptx

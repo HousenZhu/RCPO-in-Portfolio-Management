@@ -44,7 +44,11 @@ from .evaluation import (
 )
 from .io_utils import exclusive_run_lock
 from .io_utils import safe_torch_save
-from .market import generate_continuation_splits, generate_train_markets
+from .market import (
+    generate_continuation_splits,
+    generate_train_markets,
+    resolve_continuation_anchor,
+)
 from .models import ActorCritic
 from .profiling import TrainingProfiler, profile_section
 from .reward_correction import build_reward_corrector
@@ -70,6 +74,7 @@ class RCPOTrainer:
         disable_artifacts: bool = False,
         skip_validation: bool = False,
         finalize_only: bool = False,
+        resume_target_total_updates: int | None = None,
     ) -> None:
         self.config = config
         self.algo = algo
@@ -79,6 +84,7 @@ class RCPOTrainer:
         self.profiler = profiler
         self.disable_artifacts = bool(disable_artifacts)
         self.finalize_only = bool(finalize_only)
+        self.resume_target_total_updates = resume_target_total_updates
         self.resume_learning_rate: float | None = None
         self.skip_validation = bool(skip_validation)
         self.resume_completed_updates = 0
@@ -93,6 +99,17 @@ class RCPOTrainer:
 
         self.train_markets = generate_train_markets(config.market, seed)
         self.train_market = self.train_markets[0]
+        self.evaluation_anchor_market = resolve_continuation_anchor(
+            config.market,
+            self.train_market,
+            mode=config.evaluation.continuation_anchor_mode,
+            fixed_seed=config.evaluation.fixed_anchor_seed,
+            fixed_steps=config.evaluation.fixed_anchor_steps,
+            fixed_generation_lookback=config.evaluation.fixed_anchor_generation_lookback,
+        )
+        continuation_seed = (
+            0 if config.evaluation.continuation_seed_mode == "fixed_offset" else seed
+        )
         self.train_envs = [
             PortfolioEnv(config.environment, market, config.market, seed=seed + 101 * index)
             for index, market in enumerate(self.train_markets)
@@ -101,16 +118,16 @@ class RCPOTrainer:
         self.train_anchor_env = self.train_envs[0]
         self.validation_markets = generate_continuation_splits(
             config.market,
-            self.train_market,
+            self.evaluation_anchor_market,
             config.market.validation_steps,
-            seed + 10_000,
+            continuation_seed + config.evaluation.validation_seed_offset,
             count=max(1, int(config.evaluation.validation_branch_count)),
         )
         self.test_markets = generate_continuation_splits(
             config.market,
-            self.train_market,
+            self.evaluation_anchor_market,
             config.market.test_steps,
-            seed + 20_000,
+            continuation_seed + config.evaluation.test_seed_offset,
             count=max(1, int(config.evaluation.test_branch_count)),
         )
         self.validation_env = PortfolioEnv(
@@ -436,6 +453,12 @@ class RCPOTrainer:
             {
                 "algo": self.algo,
                 "seed": self.seed,
+                "market_lookback": self.config.market.lookback,
+                "train_generation_lookback": self.config.market.train_generation_lookback,
+                "fixed_anchor_generation_lookback": (
+                    self.config.evaluation.fixed_anchor_generation_lookback
+                ),
+                "continuation_seed_mode": self.config.evaluation.continuation_seed_mode,
                 "alpha": self.alpha,
                 "alpha_budget_ratio": float(self.config.rcpo.alpha_budget_ratio),
                 "constraint_mode": self.config.rcpo.constraint_mode,
@@ -560,6 +583,15 @@ class RCPOTrainer:
             raise ValueError(
                 f"Checkpoint seed {checkpoint_seed!r} does not match requested seed {self.seed!r}."
             )
+        generation_settings = {
+            "market_lookback": (checkpoint.get("market_lookback", self.config.market.lookback), self.config.market.lookback),
+            "train_generation_lookback": (checkpoint.get("train_generation_lookback"), self.config.market.train_generation_lookback),
+            "fixed_anchor_generation_lookback": (checkpoint.get("fixed_anchor_generation_lookback"), self.config.evaluation.fixed_anchor_generation_lookback),
+            "continuation_seed_mode": (checkpoint.get("continuation_seed_mode", "run_seed_offset"), self.config.evaluation.continuation_seed_mode),
+        }
+        for field_name, (saved, expected) in generation_settings.items():
+            if saved != expected:
+                raise ValueError(f"Checkpoint {field_name} {saved!r} does not match requested {expected!r}.")
         checkpoint_action_mode = checkpoint.get("action_mode", "softmax")
         if checkpoint_action_mode != self.config.environment.action_mode:
             raise ValueError(
@@ -971,18 +1003,34 @@ class RCPOTrainer:
         for row in rows:
             if "validation_annualized_return" not in row:
                 continue
-            validation_summary = {
-                key[len("validation_") :]: value
-                for key, value in row.items()
-                if key.startswith("validation_")
-            }
-            validation_summary["annualized_return"] = row["validation_annualized_return"]
-            validation_summary["split"] = "validation"
+            validation_summary = self._summary_from_validation_metric_row(row)
             score = self._validation_score(validation_summary)
             if score > best_score:
                 best_score = score
                 best_summary = validation_summary
         return best_score, best_summary
+
+    @staticmethod
+    def _summary_from_validation_metric_row(row: dict[str, Any]) -> dict[str, Any]:
+        summary = {
+            key[len("validation_") :]: value
+            for key, value in row.items()
+            if key.startswith("validation_")
+        }
+        for name in (
+            "alpha_target", "turnover", "constraint_cost", "drawdown_gap",
+            "drawdown_violation", "drawdown_constraint_cost",
+            "allocation_constraint_1_weight", "allocation_constraint_2_weight",
+            "allocation_constraint_1_violation_cost",
+            "allocation_constraint_2_violation_cost",
+            "allocation_constraint_raw_cost", "allocation_constraint_cost",
+            "allocation_drawdown_constraint_cost",
+            "simplex_z1", "simplex_z2", "simplex_z3", "simplex_z4",
+        ):
+            if name in summary:
+                summary[f"average_{name}"] = summary[name]
+        summary["split"] = "validation"
+        return summary
 
     @staticmethod
     def _validation_feasibility_tier(
@@ -1020,13 +1068,7 @@ class RCPOTrainer:
         for row in rows:
             if "validation_annualized_return" not in row:
                 continue
-            validation_summary = {
-                key[len("validation_") :]: value
-                for key, value in row.items()
-                if key.startswith("validation_")
-            }
-            validation_summary["annualized_return"] = row["validation_annualized_return"]
-            validation_summary["split"] = "validation"
+            validation_summary = self._summary_from_validation_metric_row(row)
             rate = self._validation_feasible_rate(validation_summary)
             score = self._validation_score(validation_summary)
             if self._is_better_feasible_candidate(
@@ -1076,7 +1118,11 @@ class RCPOTrainer:
         if self.skip_validation:
             return False
         interval = max(1, int(self.config.evaluation.validation_interval_updates))
-        return local_update_index == 0 or (update_index + 1) % interval == 0
+        first_update_validation = (
+            local_update_index == 0
+            and (self.resume_checkpoint is None or self.resume_target_total_updates is None)
+        )
+        return first_update_validation or (update_index + 1) % interval == 0
 
     def _validation_placeholder(self) -> dict[str, Any]:
         return {
@@ -1135,7 +1181,11 @@ class RCPOTrainer:
         equal_weight_returns: list[np.ndarray] = []
         model_cumulative_returns: list[float] = []
         equal_weight_cumulative_returns: list[float] = []
-        seed_offset = 10_000 if split_name == "validation" else 20_000
+        seed_offset = (
+            self.config.evaluation.validation_seed_offset
+            if split_name == "validation"
+            else self.config.evaluation.test_seed_offset
+        )
         for index, market in enumerate(self._branch_markets(split_name)):
             env = PortfolioEnv(
                 self.config.environment,
@@ -1376,8 +1426,12 @@ class RCPOTrainer:
             best_feasible_score = -math.inf
             best_feasible_summary = None
         training_start_time = time.perf_counter()
-        additional_updates = 0 if self.finalize_only else self.optimization.total_updates
         start_update = max(self.resume_completed_updates, len(metrics_rows))
+        additional_updates = (
+            0 if self.finalize_only else self.optimization.total_updates
+        )
+        if self.resume_target_total_updates is not None and not self.finalize_only:
+            additional_updates = max(0, self.resume_target_total_updates - start_update)
         target_total_updates = start_update + additional_updates
         if metrics_rows:
             self.lambda_history = [
@@ -1391,15 +1445,7 @@ class RCPOTrainer:
         if metrics_rows:
             for row in reversed(metrics_rows):
                 if "validation_annualized_return" in row:
-                    last_validation_summary = {
-                        key[len("validation_") :]: value
-                        for key, value in row.items()
-                        if key.startswith("validation_")
-                    }
-                    last_validation_summary["annualized_return"] = row[
-                        "validation_annualized_return"
-                    ]
-                    last_validation_summary["split"] = "validation"
+                    last_validation_summary = self._summary_from_validation_metric_row(row)
                     break
         if self.resume_checkpoint is not None:
             print(
@@ -1413,7 +1459,7 @@ class RCPOTrainer:
         for local_update_index in range(additional_updates):
             update_index = start_update + local_update_index
             update_start_time = time.perf_counter()
-            if self.resume_checkpoint is not None:
+            if self.resume_checkpoint is not None and self.resume_target_total_updates is None:
                 current_learning_rate = self._set_learning_rate(
                     local_update_index,
                     additional_updates,
@@ -1823,6 +1869,7 @@ def resume_experiment(
     disable_artifacts: bool = False,
     skip_validation: bool = False,
     finalize_only: bool = False,
+    target_total_updates: int | None = None,
 ) -> Path:
     run_path = Path(run_dir)
     checkpoint_path = run_path / checkpoint_name
@@ -1838,6 +1885,7 @@ def resume_experiment(
         disable_artifacts=disable_artifacts,
         skip_validation=skip_validation,
         finalize_only=finalize_only,
+        resume_target_total_updates=target_total_updates,
     )
     with exclusive_run_lock(run_path):
         trainer.train()

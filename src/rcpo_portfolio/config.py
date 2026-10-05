@@ -37,6 +37,7 @@ class RuntimeConfig:
 class MarketConfig:
     num_risky_assets: int = 5
     lookback: int = 20
+    train_generation_lookback: int | None = None
     train_market_count: int = 8
     train_steps: int = 5040
     validation_steps: int = 252
@@ -210,6 +211,13 @@ class EvaluationConfig:
     rolling_risk_window: int = 20
     validation_branch_count: int = 5
     test_branch_count: int = 10
+    validation_seed_offset: int = 10_000
+    test_seed_offset: int = 20_000
+    continuation_anchor_mode: str = "train_market"
+    fixed_anchor_seed: int = 90_000
+    fixed_anchor_steps: int = 5_040
+    fixed_anchor_generation_lookback: int | None = None
+    continuation_seed_mode: str = "run_seed_offset"
     validation_interval_updates: int = 5
     checkpoint_score: str = "validation_mean_excess_cumulative_return"
 
@@ -241,6 +249,13 @@ class ProjectConfig:
 
 
 def sync_rcpo_constraint_settings(config: ProjectConfig) -> None:
+    if config.market.lookback < 1:
+        raise ValueError("market.lookback must be positive.")
+    if (
+        config.market.train_generation_lookback is not None
+        and config.market.train_generation_lookback < config.market.lookback
+    ):
+        raise ValueError("market.train_generation_lookback must be at least market.lookback.")
     valid_policy_architectures = {
         "flat_gaussian",
         "simplex_branch_gaussian",
@@ -393,6 +408,30 @@ def sync_rcpo_constraint_settings(config: ProjectConfig) -> None:
         raise ValueError("logging.print_interval_updates must be positive.")
     if config.logging.branch_diagnostic_interval_updates < 1:
         raise ValueError("logging.branch_diagnostic_interval_updates must be positive.")
+    if config.evaluation.validation_branch_count < 1 or config.evaluation.test_branch_count < 1:
+        raise ValueError("evaluation branch counts must be positive.")
+    if config.evaluation.validation_seed_offset < 0 or config.evaluation.test_seed_offset < 0:
+        raise ValueError("evaluation seed offsets cannot be negative.")
+    if config.evaluation.validation_seed_offset == config.evaluation.test_seed_offset:
+        raise ValueError("validation and test seed offsets must differ.")
+    if config.evaluation.continuation_anchor_mode not in {"train_market", "fixed_market"}:
+        raise ValueError(
+            "evaluation.continuation_anchor_mode must be 'train_market' or 'fixed_market'."
+        )
+    if config.evaluation.fixed_anchor_seed < 0:
+        raise ValueError("evaluation.fixed_anchor_seed cannot be negative.")
+    if config.evaluation.fixed_anchor_steps < 1:
+        raise ValueError("evaluation.fixed_anchor_steps must be positive.")
+    if (
+        config.evaluation.fixed_anchor_generation_lookback is not None
+        and config.evaluation.fixed_anchor_generation_lookback < 1
+    ):
+        raise ValueError("evaluation.fixed_anchor_generation_lookback must be positive.")
+    if config.evaluation.continuation_seed_mode not in {
+        "run_seed_offset",
+        "fixed_offset",
+    }:
+        raise ValueError("evaluation.continuation_seed_mode must be run_seed_offset or fixed_offset.")
 
 
 def validate_reward_correction_settings(config: ProjectConfig) -> None:

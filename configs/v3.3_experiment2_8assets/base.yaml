@@ -1,0 +1,21 @@
+extends: ../v2.6_experiment2_8assets/base.yaml
+
+experiment:
+  seeds: [0]
+
+market:
+  train_market_count: 2
+  train_steps: 10080
+
+evaluation:
+  validation_branch_count: 20
+  test_branch_count: 50
+  validation_seed_offset: 100000
+  test_seed_offset: 200000
+  continuation_anchor_mode: fixed_market
+  fixed_anchor_seed: 90000
+  fixed_anchor_steps: 5040
+  validation_interval_updates: 200
+
+logging:
+  live_validation_plot: false

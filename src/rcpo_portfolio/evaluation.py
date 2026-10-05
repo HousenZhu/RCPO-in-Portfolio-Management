@@ -25,7 +25,11 @@ from .config import (
 from .devices import resolve_device
 from .env import PortfolioEnv
 from .io_utils import live_savefig, safe_savefig
-from .market import generate_market_splits
+from .market import (
+    generate_continuation_split,
+    generate_train_markets,
+    resolve_continuation_anchor,
+)
 from .models import ActorCritic
 
 
@@ -813,6 +817,15 @@ def load_checkpoint_for_evaluation(
     ):
         checkpoint_path = run_path / "checkpoint_best.pt"
     checkpoint = torch.load(checkpoint_path, map_location=device)
+    generation_settings = {
+        "market_lookback": (checkpoint.get("market_lookback", config.market.lookback), config.market.lookback),
+        "train_generation_lookback": (checkpoint.get("train_generation_lookback"), config.market.train_generation_lookback),
+        "fixed_anchor_generation_lookback": (checkpoint.get("fixed_anchor_generation_lookback"), config.evaluation.fixed_anchor_generation_lookback),
+        "continuation_seed_mode": (checkpoint.get("continuation_seed_mode", "run_seed_offset"), config.evaluation.continuation_seed_mode),
+    }
+    for field_name, (saved, expected) in generation_settings.items():
+        if saved != expected:
+            raise ValueError(f"Checkpoint {field_name} {saved!r} does not match config_snapshot {expected!r}.")
     checkpoint_action_mode = checkpoint.get("action_mode", "softmax")
     if checkpoint_action_mode != config.environment.action_mode:
         raise ValueError(
@@ -961,7 +974,34 @@ def load_checkpoint_for_evaluation(
                 raise ValueError(
                     "Checkpoint combined_drawdown_cost_weight does not match config_snapshot."
                 )
-    market_splits = generate_market_splits(config.market, int(checkpoint["seed"]))
+    seed = int(checkpoint["seed"])
+    train_market = generate_train_markets(config.market, seed)[0]
+    continuation_anchor = resolve_continuation_anchor(
+        config.market,
+        train_market,
+        mode=config.evaluation.continuation_anchor_mode,
+        fixed_seed=config.evaluation.fixed_anchor_seed,
+        fixed_steps=config.evaluation.fixed_anchor_steps,
+        fixed_generation_lookback=config.evaluation.fixed_anchor_generation_lookback,
+    )
+    continuation_seed = (
+        0 if config.evaluation.continuation_seed_mode == "fixed_offset" else seed
+    )
+    market_splits = {
+        "train": train_market,
+        "validation": generate_continuation_split(
+            config.market,
+            continuation_anchor,
+            config.market.validation_steps,
+            continuation_seed + config.evaluation.validation_seed_offset,
+        ),
+        "test": generate_continuation_split(
+            config.market,
+            continuation_anchor,
+            config.market.test_steps,
+            continuation_seed + config.evaluation.test_seed_offset,
+        ),
+    }
     environments = {
         split_name: PortfolioEnv(config.environment, market, config.market, seed=int(checkpoint["seed"]))
         for split_name, market in market_splits.items()

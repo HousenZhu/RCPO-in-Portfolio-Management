@@ -1,0 +1,7 @@
+extends: window_base.yaml
+
+experiment:
+  run_name: simplex_v3.4_window_60
+
+market:
+  lookback: 60

@@ -326,6 +326,17 @@ runtime:
 
 `auto` uses CUDA when PyTorch can see a GPU and otherwise falls back to CPU. Set `runtime.device: cpu` to force CPU.
 
+## Latest V3.3/V3.4 Results
+
+- [Experiment configurations](configs/v3.4_experiment2_8assets/README.md)
+- [Generalization study and presentation notes](reports/simplex_v33_v34_generalization_meeting_20261003.md)
+- [Concise evaluation meeting guide](reports/v3_3_v3_4_evaluation_meeting.md)
+- [Aggregated evaluation figures and tables](evaluation/v3.3_v3.4_professor_meeting/)
+- [Final V3.3/V3.4 presentation](slides/simplex_v33_v34_generalization_20261003/output/V3.3_V3.4_Generalization_Study_20261003_v4.pptx)
+- [Final project report](reports/final_project_report.pdf)
+
+Raw training logs, model checkpoints, large transfer archives, and reproducible evaluation caches are kept outside Git. Per-run evaluation PNGs and aggregated results remain versioned for inspection.
+
 ## Outputs
 
 Training creates a run directory containing:

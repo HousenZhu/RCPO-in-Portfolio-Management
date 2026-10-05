@@ -1,0 +1,7 @@
+extends: rcpo_dirichlet_m2_s10080_e4.yaml
+
+experiment:
+  run_name: simplex_v3.3_cf_reward_dirichlet_m2_s10080_e4
+
+network:
+  branch_credit_mode: counterfactual_open_loop_reward_global_cost
