@@ -45,7 +45,8 @@ class EvaluationResult:
 
 def compute_drawdown(returns: np.ndarray) -> np.ndarray:
     wealth = np.cumprod(1.0 + returns)
-    running_peak = np.maximum.accumulate(wealth)
+    # Include initial wealth while keeping one drawdown value per return.
+    running_peak = np.maximum.accumulate(np.concatenate(([1.0], wealth)))[1:]
     return (running_peak - wealth) / np.maximum(running_peak, 1e-12)
 
 
