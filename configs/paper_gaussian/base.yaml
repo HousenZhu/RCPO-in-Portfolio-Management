@@ -1,0 +1,24 @@
+extends: ../v3.3_experiment2_8assets/rcpo_gaussian_m8_s5040_e3.yaml
+
+experiment:
+  run_name: paper_gaussian
+  seeds: [0, 1, 2]
+
+runtime:
+  device: cpu
+
+network:
+  matched_branch_credit: true
+  counterfactual_semantics_version: 2
+  counterfactual_critic_schema_version: 2
+
+evaluation:
+  fixed_anchor_generation_lookback: 20
+  continuation_seed_mode: fixed_offset
+
+logging:
+  validation_checkpoint_interval_updates: 2000
+  live_validation_plot: false
+
+rcpo:
+  lambda_gap_mode: mean_step

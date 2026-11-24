@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import shutil
@@ -18,6 +19,7 @@ from .algorithms import (
     update_ppo_actor_critic,
     update_rcpo_actor_critic,
 )
+from .branch_credit import uses_counterfactual_credit
 from .config import (
     ALLOCATION_CONSTRAINT_VERSION,
     ALLOCATION_DRAWDOWN_CONSTRAINT_VERSION,
@@ -25,6 +27,7 @@ from .config import (
     BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION,
     RELATIVE_CURRENT_DRAWDOWN_CONSTRAINT_VERSION,
     ProjectConfig,
+    counterfactual_checkpoint_metadata,
     save_config,
     sync_rcpo_constraint_settings,
     validate_reward_correction_settings,
@@ -90,6 +93,15 @@ class RCPOTrainer:
         self.resume_completed_updates = 0
         set_global_seeds(seed)
         sync_rcpo_constraint_settings(config)
+        if (
+            config.environment.counterfactual_branch_credit_enabled
+            and config.network.counterfactual_semantics_version == 1
+            and not self.finalize_only
+        ):
+            raise ValueError(
+                "Legacy shadow-path CF checkpoints support evaluation and --finalize-only. "
+                "Start a new run with counterfactual semantics and critic schema 2 for one-step CF."
+            )
         validate_reward_correction_settings(config)
         validate_reward_noise_settings(config)
         self.device = resolve_device(config.runtime.device)
@@ -137,6 +149,25 @@ class RCPOTrainer:
             config.environment, self.test_markets[0], config.market, seed=seed + 2
         )
         self.optimization = config.ppo if algo == "ppo_unconstrained" else config.optimization
+        self.matched_credit_protocol = None
+        if config.network.matched_branch_credit and algo == "rcpo":
+            source_root = Path(__file__).parent
+            source_hash = hashlib.sha256()
+            for name in (
+                "trainer.py", "config.py", "branch_credit.py", "env.py", "market.py",
+                "simplex.py", "models.py", "rollouts.py", "algorithms/ppo.py", "algorithms/rcpo.py",
+            ):
+                source_hash.update((source_root / name).read_bytes().replace(b"\r\n", b"\n"))
+            self.matched_credit_protocol = {
+                "id": "paper_matched_credit_v1",
+                "surrogate_type": "conditional_branch",
+                "outer_branch_weight": "active_mask",
+                "entropy_weight": "active_mask",
+                "critic_schema": "actual_observation_global_and_per_branch_reward_and_cost_heads",
+                "reward_scaling": "none",
+                "real_transition_budget": self.optimization.total_updates * self.optimization.rollout_steps,
+                "training_code_revision": source_hash.hexdigest(),
+            }
 
         obs_dim = self.train_env.observation_space.shape[0]
         action_dim = self.train_env.action_space.shape[0]
@@ -146,10 +177,8 @@ class RCPOTrainer:
             config=config.network,
             branch_sizes=self.train_env.simplex_branch_sizes(),
             branch_train_mask=self.train_env.simplex_branch_train_mask(),
-            counterfactual_context_dim=(
-                self.train_env.counterfactual_critic_context_dim
-                if config.environment.counterfactual_branch_credit_enabled
-                else 0
+            counterfactual_context_dim=int(
+                counterfactual_checkpoint_metadata(config)["counterfactual_context_dim"]
             ),
         ).to(self.device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.optimization.learning_rate)
@@ -495,23 +524,9 @@ class RCPOTrainer:
                 "simplex_branch_train_mask": self.train_env.simplex_branch_train_mask(),
                 "policy_architecture": self.config.network.policy_architecture,
                 "branch_credit_mode": self.config.network.branch_credit_mode,
-                "counterfactual_semantics_version": int(
-                    self.config.network.counterfactual_semantics_version
-                ),
-                "counterfactual_downstream_mode": (
-                    self.config.network.counterfactual_downstream_mode
-                ),
-                "counterfactual_neutral_action_mode": (
-                    self.config.network.counterfactual_neutral_action_mode
-                ),
-                "counterfactual_critic_schema_version": int(
-                    self.config.network.counterfactual_critic_schema_version
-                ),
-                "counterfactual_context_dim": int(
-                    self.train_env.counterfactual_critic_context_dim
-                    if self.config.environment.counterfactual_branch_credit_enabled
-                    else 0
-                ),
+                "matched_branch_credit": self.config.network.matched_branch_credit,
+                "matched_credit_protocol": self.matched_credit_protocol,
+                **counterfactual_checkpoint_metadata(self.config),
                 "initial_portfolio_mode": self.config.environment.initial_portfolio_mode,
                 "observation_schema_version": int(
                     self.config.environment.observation_schema_version
@@ -619,25 +634,12 @@ class RCPOTrainer:
                 f"Checkpoint branch_credit_mode {checkpoint_branch_credit_mode!r} "
                 f"does not match requested {self.config.network.branch_credit_mode!r}."
             )
+        if checkpoint.get("matched_branch_credit", False) != self.config.network.matched_branch_credit:
+            raise ValueError("Checkpoint matched_branch_credit does not match the requested mode.")
+        if checkpoint.get("matched_credit_protocol") != self.matched_credit_protocol and not self.finalize_only:
+            raise ValueError("Checkpoint matched credit protocol, training source or budget changed.")
         if self.config.environment.counterfactual_branch_credit_enabled:
-            expected_counterfactual_metadata = {
-                "counterfactual_semantics_version": int(
-                    self.config.network.counterfactual_semantics_version
-                ),
-                "counterfactual_downstream_mode": (
-                    self.config.network.counterfactual_downstream_mode
-                ),
-                "counterfactual_neutral_action_mode": (
-                    self.config.network.counterfactual_neutral_action_mode
-                ),
-                "counterfactual_critic_schema_version": int(
-                    self.config.network.counterfactual_critic_schema_version
-                ),
-                "counterfactual_context_dim": int(
-                    self.train_env.counterfactual_critic_context_dim
-                ),
-            }
-            for field_name, expected_value in expected_counterfactual_metadata.items():
+            for field_name, expected_value in counterfactual_checkpoint_metadata(self.config).items():
                 if checkpoint.get(field_name) != expected_value:
                     raise ValueError(
                         f"Checkpoint {field_name} {checkpoint.get(field_name)!r} does "
@@ -1456,6 +1458,9 @@ class RCPOTrainer:
 
         stale_updates = 0
         early_stopped = False
+        snapshot_interval = self.config.logging.validation_checkpoint_interval_updates
+        if snapshot_interval is not None and self.resume_checkpoint is None and not self.finalize_only:
+            self._checkpoint("checkpoint_validation_000000.pt")
         for local_update_index in range(additional_updates):
             update_index = start_update + local_update_index
             update_start_time = time.perf_counter()
@@ -1618,6 +1623,8 @@ class RCPOTrainer:
             previous_best_score = best_score
             min_delta = self.optimization.early_stop_min_delta
             self.resume_completed_updates = update_index + 1
+            if snapshot_interval is not None and self.resume_completed_updates % snapshot_interval == 0:
+                self._checkpoint(f"checkpoint_validation_{self.resume_completed_updates:06d}.pt")
             if validation_evaluated and validation_score > best_score:
                 best_score = validation_score
                 best_summary = last_validation_summary
@@ -1764,6 +1771,15 @@ class RCPOTrainer:
             "evaluation_last": last_evaluation,
             "lambda_final": self.lambda_value,
             "completed_updates": len(metrics_rows),
+            "retained_real_transition_count": len(metrics_rows) * self.optimization.rollout_steps,
+            "retained_optimizer_step_count": sum(
+                int(row.get("optimizer_steps_completed", 0)) for row in metrics_rows
+            ),
+            "retained_one_step_replacement_count": (
+                len(metrics_rows) * self.optimization.rollout_steps
+                * sum(self.train_env.simplex_branch_train_mask())
+                if uses_counterfactual_credit(self.config.network.branch_credit_mode) else 0
+            ),
             "early_stopped": early_stopped,
         }
         with (self.run_dir / "training_summary.json").open("w", encoding="utf-8") as handle:

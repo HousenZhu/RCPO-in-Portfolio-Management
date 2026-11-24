@@ -1,0 +1,13 @@
+extends: base.yaml
+experiment:
+  run_name: paper_gaussian_allocation_drawdown
+environment:
+  action_mode: softmax
+  constraint_mode: allocation_relative_drawdown
+network:
+  policy_architecture: flat_gaussian
+  branch_credit_mode: global
+  matched_branch_credit: false
+rcpo:
+  constraint_mode: allocation_relative_drawdown
+  lambda_lr_up: 0.00050

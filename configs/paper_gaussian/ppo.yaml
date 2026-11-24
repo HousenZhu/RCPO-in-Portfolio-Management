@@ -1,0 +1,14 @@
+extends: shared.yaml
+experiment:
+  run_name: paper_gaussian_ppo
+ppo:
+  total_updates: 60000
+  rollout_steps: 2048
+  epochs: 3
+  minibatch_size: 512
+  learning_rate: 0.000060
+  learning_rate_final: 0.000030
+  entropy_coef: 0.0015
+  clip_epsilon: 0.10
+  target_kl: 0.02
+  early_stop_patience:

@@ -20,12 +20,14 @@ from .config import (
     BENCHMARK_DRAWDOWN_CONSTRAINT_VERSION,
     RELATIVE_CURRENT_DRAWDOWN_CONSTRAINT_VERSION,
     ProjectConfig,
+    counterfactual_checkpoint_metadata,
     sync_rcpo_constraint_settings,
 )
 from .devices import resolve_device
 from .env import PortfolioEnv
 from .io_utils import live_savefig, safe_savefig
 from .market import (
+    MarketSlice,
     generate_continuation_split,
     generate_train_markets,
     resolve_continuation_anchor,
@@ -803,13 +805,16 @@ def save_training_progress_artifacts(
 def load_checkpoint_for_evaluation(
     run_dir: str | Path,
     checkpoint_name: str = "checkpoint_best_return.pt",
+    *,
+    evaluation_device: str | None = None,
+    shared_market: MarketSlice | None = None,
 ) -> tuple[ProjectConfig, dict[str, Any], ActorCritic, dict[str, PortfolioEnv]]:
     run_path = Path(run_dir)
     from .config import load_config
 
     config = load_config(run_path / "config_snapshot.yaml")
     sync_rcpo_constraint_settings(config)
-    device = resolve_device(config.runtime.device)
+    device = resolve_device(evaluation_device or config.runtime.device)
     checkpoint_path = run_path / checkpoint_name
     if (
         checkpoint_name == "checkpoint_best_return.pt"
@@ -851,24 +856,10 @@ def load_checkpoint_for_evaluation(
             f"Checkpoint branch_credit_mode {checkpoint_branch_credit_mode!r} "
             f"does not match config_snapshot {config.network.branch_credit_mode!r}."
         )
+    if checkpoint.get("matched_branch_credit", False) != config.network.matched_branch_credit:
+        raise ValueError("Checkpoint matched_branch_credit does not match config_snapshot.")
+    expected_counterfactual_metadata = counterfactual_checkpoint_metadata(config)
     if config.environment.counterfactual_branch_credit_enabled:
-        expected_counterfactual_metadata = {
-            "counterfactual_semantics_version": int(
-                config.network.counterfactual_semantics_version
-            ),
-            "counterfactual_downstream_mode": (
-                config.network.counterfactual_downstream_mode
-            ),
-            "counterfactual_neutral_action_mode": (
-                config.network.counterfactual_neutral_action_mode
-            ),
-            "counterfactual_critic_schema_version": int(
-                config.network.counterfactual_critic_schema_version
-            ),
-            "counterfactual_context_dim": int(
-                config.market.num_risky_assets + 7
-            ),
-        }
         for field_name, expected_value in expected_counterfactual_metadata.items():
             if checkpoint.get(field_name) != expected_value:
                 raise ValueError(
@@ -976,33 +967,36 @@ def load_checkpoint_for_evaluation(
                     "Checkpoint combined_drawdown_cost_weight does not match config_snapshot."
                 )
     seed = int(checkpoint["seed"])
-    train_market = generate_train_markets(config.market, seed)[0]
-    continuation_anchor = resolve_continuation_anchor(
-        config.market,
-        train_market,
-        mode=config.evaluation.continuation_anchor_mode,
-        fixed_seed=config.evaluation.fixed_anchor_seed,
-        fixed_steps=config.evaluation.fixed_anchor_steps,
-        fixed_generation_lookback=config.evaluation.fixed_anchor_generation_lookback,
-    )
-    continuation_seed = (
-        0 if config.evaluation.continuation_seed_mode == "fixed_offset" else seed
-    )
-    market_splits = {
-        "train": train_market,
-        "validation": generate_continuation_split(
+    if shared_market is not None:
+        market_splits = {"train": shared_market}
+    else:
+        train_market = generate_train_markets(config.market, seed)[0]
+        continuation_anchor = resolve_continuation_anchor(
             config.market,
-            continuation_anchor,
-            config.market.validation_steps,
-            continuation_seed + config.evaluation.validation_seed_offset,
-        ),
-        "test": generate_continuation_split(
-            config.market,
-            continuation_anchor,
-            config.market.test_steps,
-            continuation_seed + config.evaluation.test_seed_offset,
-        ),
-    }
+            train_market,
+            mode=config.evaluation.continuation_anchor_mode,
+            fixed_seed=config.evaluation.fixed_anchor_seed,
+            fixed_steps=config.evaluation.fixed_anchor_steps,
+            fixed_generation_lookback=config.evaluation.fixed_anchor_generation_lookback,
+        )
+        continuation_seed = (
+            0 if config.evaluation.continuation_seed_mode == "fixed_offset" else seed
+        )
+        market_splits = {
+            "train": train_market,
+            "validation": generate_continuation_split(
+                config.market,
+                continuation_anchor,
+                config.market.validation_steps,
+                continuation_seed + config.evaluation.validation_seed_offset,
+            ),
+            "test": generate_continuation_split(
+                config.market,
+                continuation_anchor,
+                config.market.test_steps,
+                continuation_seed + config.evaluation.test_seed_offset,
+            ),
+        }
     environments = {
         split_name: PortfolioEnv(config.environment, market, config.market, seed=int(checkpoint["seed"]))
         for split_name, market in market_splits.items()
@@ -1013,10 +1007,8 @@ def load_checkpoint_for_evaluation(
         config=config.network,
         branch_sizes=environments["train"].simplex_branch_sizes(),
         branch_train_mask=environments["train"].simplex_branch_train_mask(),
-        counterfactual_context_dim=(
-            environments["train"].counterfactual_critic_context_dim
-            if config.environment.counterfactual_branch_credit_enabled
-            else 0
+        counterfactual_context_dim=int(
+            expected_counterfactual_metadata["counterfactual_context_dim"]
         ),
     ).to(device)
     checkpoint_action_dim = checkpoint.get("action_dim")
@@ -1068,6 +1060,9 @@ def load_checkpoint_for_evaluation(
         "simplex_branch_sizes": environments["train"].simplex_branch_sizes(),
         "simplex_branch_train_mask": environments["train"].simplex_branch_train_mask(),
         "lambda_value": float(checkpoint["lambda_value"]),
+        "completed_updates": int(checkpoint.get("completed_updates", 0)),
+        "counterfactual_semantics_version": config.network.counterfactual_semantics_version,
+        "matched_credit_protocol": checkpoint.get("matched_credit_protocol"),
         "device": str(device),
     }
     return config, metadata, model, environments

@@ -12,7 +12,7 @@ This project builds a synthetic portfolio management problem and trains policy-g
 - Combined allocation-plus-drawdown RCPO baseline for joint feasibility and risk control
 - Two hard allocation constraints under `environment.action_mode: simplex_decomposition`
 - Configurable CAOSD policies: flat Gaussian, parallel/autoregressive Gaussian logits, or autoregressive Dirichlet weights
-- Global or standalone branch credit assignment for simplex policies
+- Global, standalone, or one-step counterfactual branch credit for simplex policies
 - Optional DRC/GDRC reward correction for PPO or RCPO
 - Config-driven training, resume, evaluation, checkpoints, metrics, and plots
 
@@ -182,6 +182,83 @@ network:
 The config loader resolves Gaussian architectures to `branch_logits` and applies softmax within each branch. Dirichlet resolves to `branch_weights`, because its sampled action already lies on each branch simplex.
 
 With `branch_credit_mode: standalone`, each branch receives its own shadow-portfolio return and drawdown advantage, and its PPO loss is scaled by its realized CAOSD coefficient `z_i`. RCPO still uses one global Lagrange multiplier, updated only from the final combined portfolio drawdown cost. Set `branch_credit_mode: global` to preserve the original joint log-probability and shared final-portfolio advantage.
+
+With `standalone_reward_global_cost`, each standalone branch reward uses the
+current and previous sampled branch weights to account for transaction costs.
+Only the actual portfolio and the constrained-neutral benchmark maintain
+wealth and drawdown histories. The actual portfolio supplies the cost advantage
+for all branches.
+
+Counterfactual modes use one-step replacement for new runs. Each replacement uses
+the actual portfolio's pre-step weights, wealth and peak, then recomputes CAOSD
+with one neutral branch and the other sampled branches held fixed. The realized
+market return and benchmark budget are shared. The branch critics use the actual
+observation, and RCPO updates its multiplier from actual portfolio costs.
+
+| Config value | Reward credit | Cost credit |
+| --- | --- | --- |
+| `counterfactual_open_loop_reward_global_cost` | One-step reward difference | Actual portfolio cost |
+| `standalone_reward_counterfactual_open_loop_cost` | Standalone reward from current and previous sampled branch weights | One-step cost difference |
+| `counterfactual_open_loop_reward_cost` | One-step reward difference | One-step cost difference |
+
+One-step CF uses checkpoint semantics and critic schema version 2. Version 1
+shadow-path checkpoints support evaluation and `--finalize-only`. Start a new
+run to train with one-step CF.
+
+## Paper Gaussian Experiment
+
+The main comparison uses eight methods and three matched training seeds for
+each learned method. The static constrained-neutral baseline has no training
+task. The 21 tasks use 8 training markets of 5,040 steps each, 252-step
+episodes, a 20-step lookback, 60,000 updates, 2,048 real transitions per
+update, and three optimizer epochs. This follows the V3.4 8-market, 3-epoch
+Gaussian control. The learning-rate schedule is 0.000060 to 0.000030.
+
+| Tasks | Method | Training signal |
+| --- | --- | --- |
+| 0–2 | Soft allocation + drawdown RCPO | Softmax, combined cost, one multiplier with the V2.6 soft baseline's upward rate |
+| 3–5 | CAOSD + PPO | Actual portfolio reward and conditional branch PPO |
+| 6–8 | CAOSD + RCPO (shared global) | Actual portfolio reward and cost advantages reused across active branches |
+| 9–11 | CAOSD + RCPO (standalone) | Standalone branch reward and actual portfolio cost |
+| 12–14 | CAOSD + RCPO (CF-R) | One-step reward difference and actual portfolio cost |
+| 15–17 | CAOSD + RCPO (CF-C) | Unscaled standalone branch reward and one-step cost difference |
+| 18–20 | CAOSD + RCPO (CF-RC) | One-step reward and cost differences |
+
+Within each group, indices increase in training-seed order 0, 1, 2. The five
+CAOSD + RCPO arms supply both the main table and matched Table 2. They share
+the same conditional surrogate, active-branch weights for the loss and
+entropy, critic heads, optimizer settings and actual-portfolio lambda update.
+The reward and cost target sources vary by arm. V3.2–V3.4 shadow-CF runs,
+V3.4 CAOSD-mass-weighted standalone runs, and earlier single-seed PPO and
+soft-constraint runs remain historical comparisons. Their settings or saved
+checkpoints differ from this protocol.
+
+Training selects best-return checkpoints on the shared 20-branch validation
+set. Figure 1 uses separately saved initial and every-2,000-update checkpoints.
+Final testing uses five new anchors with 20 branches each. The manifest builder
+checks the 60,000-update budget and records the requested checkpoint grid.
+
+In the Fir repository directory, use the CPU account listed for your login.
+
+```bash
+mkdir -p slurm_logs/paper_gaussian
+sbatch --account="$PAPER_ACCOUNT" --array=0-20%21 scripts/fir_paper_gaussian.sh
+```
+
+Set `PAPER_RUN_ROOT` and `PAPER_VENV` if the defaults in the job script differ
+from your paths. Each task has its own run directory. Resubmitting an
+interrupted task resumes from its last checkpoint toward the same absolute
+budget. Training time and peak RSS enter the compute table only when measured
+for an uninterrupted run. Hardware and timing boundaries determine which
+measurements can be normalized together.
+
+After copying the run directory tree back, use the same path for the manifest
+builder and the experiment output root.
+
+```powershell
+py -3.11 scripts/paper_experiments.py --run-root runs/paper_gaussian manifest --output evaluation/paper_gaussian_manifest.json
+py -3.11 scripts/evaluate_paper.py --manifest evaluation/paper_gaussian_manifest.json --output-dir evaluation/paper_gaussian
+```
 
 ## Constraint Definition
 

@@ -1,0 +1,5710 @@
+{
+  "reference_config": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\configs\\paper_gaussian\\base.yaml",
+  "actor_family": "gaussian",
+  "protocol_id": "paper_gaussian_v1",
+  "decoding": "deterministic",
+  "validation": {
+    "id": "paper_validation_anchor_90000",
+    "markets": [
+      {
+        "id": "val_00",
+        "anchor_seed": 90000,
+        "continuation_seed": 100000
+      },
+      {
+        "id": "val_01",
+        "anchor_seed": 90000,
+        "continuation_seed": 100001
+      },
+      {
+        "id": "val_02",
+        "anchor_seed": 90000,
+        "continuation_seed": 100002
+      },
+      {
+        "id": "val_03",
+        "anchor_seed": 90000,
+        "continuation_seed": 100003
+      },
+      {
+        "id": "val_04",
+        "anchor_seed": 90000,
+        "continuation_seed": 100004
+      },
+      {
+        "id": "val_05",
+        "anchor_seed": 90000,
+        "continuation_seed": 100005
+      },
+      {
+        "id": "val_06",
+        "anchor_seed": 90000,
+        "continuation_seed": 100006
+      },
+      {
+        "id": "val_07",
+        "anchor_seed": 90000,
+        "continuation_seed": 100007
+      },
+      {
+        "id": "val_08",
+        "anchor_seed": 90000,
+        "continuation_seed": 100008
+      },
+      {
+        "id": "val_09",
+        "anchor_seed": 90000,
+        "continuation_seed": 100009
+      },
+      {
+        "id": "val_10",
+        "anchor_seed": 90000,
+        "continuation_seed": 100010
+      },
+      {
+        "id": "val_11",
+        "anchor_seed": 90000,
+        "continuation_seed": 100011
+      },
+      {
+        "id": "val_12",
+        "anchor_seed": 90000,
+        "continuation_seed": 100012
+      },
+      {
+        "id": "val_13",
+        "anchor_seed": 90000,
+        "continuation_seed": 100013
+      },
+      {
+        "id": "val_14",
+        "anchor_seed": 90000,
+        "continuation_seed": 100014
+      },
+      {
+        "id": "val_15",
+        "anchor_seed": 90000,
+        "continuation_seed": 100015
+      },
+      {
+        "id": "val_16",
+        "anchor_seed": 90000,
+        "continuation_seed": 100016
+      },
+      {
+        "id": "val_17",
+        "anchor_seed": 90000,
+        "continuation_seed": 100017
+      },
+      {
+        "id": "val_18",
+        "anchor_seed": 90000,
+        "continuation_seed": 100018
+      },
+      {
+        "id": "val_19",
+        "anchor_seed": 90000,
+        "continuation_seed": 100019
+      }
+    ]
+  },
+  "test": {
+    "id": "paper_heldout_anchors_191000_to_195000",
+    "markets": [
+      {
+        "id": "test_0_00",
+        "anchor_seed": 191000,
+        "continuation_seed": 300000
+      },
+      {
+        "id": "test_0_01",
+        "anchor_seed": 191000,
+        "continuation_seed": 300001
+      },
+      {
+        "id": "test_0_02",
+        "anchor_seed": 191000,
+        "continuation_seed": 300002
+      },
+      {
+        "id": "test_0_03",
+        "anchor_seed": 191000,
+        "continuation_seed": 300003
+      },
+      {
+        "id": "test_0_04",
+        "anchor_seed": 191000,
+        "continuation_seed": 300004
+      },
+      {
+        "id": "test_0_05",
+        "anchor_seed": 191000,
+        "continuation_seed": 300005
+      },
+      {
+        "id": "test_0_06",
+        "anchor_seed": 191000,
+        "continuation_seed": 300006
+      },
+      {
+        "id": "test_0_07",
+        "anchor_seed": 191000,
+        "continuation_seed": 300007
+      },
+      {
+        "id": "test_0_08",
+        "anchor_seed": 191000,
+        "continuation_seed": 300008
+      },
+      {
+        "id": "test_0_09",
+        "anchor_seed": 191000,
+        "continuation_seed": 300009
+      },
+      {
+        "id": "test_0_10",
+        "anchor_seed": 191000,
+        "continuation_seed": 300010
+      },
+      {
+        "id": "test_0_11",
+        "anchor_seed": 191000,
+        "continuation_seed": 300011
+      },
+      {
+        "id": "test_0_12",
+        "anchor_seed": 191000,
+        "continuation_seed": 300012
+      },
+      {
+        "id": "test_0_13",
+        "anchor_seed": 191000,
+        "continuation_seed": 300013
+      },
+      {
+        "id": "test_0_14",
+        "anchor_seed": 191000,
+        "continuation_seed": 300014
+      },
+      {
+        "id": "test_0_15",
+        "anchor_seed": 191000,
+        "continuation_seed": 300015
+      },
+      {
+        "id": "test_0_16",
+        "anchor_seed": 191000,
+        "continuation_seed": 300016
+      },
+      {
+        "id": "test_0_17",
+        "anchor_seed": 191000,
+        "continuation_seed": 300017
+      },
+      {
+        "id": "test_0_18",
+        "anchor_seed": 191000,
+        "continuation_seed": 300018
+      },
+      {
+        "id": "test_0_19",
+        "anchor_seed": 191000,
+        "continuation_seed": 300019
+      },
+      {
+        "id": "test_1_00",
+        "anchor_seed": 192000,
+        "continuation_seed": 301000
+      },
+      {
+        "id": "test_1_01",
+        "anchor_seed": 192000,
+        "continuation_seed": 301001
+      },
+      {
+        "id": "test_1_02",
+        "anchor_seed": 192000,
+        "continuation_seed": 301002
+      },
+      {
+        "id": "test_1_03",
+        "anchor_seed": 192000,
+        "continuation_seed": 301003
+      },
+      {
+        "id": "test_1_04",
+        "anchor_seed": 192000,
+        "continuation_seed": 301004
+      },
+      {
+        "id": "test_1_05",
+        "anchor_seed": 192000,
+        "continuation_seed": 301005
+      },
+      {
+        "id": "test_1_06",
+        "anchor_seed": 192000,
+        "continuation_seed": 301006
+      },
+      {
+        "id": "test_1_07",
+        "anchor_seed": 192000,
+        "continuation_seed": 301007
+      },
+      {
+        "id": "test_1_08",
+        "anchor_seed": 192000,
+        "continuation_seed": 301008
+      },
+      {
+        "id": "test_1_09",
+        "anchor_seed": 192000,
+        "continuation_seed": 301009
+      },
+      {
+        "id": "test_1_10",
+        "anchor_seed": 192000,
+        "continuation_seed": 301010
+      },
+      {
+        "id": "test_1_11",
+        "anchor_seed": 192000,
+        "continuation_seed": 301011
+      },
+      {
+        "id": "test_1_12",
+        "anchor_seed": 192000,
+        "continuation_seed": 301012
+      },
+      {
+        "id": "test_1_13",
+        "anchor_seed": 192000,
+        "continuation_seed": 301013
+      },
+      {
+        "id": "test_1_14",
+        "anchor_seed": 192000,
+        "continuation_seed": 301014
+      },
+      {
+        "id": "test_1_15",
+        "anchor_seed": 192000,
+        "continuation_seed": 301015
+      },
+      {
+        "id": "test_1_16",
+        "anchor_seed": 192000,
+        "continuation_seed": 301016
+      },
+      {
+        "id": "test_1_17",
+        "anchor_seed": 192000,
+        "continuation_seed": 301017
+      },
+      {
+        "id": "test_1_18",
+        "anchor_seed": 192000,
+        "continuation_seed": 301018
+      },
+      {
+        "id": "test_1_19",
+        "anchor_seed": 192000,
+        "continuation_seed": 301019
+      },
+      {
+        "id": "test_2_00",
+        "anchor_seed": 193000,
+        "continuation_seed": 302000
+      },
+      {
+        "id": "test_2_01",
+        "anchor_seed": 193000,
+        "continuation_seed": 302001
+      },
+      {
+        "id": "test_2_02",
+        "anchor_seed": 193000,
+        "continuation_seed": 302002
+      },
+      {
+        "id": "test_2_03",
+        "anchor_seed": 193000,
+        "continuation_seed": 302003
+      },
+      {
+        "id": "test_2_04",
+        "anchor_seed": 193000,
+        "continuation_seed": 302004
+      },
+      {
+        "id": "test_2_05",
+        "anchor_seed": 193000,
+        "continuation_seed": 302005
+      },
+      {
+        "id": "test_2_06",
+        "anchor_seed": 193000,
+        "continuation_seed": 302006
+      },
+      {
+        "id": "test_2_07",
+        "anchor_seed": 193000,
+        "continuation_seed": 302007
+      },
+      {
+        "id": "test_2_08",
+        "anchor_seed": 193000,
+        "continuation_seed": 302008
+      },
+      {
+        "id": "test_2_09",
+        "anchor_seed": 193000,
+        "continuation_seed": 302009
+      },
+      {
+        "id": "test_2_10",
+        "anchor_seed": 193000,
+        "continuation_seed": 302010
+      },
+      {
+        "id": "test_2_11",
+        "anchor_seed": 193000,
+        "continuation_seed": 302011
+      },
+      {
+        "id": "test_2_12",
+        "anchor_seed": 193000,
+        "continuation_seed": 302012
+      },
+      {
+        "id": "test_2_13",
+        "anchor_seed": 193000,
+        "continuation_seed": 302013
+      },
+      {
+        "id": "test_2_14",
+        "anchor_seed": 193000,
+        "continuation_seed": 302014
+      },
+      {
+        "id": "test_2_15",
+        "anchor_seed": 193000,
+        "continuation_seed": 302015
+      },
+      {
+        "id": "test_2_16",
+        "anchor_seed": 193000,
+        "continuation_seed": 302016
+      },
+      {
+        "id": "test_2_17",
+        "anchor_seed": 193000,
+        "continuation_seed": 302017
+      },
+      {
+        "id": "test_2_18",
+        "anchor_seed": 193000,
+        "continuation_seed": 302018
+      },
+      {
+        "id": "test_2_19",
+        "anchor_seed": 193000,
+        "continuation_seed": 302019
+      },
+      {
+        "id": "test_3_00",
+        "anchor_seed": 194000,
+        "continuation_seed": 303000
+      },
+      {
+        "id": "test_3_01",
+        "anchor_seed": 194000,
+        "continuation_seed": 303001
+      },
+      {
+        "id": "test_3_02",
+        "anchor_seed": 194000,
+        "continuation_seed": 303002
+      },
+      {
+        "id": "test_3_03",
+        "anchor_seed": 194000,
+        "continuation_seed": 303003
+      },
+      {
+        "id": "test_3_04",
+        "anchor_seed": 194000,
+        "continuation_seed": 303004
+      },
+      {
+        "id": "test_3_05",
+        "anchor_seed": 194000,
+        "continuation_seed": 303005
+      },
+      {
+        "id": "test_3_06",
+        "anchor_seed": 194000,
+        "continuation_seed": 303006
+      },
+      {
+        "id": "test_3_07",
+        "anchor_seed": 194000,
+        "continuation_seed": 303007
+      },
+      {
+        "id": "test_3_08",
+        "anchor_seed": 194000,
+        "continuation_seed": 303008
+      },
+      {
+        "id": "test_3_09",
+        "anchor_seed": 194000,
+        "continuation_seed": 303009
+      },
+      {
+        "id": "test_3_10",
+        "anchor_seed": 194000,
+        "continuation_seed": 303010
+      },
+      {
+        "id": "test_3_11",
+        "anchor_seed": 194000,
+        "continuation_seed": 303011
+      },
+      {
+        "id": "test_3_12",
+        "anchor_seed": 194000,
+        "continuation_seed": 303012
+      },
+      {
+        "id": "test_3_13",
+        "anchor_seed": 194000,
+        "continuation_seed": 303013
+      },
+      {
+        "id": "test_3_14",
+        "anchor_seed": 194000,
+        "continuation_seed": 303014
+      },
+      {
+        "id": "test_3_15",
+        "anchor_seed": 194000,
+        "continuation_seed": 303015
+      },
+      {
+        "id": "test_3_16",
+        "anchor_seed": 194000,
+        "continuation_seed": 303016
+      },
+      {
+        "id": "test_3_17",
+        "anchor_seed": 194000,
+        "continuation_seed": 303017
+      },
+      {
+        "id": "test_3_18",
+        "anchor_seed": 194000,
+        "continuation_seed": 303018
+      },
+      {
+        "id": "test_3_19",
+        "anchor_seed": 194000,
+        "continuation_seed": 303019
+      },
+      {
+        "id": "test_4_00",
+        "anchor_seed": 195000,
+        "continuation_seed": 304000
+      },
+      {
+        "id": "test_4_01",
+        "anchor_seed": 195000,
+        "continuation_seed": 304001
+      },
+      {
+        "id": "test_4_02",
+        "anchor_seed": 195000,
+        "continuation_seed": 304002
+      },
+      {
+        "id": "test_4_03",
+        "anchor_seed": 195000,
+        "continuation_seed": 304003
+      },
+      {
+        "id": "test_4_04",
+        "anchor_seed": 195000,
+        "continuation_seed": 304004
+      },
+      {
+        "id": "test_4_05",
+        "anchor_seed": 195000,
+        "continuation_seed": 304005
+      },
+      {
+        "id": "test_4_06",
+        "anchor_seed": 195000,
+        "continuation_seed": 304006
+      },
+      {
+        "id": "test_4_07",
+        "anchor_seed": 195000,
+        "continuation_seed": 304007
+      },
+      {
+        "id": "test_4_08",
+        "anchor_seed": 195000,
+        "continuation_seed": 304008
+      },
+      {
+        "id": "test_4_09",
+        "anchor_seed": 195000,
+        "continuation_seed": 304009
+      },
+      {
+        "id": "test_4_10",
+        "anchor_seed": 195000,
+        "continuation_seed": 304010
+      },
+      {
+        "id": "test_4_11",
+        "anchor_seed": 195000,
+        "continuation_seed": 304011
+      },
+      {
+        "id": "test_4_12",
+        "anchor_seed": 195000,
+        "continuation_seed": 304012
+      },
+      {
+        "id": "test_4_13",
+        "anchor_seed": 195000,
+        "continuation_seed": 304013
+      },
+      {
+        "id": "test_4_14",
+        "anchor_seed": 195000,
+        "continuation_seed": 304014
+      },
+      {
+        "id": "test_4_15",
+        "anchor_seed": 195000,
+        "continuation_seed": 304015
+      },
+      {
+        "id": "test_4_16",
+        "anchor_seed": 195000,
+        "continuation_seed": 304016
+      },
+      {
+        "id": "test_4_17",
+        "anchor_seed": 195000,
+        "continuation_seed": 304017
+      },
+      {
+        "id": "test_4_18",
+        "anchor_seed": 195000,
+        "continuation_seed": 304018
+      },
+      {
+        "id": "test_4_19",
+        "anchor_seed": 195000,
+        "continuation_seed": 304019
+      }
+    ]
+  },
+  "runs": [
+    {
+      "algorithm_id": "rcpo_allocation_penalty",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_allocation_drawdown\\seed_0\\v4.1_paper_gaussian_allocation_drawdown_rcpo_none_20261122_195058\\seed_0",
+      "training_seed": 0,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "rcpo_allocation_penalty",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_allocation_drawdown\\seed_1\\v4.1_paper_gaussian_allocation_drawdown_rcpo_none_20261122_195058\\seed_1",
+      "training_seed": 1,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "rcpo_allocation_penalty",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_allocation_drawdown\\seed_2\\v4.1_paper_gaussian_allocation_drawdown_rcpo_none_20261122_195058\\seed_2",
+      "training_seed": 2,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_ppo",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_ppo\\seed_0\\v4.1_paper_gaussian_ppo_ppo_unconstrained_none_20261122_195058\\seed_0",
+      "training_seed": 0,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_ppo",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_ppo\\seed_1\\v4.1_paper_gaussian_ppo_ppo_unconstrained_none_20261122_195058\\seed_1",
+      "training_seed": 1,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_ppo",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_ppo\\seed_2\\v4.1_paper_gaussian_ppo_ppo_unconstrained_none_20261122_195058\\seed_2",
+      "training_seed": 2,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_shared",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_shared\\seed_0\\v4.1_paper_gaussian_shared_rcpo_none_20261122_195058\\seed_0",
+      "training_seed": 0,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_shared",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_shared\\seed_1\\v4.1_paper_gaussian_shared_rcpo_none_20261122_195058\\seed_1",
+      "training_seed": 1,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_shared",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_shared\\seed_2\\v4.1_paper_gaussian_shared_rcpo_none_20261122_195058\\seed_2",
+      "training_seed": 2,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_standalone",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_standalone\\seed_0\\v4.1_paper_gaussian_standalone_rcpo_none_20261122_195058\\seed_0",
+      "training_seed": 0,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_standalone",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_standalone\\seed_1\\v4.1_paper_gaussian_standalone_rcpo_none_20261122_195058\\seed_1",
+      "training_seed": 1,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_standalone",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_standalone\\seed_2\\v4.1_paper_gaussian_standalone_rcpo_none_20261122_195058\\seed_2",
+      "training_seed": 2,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_r",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_cf_r\\seed_0\\v4.1_paper_gaussian_cf_r_rcpo_none_20261122_195058\\seed_0",
+      "training_seed": 0,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_r",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_cf_r\\seed_1\\v4.1_paper_gaussian_cf_r_rcpo_none_20261122_195058\\seed_1",
+      "training_seed": 1,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_r",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_cf_r\\seed_2\\v4.1_paper_gaussian_cf_r_rcpo_none_20261122_195058\\seed_2",
+      "training_seed": 2,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_c",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_cf_c\\seed_0\\v4.1_paper_gaussian_cf_c_rcpo_none_20261122_195058\\seed_0",
+      "training_seed": 0,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_c",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_cf_c\\seed_1\\v4.1_paper_gaussian_cf_c_rcpo_none_20261122_195058\\seed_1",
+      "training_seed": 1,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_c",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_cf_c\\seed_2\\v4.1_paper_gaussian_cf_c_rcpo_none_20261122_195058\\seed_2",
+      "training_seed": 2,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_rc",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_cf_rc\\seed_0\\v4.1_paper_gaussian_cf_rc_rcpo_none_20261122_195058\\seed_0",
+      "training_seed": 0,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_rc",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_cf_rc\\seed_1\\v4.1_paper_gaussian_cf_rc_rcpo_none_20261122_195058\\seed_1",
+      "training_seed": 1,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_rc",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_cf_rc\\seed_2\\v4.1_paper_gaussian_cf_rc_rcpo_none_20261122_195058\\seed_2",
+      "training_seed": 2,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    }
+  ],
+  "matched_runs": [
+    {
+      "algorithm_id": "caosd_rcpo_shared",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_shared\\seed_0\\v4.1_paper_gaussian_shared_rcpo_none_20261122_195058\\seed_0",
+      "training_seed": 0,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_shared",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_shared\\seed_1\\v4.1_paper_gaussian_shared_rcpo_none_20261122_195058\\seed_1",
+      "training_seed": 1,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_shared",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_shared\\seed_2\\v4.1_paper_gaussian_shared_rcpo_none_20261122_195058\\seed_2",
+      "training_seed": 2,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_standalone",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_standalone\\seed_0\\v4.1_paper_gaussian_standalone_rcpo_none_20261122_195058\\seed_0",
+      "training_seed": 0,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_standalone",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_standalone\\seed_1\\v4.1_paper_gaussian_standalone_rcpo_none_20261122_195058\\seed_1",
+      "training_seed": 1,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_standalone",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_standalone\\seed_2\\v4.1_paper_gaussian_standalone_rcpo_none_20261122_195058\\seed_2",
+      "training_seed": 2,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_r",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_cf_r\\seed_0\\v4.1_paper_gaussian_cf_r_rcpo_none_20261122_195058\\seed_0",
+      "training_seed": 0,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_r",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_cf_r\\seed_1\\v4.1_paper_gaussian_cf_r_rcpo_none_20261122_195058\\seed_1",
+      "training_seed": 1,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_r",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_cf_r\\seed_2\\v4.1_paper_gaussian_cf_r_rcpo_none_20261122_195058\\seed_2",
+      "training_seed": 2,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_c",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_cf_c\\seed_0\\v4.1_paper_gaussian_cf_c_rcpo_none_20261122_195058\\seed_0",
+      "training_seed": 0,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_c",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_cf_c\\seed_1\\v4.1_paper_gaussian_cf_c_rcpo_none_20261122_195058\\seed_1",
+      "training_seed": 1,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_c",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_cf_c\\seed_2\\v4.1_paper_gaussian_cf_c_rcpo_none_20261122_195058\\seed_2",
+      "training_seed": 2,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_rc",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_cf_rc\\seed_0\\v4.1_paper_gaussian_cf_rc_rcpo_none_20261122_195058\\seed_0",
+      "training_seed": 0,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_rc",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_cf_rc\\seed_1\\v4.1_paper_gaussian_cf_rc_rcpo_none_20261122_195058\\seed_1",
+      "training_seed": 1,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_rc",
+      "run_dir": "C:\\Users\\miaoj\\Desktop\\RCPO in trading\\runs\\v4.1_cf_rc\\seed_2\\v4.1_paper_gaussian_cf_rc_rcpo_none_20261122_195058\\seed_2",
+      "training_seed": 2,
+      "test_checkpoint": "checkpoint_best_return.pt",
+      "validation_checkpoints": [
+        {
+          "checkpoint": "checkpoint_validation_000000.pt",
+          "training_real_transition_count": 0
+        },
+        {
+          "checkpoint": "checkpoint_validation_002000.pt",
+          "training_real_transition_count": 4096000
+        },
+        {
+          "checkpoint": "checkpoint_validation_004000.pt",
+          "training_real_transition_count": 8192000
+        },
+        {
+          "checkpoint": "checkpoint_validation_006000.pt",
+          "training_real_transition_count": 12288000
+        },
+        {
+          "checkpoint": "checkpoint_validation_008000.pt",
+          "training_real_transition_count": 16384000
+        },
+        {
+          "checkpoint": "checkpoint_validation_010000.pt",
+          "training_real_transition_count": 20480000
+        },
+        {
+          "checkpoint": "checkpoint_validation_012000.pt",
+          "training_real_transition_count": 24576000
+        },
+        {
+          "checkpoint": "checkpoint_validation_014000.pt",
+          "training_real_transition_count": 28672000
+        },
+        {
+          "checkpoint": "checkpoint_validation_016000.pt",
+          "training_real_transition_count": 32768000
+        },
+        {
+          "checkpoint": "checkpoint_validation_018000.pt",
+          "training_real_transition_count": 36864000
+        },
+        {
+          "checkpoint": "checkpoint_validation_020000.pt",
+          "training_real_transition_count": 40960000
+        },
+        {
+          "checkpoint": "checkpoint_validation_022000.pt",
+          "training_real_transition_count": 45056000
+        },
+        {
+          "checkpoint": "checkpoint_validation_024000.pt",
+          "training_real_transition_count": 49152000
+        },
+        {
+          "checkpoint": "checkpoint_validation_026000.pt",
+          "training_real_transition_count": 53248000
+        },
+        {
+          "checkpoint": "checkpoint_validation_028000.pt",
+          "training_real_transition_count": 57344000
+        },
+        {
+          "checkpoint": "checkpoint_validation_030000.pt",
+          "training_real_transition_count": 61440000
+        },
+        {
+          "checkpoint": "checkpoint_validation_032000.pt",
+          "training_real_transition_count": 65536000
+        },
+        {
+          "checkpoint": "checkpoint_validation_034000.pt",
+          "training_real_transition_count": 69632000
+        },
+        {
+          "checkpoint": "checkpoint_validation_036000.pt",
+          "training_real_transition_count": 73728000
+        },
+        {
+          "checkpoint": "checkpoint_validation_038000.pt",
+          "training_real_transition_count": 77824000
+        },
+        {
+          "checkpoint": "checkpoint_validation_040000.pt",
+          "training_real_transition_count": 81920000
+        },
+        {
+          "checkpoint": "checkpoint_validation_042000.pt",
+          "training_real_transition_count": 86016000
+        },
+        {
+          "checkpoint": "checkpoint_validation_044000.pt",
+          "training_real_transition_count": 90112000
+        },
+        {
+          "checkpoint": "checkpoint_validation_046000.pt",
+          "training_real_transition_count": 94208000
+        },
+        {
+          "checkpoint": "checkpoint_validation_048000.pt",
+          "training_real_transition_count": 98304000
+        },
+        {
+          "checkpoint": "checkpoint_validation_050000.pt",
+          "training_real_transition_count": 102400000
+        },
+        {
+          "checkpoint": "checkpoint_validation_052000.pt",
+          "training_real_transition_count": 106496000
+        },
+        {
+          "checkpoint": "checkpoint_validation_054000.pt",
+          "training_real_transition_count": 110592000
+        },
+        {
+          "checkpoint": "checkpoint_validation_056000.pt",
+          "training_real_transition_count": 114688000
+        },
+        {
+          "checkpoint": "checkpoint_validation_058000.pt",
+          "training_real_transition_count": 118784000
+        },
+        {
+          "checkpoint": "checkpoint_validation_060000.pt",
+          "training_real_transition_count": 122880000
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "algorithm_id": "rcpo_allocation_penalty",
+      "training_seed": 0,
+      "hardware_id": "Linux | AMD EPYC 9655 96-Core Processor | thread limits 1/1/1",
+      "timing_protocol_id": "process_peak_rss_and_wall_with_validation_no_plots_v1",
+      "training_real_transition_count": 122880000,
+      "optimizer_step_count": 720000,
+      "shadow_transition_count": 0,
+      "one_step_replacement_count": 0,
+      "training_wall_time_seconds": [
+        35325.73453412703
+      ],
+      "peak_training_memory_bytes": [
+        1597108224
+      ]
+    },
+    {
+      "algorithm_id": "rcpo_allocation_penalty",
+      "training_seed": 1,
+      "hardware_id": "Linux | AMD EPYC 9655 96-Core Processor | thread limits 1/1/1",
+      "timing_protocol_id": "process_peak_rss_and_wall_with_validation_no_plots_v1",
+      "training_real_transition_count": 122880000,
+      "optimizer_step_count": 720000,
+      "shadow_transition_count": 0,
+      "one_step_replacement_count": 0,
+      "training_wall_time_seconds": [
+        35495.325099773996
+      ],
+      "peak_training_memory_bytes": [
+        1597665280
+      ]
+    },
+    {
+      "algorithm_id": "rcpo_allocation_penalty",
+      "training_seed": 2,
+      "hardware_id": "Linux | AMD EPYC 9655 96-Core Processor | thread limits 1/1/1",
+      "timing_protocol_id": "process_peak_rss_and_wall_with_validation_no_plots_v1",
+      "training_real_transition_count": 122880000,
+      "optimizer_step_count": 720000,
+      "shadow_transition_count": 0,
+      "one_step_replacement_count": 0,
+      "training_wall_time_seconds": [
+        34971.06817183702
+      ],
+      "peak_training_memory_bytes": [
+        1594081280
+      ]
+    },
+    {
+      "algorithm_id": "caosd_ppo",
+      "training_seed": 0,
+      "hardware_id": "Linux | AMD EPYC 9655 96-Core Processor | thread limits 1/1/1",
+      "timing_protocol_id": "process_peak_rss_and_wall_with_validation_no_plots_v1",
+      "training_real_transition_count": 122880000,
+      "optimizer_step_count": 720000,
+      "shadow_transition_count": 0,
+      "one_step_replacement_count": 0,
+      "training_wall_time_seconds": [
+        67590.93674294002
+      ],
+      "peak_training_memory_bytes": [
+        1589829632
+      ]
+    },
+    {
+      "algorithm_id": "caosd_ppo",
+      "training_seed": 1,
+      "hardware_id": "Linux | AMD EPYC 9655 96-Core Processor | thread limits 1/1/1",
+      "timing_protocol_id": "process_peak_rss_and_wall_with_validation_no_plots_v1",
+      "training_real_transition_count": 122880000,
+      "optimizer_step_count": 720000,
+      "shadow_transition_count": 0,
+      "one_step_replacement_count": 0,
+      "training_wall_time_seconds": [
+        66772.84855490402
+      ],
+      "peak_training_memory_bytes": [
+        1595113472
+      ]
+    },
+    {
+      "algorithm_id": "caosd_ppo",
+      "training_seed": 2,
+      "hardware_id": "Linux | AMD EPYC 9655 96-Core Processor | thread limits 1/1/1",
+      "timing_protocol_id": "process_peak_rss_and_wall_with_validation_no_plots_v1",
+      "training_real_transition_count": 122880000,
+      "optimizer_step_count": 720000,
+      "shadow_transition_count": 0,
+      "one_step_replacement_count": 0,
+      "training_wall_time_seconds": [
+        67131.12543671302
+      ],
+      "peak_training_memory_bytes": [
+        1593450496
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_shared",
+      "training_seed": 0,
+      "hardware_id": "Linux | AMD EPYC 9655 96-Core Processor | thread limits 1/1/1",
+      "timing_protocol_id": "process_peak_rss_and_wall_with_validation_no_plots_v1",
+      "training_real_transition_count": 122880000,
+      "optimizer_step_count": 720000,
+      "shadow_transition_count": 0,
+      "one_step_replacement_count": 0,
+      "training_wall_time_seconds": [
+        67637.57711312998
+      ],
+      "peak_training_memory_bytes": [
+        1707606016
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_shared",
+      "training_seed": 1,
+      "hardware_id": "Linux | AMD EPYC 9655 96-Core Processor | thread limits 1/1/1",
+      "timing_protocol_id": "process_peak_rss_and_wall_with_validation_no_plots_v1",
+      "training_real_transition_count": 122880000,
+      "optimizer_step_count": 720000,
+      "shadow_transition_count": 0,
+      "one_step_replacement_count": 0,
+      "training_wall_time_seconds": [
+        68898.97703916498
+      ],
+      "peak_training_memory_bytes": [
+        1708875776
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_shared",
+      "training_seed": 2,
+      "hardware_id": "Linux | AMD EPYC 9655 96-Core Processor | thread limits 1/1/1",
+      "timing_protocol_id": "process_peak_rss_and_wall_with_validation_no_plots_v1",
+      "training_real_transition_count": 122880000,
+      "optimizer_step_count": 720000,
+      "shadow_transition_count": 0,
+      "one_step_replacement_count": 0,
+      "training_wall_time_seconds": [
+        66402.28513026802
+      ],
+      "peak_training_memory_bytes": [
+        1714376704
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_standalone",
+      "training_seed": 0,
+      "hardware_id": "Linux | AMD EPYC 9655 96-Core Processor | thread limits 1/1/1",
+      "timing_protocol_id": "process_peak_rss_and_wall_with_validation_no_plots_v1",
+      "training_real_transition_count": 122880000,
+      "optimizer_step_count": 720000,
+      "shadow_transition_count": 0,
+      "one_step_replacement_count": 0,
+      "training_wall_time_seconds": [
+        68913.314971808
+      ],
+      "peak_training_memory_bytes": [
+        1643757568
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_standalone",
+      "training_seed": 1,
+      "hardware_id": "Linux | AMD EPYC 9655 96-Core Processor | thread limits 1/1/1",
+      "timing_protocol_id": "process_peak_rss_and_wall_with_validation_no_plots_v1",
+      "training_real_transition_count": 122880000,
+      "optimizer_step_count": 720000,
+      "shadow_transition_count": 0,
+      "one_step_replacement_count": 0,
+      "training_wall_time_seconds": [
+        68199.86459224098
+      ],
+      "peak_training_memory_bytes": [
+        1648082944
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_standalone",
+      "training_seed": 2,
+      "hardware_id": "Linux | AMD EPYC 9655 96-Core Processor | thread limits 1/1/1",
+      "timing_protocol_id": "process_peak_rss_and_wall_with_validation_no_plots_v1",
+      "training_real_transition_count": 122880000,
+      "optimizer_step_count": 719993,
+      "shadow_transition_count": 0,
+      "one_step_replacement_count": 0,
+      "training_wall_time_seconds": [
+        75819.41652098799
+      ],
+      "peak_training_memory_bytes": [
+        1673588736
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_r",
+      "training_seed": 0,
+      "hardware_id": "Linux | AMD EPYC 9655 96-Core Processor | thread limits 1/1/1",
+      "timing_protocol_id": "process_peak_rss_and_wall_with_validation_no_plots_v1",
+      "training_real_transition_count": 122880000,
+      "optimizer_step_count": 719998,
+      "shadow_transition_count": 0,
+      "one_step_replacement_count": 368640000,
+      "training_wall_time_seconds": [
+        99862.294037599
+      ],
+      "peak_training_memory_bytes": [
+        2081882112
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_r",
+      "training_seed": 1,
+      "hardware_id": "Linux | AMD EPYC 9655 96-Core Processor | thread limits 1/1/1",
+      "timing_protocol_id": "process_peak_rss_and_wall_with_validation_no_plots_v1",
+      "training_real_transition_count": 122880000,
+      "optimizer_step_count": 720000,
+      "shadow_transition_count": 0,
+      "one_step_replacement_count": 368640000,
+      "training_wall_time_seconds": [
+        101708.59151416499
+      ],
+      "peak_training_memory_bytes": [
+        2133872640
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_r",
+      "training_seed": 2,
+      "hardware_id": "Linux | AMD EPYC 9655 96-Core Processor | thread limits 1/1/1",
+      "timing_protocol_id": "process_peak_rss_and_wall_with_validation_no_plots_v1",
+      "training_real_transition_count": 122880000,
+      "optimizer_step_count": 720000,
+      "shadow_transition_count": 0,
+      "one_step_replacement_count": 368640000,
+      "training_wall_time_seconds": [
+        102203.51011546399
+      ],
+      "peak_training_memory_bytes": [
+        2133659648
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_c",
+      "training_seed": 0,
+      "hardware_id": "Linux | AMD EPYC 9655 96-Core Processor | thread limits 1/1/1",
+      "timing_protocol_id": "process_peak_rss_and_wall_with_validation_no_plots_v1",
+      "training_real_transition_count": 122880000,
+      "optimizer_step_count": 719992,
+      "shadow_transition_count": 0,
+      "one_step_replacement_count": 368640000,
+      "training_wall_time_seconds": [
+        106132.37422167102
+      ],
+      "peak_training_memory_bytes": [
+        2161291264
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_c",
+      "training_seed": 1,
+      "hardware_id": "Linux | AMD EPYC 9655 96-Core Processor | thread limits 1/1/1",
+      "timing_protocol_id": "process_peak_rss_and_wall_with_validation_no_plots_v1",
+      "training_real_transition_count": 122880000,
+      "optimizer_step_count": 720000,
+      "shadow_transition_count": 0,
+      "one_step_replacement_count": 368640000,
+      "training_wall_time_seconds": [
+        107176.850886603
+      ],
+      "peak_training_memory_bytes": [
+        2159448064
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_c",
+      "training_seed": 2,
+      "hardware_id": "Linux | AMD EPYC 9655 96-Core Processor | thread limits 1/1/1",
+      "timing_protocol_id": "process_peak_rss_and_wall_with_validation_no_plots_v1",
+      "training_real_transition_count": 122880000,
+      "optimizer_step_count": 720000,
+      "shadow_transition_count": 0,
+      "one_step_replacement_count": 368640000,
+      "training_wall_time_seconds": [
+        107179.950510174
+      ],
+      "peak_training_memory_bytes": [
+        2160513024
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_rc",
+      "training_seed": 0,
+      "hardware_id": "Linux | AMD EPYC 9655 96-Core Processor | thread limits 1/1/1",
+      "timing_protocol_id": "process_peak_rss_and_wall_with_validation_no_plots_v1",
+      "training_real_transition_count": 122880000,
+      "optimizer_step_count": 720000,
+      "shadow_transition_count": 0,
+      "one_step_replacement_count": 368640000,
+      "training_wall_time_seconds": [
+        108343.650826962
+      ],
+      "peak_training_memory_bytes": [
+        2176679936
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_rc",
+      "training_seed": 1,
+      "hardware_id": "Linux | AMD EPYC 9655 96-Core Processor | thread limits 1/1/1",
+      "timing_protocol_id": "process_peak_rss_and_wall_with_validation_no_plots_v1",
+      "training_real_transition_count": 122880000,
+      "optimizer_step_count": 720000,
+      "shadow_transition_count": 0,
+      "one_step_replacement_count": 368640000,
+      "training_wall_time_seconds": [
+        104183.836030226
+      ],
+      "peak_training_memory_bytes": [
+        2174832640
+      ]
+    },
+    {
+      "algorithm_id": "caosd_rcpo_cf_rc",
+      "training_seed": 2,
+      "hardware_id": "Linux | AMD EPYC 9655 96-Core Processor | thread limits 1/1/1",
+      "timing_protocol_id": "process_peak_rss_and_wall_with_validation_no_plots_v1",
+      "training_real_transition_count": 122880000,
+      "optimizer_step_count": 720000,
+      "shadow_transition_count": 0,
+      "one_step_replacement_count": 368640000,
+      "training_wall_time_seconds": [
+        102364.32879214597
+      ],
+      "peak_training_memory_bytes": [
+        2170155008
+      ]
+    }
+  ]
+}

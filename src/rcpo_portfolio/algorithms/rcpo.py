@@ -93,7 +93,10 @@ def update_rcpo_actor_critic(
         if branch_cost_advantages is not None
         else None
     )
-    if model.branch_credit_mode == STANDALONE_REWARD_COUNTERFACTUAL_COST:
+    if (
+        model.branch_credit_mode == STANDALONE_REWARD_COUNTERFACTUAL_COST
+        and not model.matched_branch_credit
+    ):
         # Standalone reward does not contain CAOSD mass, while the cost difference
         # already measures the branch's effect on the full portfolio.
         branch_combined_advantages = (

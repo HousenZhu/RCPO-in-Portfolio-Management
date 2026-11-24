@@ -5,9 +5,13 @@ from pathlib import Path
 from typing import Any
 
 from .branch_credit import (
+    MATCHED_CREDIT_MODES,
+    SHARED_GLOBAL_BRANCH_CREDIT,
+    STANDALONE_REWARD_COUNTERFACTUAL_COST,
+    STANDALONE_REWARD_GLOBAL_COST,
     VALID_BRANCH_CREDIT_MODES,
     uses_branch_credit,
-    uses_counterfactual_context,
+    uses_counterfactual_credit,
 )
 
 import yaml
@@ -103,12 +107,15 @@ class EnvironmentConfig:
     resolved_allocation_constraint_1_min_weight: float | None = None
     resolved_allocation_constraint_2_min_weight: float | None = None
     counterfactual_branch_credit_enabled: bool = False
+    standalone_branch_reward_only: bool = False
+    standalone_branch_cost_enabled: bool = True
 
 
 @dataclass
 class NetworkConfig:
     policy_architecture: str = "flat_gaussian"
     branch_credit_mode: str = "global"
+    matched_branch_credit: bool = False
     hidden_sizes: list[int] = field(default_factory=lambda: [128, 128])
     activation: str = "tanh"
     init_log_std: float = -1.5
@@ -117,10 +124,10 @@ class NetworkConfig:
     dirichlet_min_concentration: float = 0.5
     dirichlet_init_concentration: float = 12.0
     dirichlet_max_concentration: float = 80.0
-    counterfactual_semantics_version: int = 1
+    counterfactual_semantics_version: int = 2
     counterfactual_downstream_mode: str = "open_loop_fixed_downstream"
     counterfactual_neutral_action_mode: str = "branch_uniform"
-    counterfactual_critic_schema_version: int = 1
+    counterfactual_critic_schema_version: int = 2
 
 
 @dataclass
@@ -228,6 +235,7 @@ class LoggingConfig:
     print_interval_updates: int = 1
     branch_diagnostic_interval_updates: int = 50
     live_validation_plot: bool = True
+    validation_checkpoint_interval_updates: int | None = None
 
 @dataclass
 class ProjectConfig:
@@ -246,6 +254,22 @@ class ProjectConfig:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+def counterfactual_checkpoint_metadata(config: ProjectConfig) -> dict[str, int | str]:
+    network = config.network
+    return {
+        "counterfactual_semantics_version": network.counterfactual_semantics_version,
+        "counterfactual_downstream_mode": network.counterfactual_downstream_mode,
+        "counterfactual_neutral_action_mode": network.counterfactual_neutral_action_mode,
+        "counterfactual_critic_schema_version": network.counterfactual_critic_schema_version,
+        "counterfactual_context_dim": (
+            config.market.num_risky_assets + 7
+            if config.environment.counterfactual_branch_credit_enabled
+            and network.counterfactual_critic_schema_version == 1
+            else 0
+        ),
+    }
 
 
 def sync_rcpo_constraint_settings(config: ProjectConfig) -> None:
@@ -284,13 +308,26 @@ def sync_rcpo_constraint_settings(config: ProjectConfig) -> None:
             "network.branch_credit_mode must be one of: "
             f"{sorted(VALID_BRANCH_CREDIT_MODES)}."
         )
+    if config.network.matched_branch_credit and (
+        config.network.branch_credit_mode not in MATCHED_CREDIT_MODES
+        or config.network.counterfactual_semantics_version != 2
+    ):
+        raise ValueError("Matched branch credit requires a supported mode and one-step CF semantics.")
+    if (
+        config.network.branch_credit_mode == SHARED_GLOBAL_BRANCH_CREDIT
+        and not config.network.matched_branch_credit
+    ):
+        raise ValueError("Shared-global branch credit requires network.matched_branch_credit.")
     if (
         uses_branch_credit(config.network.branch_credit_mode)
         and config.environment.action_mode != "simplex_decomposition"
     ):
         raise ValueError("Standalone branch credit requires simplex_decomposition action mode.")
-    if config.network.counterfactual_semantics_version != 1:
-        raise ValueError("Only counterfactual_semantics_version=1 is supported.")
+    if (
+        config.network.counterfactual_semantics_version,
+        config.network.counterfactual_critic_schema_version,
+    ) not in {(1, 1), (2, 2)}:
+        raise ValueError("Counterfactual semantics and critic schema must both be 1 or both be 2.")
     if (
         config.network.counterfactual_downstream_mode
         != "open_loop_fixed_downstream"
@@ -302,10 +339,15 @@ def sync_rcpo_constraint_settings(config: ProjectConfig) -> None:
         raise ValueError(
             "Only counterfactual_neutral_action_mode='branch_uniform' is supported."
         )
-    if config.network.counterfactual_critic_schema_version != 1:
-        raise ValueError("Only counterfactual_critic_schema_version=1 is supported.")
     config.environment.counterfactual_branch_credit_enabled = (
-        uses_counterfactual_context(config.network.branch_credit_mode)
+        uses_counterfactual_credit(config.network.branch_credit_mode)
+    )
+    config.environment.standalone_branch_reward_only = config.network.branch_credit_mode in {
+        STANDALONE_REWARD_GLOBAL_COST,
+        STANDALONE_REWARD_COUNTERFACTUAL_COST,
+    }
+    config.environment.standalone_branch_cost_enabled = (
+        config.network.branch_credit_mode == "standalone"
     )
     config.environment.simplex_action_format = (
         "branch_weights"
@@ -353,6 +395,8 @@ def sync_rcpo_constraint_settings(config: ProjectConfig) -> None:
             "environment.drawdown_benchmark_mode must be either "
             "'true_equal_weight' or 'constrained_neutral'."
         )
+    if config.network.branch_credit_mode == STANDALONE_REWARD_GLOBAL_COST:
+        config.environment.drawdown_benchmark_mode = "constrained_neutral"
     if config.environment.benchmark_drawdown_margin <= 0.0:
         raise ValueError("environment.benchmark_drawdown_margin must be positive.")
     if config.environment.drawdown_cost_scale <= 0.0:
@@ -422,6 +466,12 @@ def sync_rcpo_constraint_settings(config: ProjectConfig) -> None:
         raise ValueError("evaluation.fixed_anchor_seed cannot be negative.")
     if config.evaluation.fixed_anchor_steps < 1:
         raise ValueError("evaluation.fixed_anchor_steps must be positive.")
+    snapshot_interval = config.logging.validation_checkpoint_interval_updates
+    if snapshot_interval is not None and (
+        snapshot_interval < 1
+        or snapshot_interval % max(1, config.evaluation.validation_interval_updates)
+    ):
+        raise ValueError("Validation checkpoint interval must be a positive multiple of validation interval.")
     if (
         config.evaluation.fixed_anchor_generation_lookback is not None
         and config.evaluation.fixed_anchor_generation_lookback < 1

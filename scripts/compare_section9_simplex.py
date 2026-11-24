@@ -818,15 +818,18 @@ def plot_bar_with_points(
     title: str,
     ylabel: str,
     metric_by_policy: dict[str, list[float]],
+    *,
+    colors: dict[str, str] | None = None,
 ) -> None:
     labels = list(metric_by_policy)
     means = [float(np.mean(metric_by_policy[label])) for label in labels]
     x = np.arange(len(labels))
+    palette = colors or {label: policy_color(label) for label in labels}
     plt.figure(figsize=(10, 5.5))
     plt.bar(
         x,
         means,
-        color=[policy_color(label) for label in labels],
+        color=[palette[label] for label in labels],
         alpha=0.78,
     )
     rng = np.random.default_rng(123)
@@ -836,7 +839,7 @@ def plot_bar_with_points(
         plt.scatter(
             np.full(len(values), index) + jitter,
             values,
-            color=policy_color(label),
+            color=palette[label],
             alpha=0.6,
             s=20,
             edgecolors="#202020",
@@ -855,6 +858,8 @@ def plot_validation_history(
     histories: dict[str, list[dict[str, float]]],
     *,
     max_update: float | None = None,
+    colors: dict[str, str] | None = None,
+    title: str = "Section 9: Validation Relative Wealth History",
 ) -> None:
     plt.figure(figsize=(10, 5.5))
     for label, rows in histories.items():
@@ -867,12 +872,12 @@ def plot_validation_history(
         plt.plot(
             updates,
             scores,
-            color=policy_color(label),
+            color=colors[label] if colors is not None else policy_color(label),
             linewidth=1.8,
             label=label,
         )
     plt.axhline(0.0, color="#777777", linewidth=0.8, alpha=0.5)
-    plt.title("Section 9: Validation Relative Wealth History")
+    plt.title(title)
     plt.xlabel("Training Update")
     plt.ylabel("Relative Wealth vs Constrained-Neutral Baseline")
     apply_signed_percent_axis(plt.gca())

@@ -1,0 +1,5 @@
+extends: base.yaml
+experiment:
+  run_name: paper_gaussian_shared
+network:
+  branch_credit_mode: shared_global_branch

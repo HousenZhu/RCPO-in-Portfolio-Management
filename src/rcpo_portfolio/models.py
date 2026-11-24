@@ -60,6 +60,7 @@ class ActorCritic(nn.Module):
         super().__init__()
         self.policy_architecture = config.policy_architecture
         self.branch_credit_mode = config.branch_credit_mode
+        self.matched_branch_credit = config.matched_branch_credit
         self.action_dim = int(action_dim)
         self.branch_sizes = [int(size) for size in (branch_sizes or [])]
         self.branch_train_mask = (
@@ -87,7 +88,7 @@ class ActorCritic(nn.Module):
             self.branch_reward_values = nn.ModuleList(
                 [nn.Linear(reward_input_dim, 1) for _ in self.branch_sizes]
             )
-            if self.branch_credit_mode == "standalone" or uses_counterfactual_cost(
+            if self.matched_branch_credit or self.branch_credit_mode == "standalone" or uses_counterfactual_cost(
                 self.branch_credit_mode
             ):
                 cost_input_dim = feature_dim + (
@@ -202,7 +203,7 @@ class ActorCritic(nn.Module):
                 )
 
         def critic_input(branch_index: int, use_context: bool) -> torch.Tensor:
-            if not use_context:
+            if not use_context or self.counterfactual_context_dim == 0:
                 return features
             if counterfactual_context is None:
                 raise RuntimeError("Counterfactual critic context is unavailable.")
@@ -230,7 +231,7 @@ class ActorCritic(nn.Module):
             ],
             dim=-1,
         )
-        if self.branch_credit_mode == "standalone" or uses_counterfactual_cost(
+        if self.matched_branch_credit or self.branch_credit_mode == "standalone" or uses_counterfactual_cost(
             self.branch_credit_mode
         ):
             cost_values = torch.cat(

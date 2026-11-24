@@ -32,6 +32,14 @@ runs/**
 !runs/**/
 !runs/**/evaluation/**/*.png
 !runs/**/evaluation_*/**/*.png
+/runs/v4.1/
+
+# Publish only presentation artifacts from the V4.1 evaluation.
+/evaluation/v4.1/**
+!/evaluation/v4.1/**/
+!/evaluation/v4.1/**/*.png
+!/evaluation/v4.1/**/*.pdf
+!/evaluation/v4.1/**/*.md
 
 # Model binaries, raw training logs, scheduler output, and locks
 *.pt

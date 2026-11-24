@@ -1,0 +1,5 @@
+extends: base.yaml
+experiment:
+  run_name: paper_gaussian_cf_c
+network:
+  branch_credit_mode: standalone_reward_counterfactual_open_loop_cost

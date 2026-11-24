@@ -1,8 +1,14 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
-from rcpo_portfolio.config import EnvironmentConfig, MarketConfig
+from rcpo_portfolio.config import (
+    EnvironmentConfig,
+    MarketConfig,
+    ProjectConfig,
+    sync_rcpo_constraint_settings,
+)
 from rcpo_portfolio.env import PortfolioEnv
 from rcpo_portfolio.market import MarketSlice
 
@@ -170,8 +176,9 @@ def test_counterfactual_neutral_replacement_is_online_and_zero_at_neutral_action
     neutral_action = env.neutral_action()
     env.reset(options={"start_index": 2})
 
-    context = env.counterfactual_critic_context()
-    assert context.shape == (4, env.num_assets + 6)
+    assert env.state is not None
+    assert env.state.standalone is None
+    assert env.state.branch_weights == ()
     _, reward, _, _, info = env.step(neutral_action)
 
     active = np.asarray(env.simplex_branch_train_mask(), dtype=bool)
@@ -184,10 +191,11 @@ def test_counterfactual_neutral_replacement_is_online_and_zero_at_neutral_action
     assert info["counterfactual_mapping_failure_count"] == 0
 
 
-def test_counterfactual_branch_uses_own_turnover_and_stateful_path() -> None:
+def test_counterfactual_branch_reuses_actual_weights_wealth_and_peak() -> None:
     env = build_project_simplex_env(
         initial_portfolio_mode="constrained_neutral",
         counterfactual_branch_credit_enabled=True,
+        constraint_mode="relative_current_drawdown",
         drawdown_budget_floor=0.001,
     )
     env.reset(options={"start_index": 4})
@@ -204,13 +212,84 @@ def test_counterfactual_branch_uses_own_turnover_and_stateful_path() -> None:
         first["branch_delta_rewards"][1],
         reward - first["counterfactual_branch_rewards"][1],
     )
-    first_counterfactual_weights = env.state.counterfactual_weights[1].copy()
-
-    env.step(action)
-    np.testing.assert_allclose(
-        env.state.counterfactual_weights[1], first_counterfactual_weights, atol=1e-8
+    assert env.state is not None
+    previous_weights = env.state.weights.copy()
+    previous_wealth = env.state.portfolio_value
+    previous_peak = env.state.running_peak_value
+    replacement = env._counterfactual_weights_from_action(action, 1)
+    assert not np.allclose(previous_weights, replacement)
+    turnover = np.abs(replacement - previous_weights).sum()
+    net = float(
+        replacement[1:] @ env.market.risky_returns[env.state.current_index]
+        - env.transaction_cost_rate * turnover
     )
-    assert env.state.counterfactual_previous_turnovers[1] >= 0.0
+    wealth = previous_wealth * (1.0 + net)
+    drawdown = 1.0 - wealth / max(wealth, previous_peak)
+
+    _, _, _, _, second = env.step(action)
+    budget = second["effective_drawdown_budget"]
+    cost = max(0.0, drawdown - budget) ** 2 / env.config.drawdown_cost_scale
+    np.testing.assert_allclose(second["counterfactual_branch_rewards"][1], np.log1p(net))
+    np.testing.assert_allclose(second["counterfactual_turnover_differences"][1], -turnover)
+    np.testing.assert_allclose(second["counterfactual_branch_costs"][1], cost, atol=1e-8)
+    np.testing.assert_allclose(
+        second["branch_delta_costs"][1], second["constraint_cost"] - cost, atol=1e-8
+    )
+
+    _, _, _, _, neutral = env.step(env.neutral_action())
+    assert neutral["turnover"] > 0.0
+    np.testing.assert_allclose(neutral["branch_delta_rewards"], 0.0, atol=1e-8)
+    np.testing.assert_allclose(neutral["branch_delta_costs"], 0.0, atol=1e-8)
+    assert env.state.standalone is None
+    assert env.state.branch_weights == ()
+
+
+@pytest.mark.parametrize(
+    "credit_mode",
+    ["standalone_reward_global_cost", "standalone_reward_counterfactual_open_loop_cost"],
+)
+def test_standalone_reward_without_branch_accounts(credit_mode: str) -> None:
+    standalone_env = build_project_simplex_env(
+        initial_portfolio_mode="constrained_neutral",
+        constraint_mode="relative_current_drawdown",
+        observation_schema_version=2,
+        drawdown_budget_floor=0.001,
+    )
+    reward_only_env = build_project_simplex_env(
+        initial_portfolio_mode="constrained_neutral",
+        observation_schema_version=2,
+        drawdown_budget_floor=0.001,
+        drawdown_benchmark_mode=(
+            "true_equal_weight"
+            if credit_mode == "standalone_reward_global_cost"
+            else "constrained_neutral"
+        ),
+    )
+    config = ProjectConfig(
+        market=reward_only_env.market_config,
+        environment=reward_only_env.config,
+    )
+    config.network.branch_credit_mode = credit_mode
+    config.rcpo.constraint_mode = "relative_current_drawdown"
+    sync_rcpo_constraint_settings(config)
+    reward_only_env = PortfolioEnv(
+        config.environment, reward_only_env.market, config.market
+    )
+    for env in (standalone_env, reward_only_env):
+        env.reset(options={"start_index": 4})
+    action = reward_only_env.neutral_action()
+    action[1:4] = [4.0, -2.0, -2.0]
+    for chosen_action in (action, reward_only_env.neutral_action()):
+        expected = standalone_env.step(chosen_action)[-1]
+        actual = reward_only_env.step(chosen_action)[-1]
+        for key in (
+            "weights", "branch_rewards", "branch_turnovers", "portfolio_value",
+            "benchmark_portfolio_value", "effective_drawdown_budget", "constraint_cost",
+        ):
+            np.testing.assert_allclose(actual[key], expected[key])
+        assert actual["drawdown_benchmark_mode"] == "constrained_neutral"
+        np.testing.assert_allclose(actual["branch_max_drawdowns"], 0.0)
+        assert reward_only_env.state is not None and reward_only_env.state.standalone is None
 
 
 def test_standalone_branch_reward_and_cost_use_same_market_step() -> None:

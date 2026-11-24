@@ -6,7 +6,9 @@ import numpy as np
 import torch
 
 from .branch_credit import (
-    uses_counterfactual_context,
+    SHARED_GLOBAL_BRANCH_CREDIT,
+    STANDALONE_REWARD_GLOBAL_COST,
+    uses_counterfactual_credit,
     uses_counterfactual_cost,
     uses_counterfactual_reward,
 )
@@ -46,7 +48,6 @@ class RolloutBatch:
     branch_reward_advantages: torch.Tensor
     branch_cost_advantages: torch.Tensor
     info_summary: dict[str, float | int | str]
-    branch_critic_contexts: torch.Tensor | None = None
     episode_constraint_gaps: tuple[float, ...] = ()
 
 
@@ -94,6 +95,10 @@ def collect_rollout(
     profiler: TrainingProfiler | None = None,
 ) -> RolloutBatch:
     device = device or next(model.parameters()).device
+    standalone_reward_global_cost = (
+        model.branch_credit_mode == STANDALONE_REWARD_GLOBAL_COST
+    )
+    shared_global_credit = model.branch_credit_mode == SHARED_GLOBAL_BRANCH_CREDIT
     observations: list[np.ndarray] = []
     actions: list[np.ndarray] = []
     next_observations: list[np.ndarray] = []
@@ -113,7 +118,6 @@ def collect_rollout(
     branch_turnovers: list[np.ndarray] = []
     branch_transaction_costs: list[np.ndarray] = []
     branch_max_drawdowns: list[np.ndarray] = []
-    branch_critic_contexts: list[np.ndarray] = []
     branch_actual_rewards: list[np.ndarray] = []
     branch_counterfactual_rewards: list[np.ndarray] = []
     branch_delta_rewards: list[np.ndarray] = []
@@ -162,23 +166,8 @@ def collect_rollout(
     for _ in range(optimization.rollout_steps):
         with profile_section(profiler, "policy_action_forward"):
             obs_tensor = torch.as_tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
-            critic_context = (
-                env.counterfactual_critic_context()
-                if uses_counterfactual_context(model.branch_credit_mode)
-                else np.zeros((4, 0), dtype=np.float32)
-            )
-            critic_context_tensor = (
-                torch.as_tensor(
-                    critic_context, dtype=torch.float32, device=device
-                ).unsqueeze(0)
-                if uses_counterfactual_context(model.branch_credit_mode)
-                else None
-            )
             with torch.no_grad():
-                policy_output = model.get_policy_output(
-                    obs_tensor,
-                    counterfactual_context=critic_context_tensor,
-                )
+                policy_output = model.get_policy_output(obs_tensor)
                 action_tensor = policy_output.action
                 log_prob_tensor = policy_output.log_prob
                 reward_value_tensor = policy_output.reward_value
@@ -210,7 +199,6 @@ def collect_rollout(
             branch_cost_values.append(
                 policy_output.branch_cost_values.squeeze(0).cpu().numpy().astype(np.float32)
             )
-            branch_critic_contexts.append(critic_context)
             actual_branch_rewards = np.asarray(info["branch_rewards"], dtype=np.float32)
             actual_branch_costs = np.asarray(info["branch_costs"], dtype=np.float32)
             counterfactual_rewards = np.asarray(
@@ -232,9 +220,10 @@ def collect_rollout(
             branch_counterfactual_costs.append(counterfactual_costs)
             branch_delta_costs.append(delta_costs)
             branch_rewards.append(
-                delta_rewards
-                if uses_counterfactual_reward(model.branch_credit_mode)
-                else actual_branch_rewards
+                np.full(4, float(reward), dtype=np.float32)
+                if shared_global_credit
+                else (delta_rewards if uses_counterfactual_reward(model.branch_credit_mode)
+                      else actual_branch_rewards)
             )
             branch_costs.append(
                 delta_costs
@@ -267,9 +256,10 @@ def collect_rollout(
             branch_transaction_costs.append(
                 np.asarray(info["branch_transaction_costs"], dtype=np.float32)
             )
-            branch_max_drawdowns.append(
-                np.asarray(info["branch_max_drawdowns"], dtype=np.float32)
-            )
+            if not standalone_reward_global_cost:
+                branch_max_drawdowns.append(
+                    np.asarray(info["branch_max_drawdowns"], dtype=np.float32)
+                )
             current_drawdowns.append(float(info["current_drawdown"]))
             max_drawdowns.append(float(info["max_drawdown"]))
             benchmark_current_drawdowns.append(float(info["benchmark_current_drawdown"]))
@@ -350,17 +340,9 @@ def collect_rollout(
             episode_steps = 0
 
     with profile_section(profiler, "policy_action_forward"):
-        next_context_tensor = None
-        if uses_counterfactual_context(model.branch_credit_mode):
-            next_context_tensor = torch.as_tensor(
-                env.counterfactual_critic_context(),
-                dtype=torch.float32,
-                device=device,
-            ).unsqueeze(0)
         next_value_r, next_value_c, next_branch_value_r, next_branch_value_c = (
             model.value_with_branches(
                 torch.as_tensor(obs, dtype=torch.float32, device=device).unsqueeze(0),
-                counterfactual_context=next_context_tensor,
             )
         )
     with profile_section(profiler, "tensor_conversion"):
@@ -433,9 +415,6 @@ def collect_rollout(
         branch_cost_values_tensor = torch.as_tensor(
             np.asarray(branch_cost_values), dtype=torch.float32, device=device
         )
-        branch_critic_contexts_tensor = torch.as_tensor(
-            np.asarray(branch_critic_contexts), dtype=torch.float32, device=device
-        )
     with profile_section(profiler, "reward_gae"):
         reward_advantages, reward_returns = compute_gae(
             rewards_tensor,
@@ -481,6 +460,13 @@ def collect_rollout(
                 branch_rewards_tensor
             )
             branch_cost_returns = cost_returns.unsqueeze(-1).expand_as(
+                branch_rewards_tensor
+            )
+        if shared_global_credit:
+            branch_reward_advantages = reward_advantages.unsqueeze(-1).expand_as(
+                branch_rewards_tensor
+            )
+            branch_reward_returns = reward_returns.unsqueeze(-1).expand_as(
                 branch_rewards_tensor
             )
     else:
@@ -603,12 +589,13 @@ def collect_rollout(
         info_summary[f"batch_branch_{number}_transaction_cost_mean"] = float(
             np.mean(np.asarray(branch_transaction_costs)[:, branch_index])
         )
-        info_summary[f"batch_branch_{number}_drawdown_cost_mean"] = float(
-            branch_costs_tensor[:, branch_index].mean().item()
-        )
-        info_summary[f"batch_branch_{number}_max_drawdown_mean"] = float(
-            np.mean(np.asarray(branch_max_drawdowns)[:, branch_index])
-        )
+        if not standalone_reward_global_cost:
+            info_summary[f"batch_branch_{number}_drawdown_cost_mean"] = float(
+                branch_costs_tensor[:, branch_index].mean().item()
+            )
+            info_summary[f"batch_branch_{number}_max_drawdown_mean"] = float(
+                np.mean(np.asarray(branch_max_drawdowns)[:, branch_index])
+            )
         info_summary[f"batch_branch_{number}_z_mean"] = float(
             branch_z_values_tensor[:, branch_index].mean().item()
         )
@@ -618,7 +605,7 @@ def collect_rollout(
         info_summary[f"batch_branch_{number}_cost_advantage_std"] = float(
             branch_cost_advantages[:, branch_index].std(unbiased=False).item()
         )
-        if uses_counterfactual_context(model.branch_credit_mode):
+        if uses_counterfactual_credit(model.branch_credit_mode):
             actual_rewards_array = np.asarray(branch_actual_rewards)[:, branch_index]
             counterfactual_rewards_array = np.asarray(
                 branch_counterfactual_rewards
@@ -702,7 +689,6 @@ def collect_rollout(
         branch_cost_returns=branch_cost_returns.detach(),
         branch_reward_advantages=branch_reward_advantages.detach(),
         branch_cost_advantages=branch_cost_advantages.detach(),
-        branch_critic_contexts=branch_critic_contexts_tensor,
         info_summary=info_summary,
         episode_constraint_gaps=episode_constraint_gaps,
     )

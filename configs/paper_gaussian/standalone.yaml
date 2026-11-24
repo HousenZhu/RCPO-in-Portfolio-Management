@@ -1,0 +1,3 @@
+extends: base.yaml
+experiment:
+  run_name: paper_gaussian_standalone

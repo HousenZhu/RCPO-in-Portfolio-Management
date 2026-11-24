@@ -8,6 +8,7 @@ import pytest
 import torch
 
 from rcpo_portfolio.config import ProjectConfig, load_config
+from rcpo_portfolio.evaluation import load_checkpoint_for_evaluation
 from rcpo_portfolio.market import generate_market_splits
 from rcpo_portfolio.trainer import resume_experiment, run_experiment
 
@@ -623,8 +624,11 @@ def test_short_counterfactual_reward_cost_rcpo_run(
         "reward_cost"
     ):
         assert "branch_delta_cost_critic_ev_2" in metric
-    assert checkpoint["counterfactual_semantics_version"] == 1
-    assert checkpoint["counterfactual_context_dim"] == config.market.num_risky_assets + 7
+    assert checkpoint["counterfactual_semantics_version"] == 2
+    assert checkpoint["counterfactual_critic_schema_version"] == 2
+    assert checkpoint["counterfactual_context_dim"] == 0
+    _, _, model, _ = load_checkpoint_for_evaluation(run_dir, "checkpoint_last.pt")
+    assert model.counterfactual_context_dim == 0
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is not available")

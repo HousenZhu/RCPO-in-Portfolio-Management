@@ -1,0 +1,5 @@
+extends: base.yaml
+experiment:
+  run_name: paper_gaussian_cf_r
+network:
+  branch_credit_mode: counterfactual_open_loop_reward_global_cost
